@@ -34,6 +34,10 @@ from domain.planning.output_planner import (
     DomainPlanningConstraints,
     SearchParameters,
     ObjectiveFunction,
+    RankingRequest,
+    RankingResult,
+    RankingCriterion,
+    RankingCriterionType,
 )
 
 router = APIRouter()
@@ -100,6 +104,18 @@ class PlanningRequestModel(BaseModel):
     domain_constraints: DomainPlanningConstraintsModel = DomainPlanningConstraintsModel()
     search_parameters: SearchParametersModel = SearchParametersModel()
     objective: ObjectiveFunctionModel = ObjectiveFunctionModel()
+    ranking: Optional["RankingRequestModel"] = None
+
+
+class RankingCriterionModel(BaseModel):
+    id: str
+    type: RankingCriterionType
+    material_constraint: Optional[ParameterConstraintSpecModel] = None
+
+
+class RankingRequestModel(BaseModel):
+    max_plans_per_criterion: int = 5
+    criteria: List[RankingCriterionModel] = []
 
 
 class MaterialRequirementNodeModel(BaseModel):
@@ -158,6 +174,13 @@ class PlanCandidateModel(BaseModel):
 class PlanningResponseModel(BaseModel):
     success: bool
     plans: List[PlanCandidateModel] = []
+    rankings: List["RankingResultModel"] = []
+    remaining_plan_ids: List[str] = []
+
+
+class RankingResultModel(BaseModel):
+    criterion_id: str
+    ranked_plan_ids: List[str] = []
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
@@ -280,7 +303,30 @@ def plan_target(project_id: uuid.UUID, request_data: PlanningRequestModel, db: S
         objective=objective
     )
     
-    result = service.plan(planning_request)
+    # Convert ranking request if provided
+    ranking_request = None
+    if request_data.ranking:
+        ranking_request = RankingRequest(
+            max_plans_per_criterion=request_data.ranking.max_plans_per_criterion,
+            criteria=[
+                RankingCriterion(
+                    id=criterion.id,
+                    type=criterion.type,
+                    material_constraint=ParameterConstraintSpec(
+                        domain=criterion.material_constraint.domain,
+                        key=criterion.material_constraint.key,
+                        operator=criterion.material_constraint.operator,
+                        value_string=criterion.material_constraint.value_string,
+                        value_number=criterion.material_constraint.value_number,
+                        value_boolean=criterion.material_constraint.value_boolean,
+                        is_wildcard=criterion.material_constraint.is_wildcard
+                    ) if criterion.material_constraint else None
+                )
+                for criterion in request_data.ranking.criteria
+            ]
+        )
+    
+    result = service.plan(planning_request, ranking_request)
     
     # Convert domain models back to Pydantic models
     def node_to_dict(node):
@@ -369,4 +415,18 @@ def plan_target(project_id: uuid.UUID, request_data: PlanningRequestModel, db: S
         )
         plans.append(plan_model)
     
-    return PlanningResponseModel(success=result.success, plans=plans)
+    # Convert rankings
+    rankings = [
+        RankingResultModel(
+            criterion_id=ranking.criterion_id,
+            ranked_plan_ids=ranking.ranked_plan_ids
+        )
+        for ranking in result.rankings
+    ]
+    
+    return PlanningResponseModel(
+        success=result.success,
+        plans=plans,
+        rankings=rankings,
+        remaining_plan_ids=result.remaining_plan_ids
+    )

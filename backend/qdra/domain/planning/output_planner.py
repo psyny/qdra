@@ -31,6 +31,15 @@ class ObjectiveMode(Enum):
 class CriterionKind(Enum):
     MATERIAL = "material"
     RECIPE_COUNT = "recipe_count"
+    RECIPE_TYPES = "recipe_types"
+    GRAPH_DEPTH = "graph_depth"
+
+
+class RankingCriterionType(Enum):
+    MINIMIZE_MATERIAL_REQUIREMENT = "minimize_material_requirement"
+    MINIMIZE_RECIPE_EXECUTIONS = "minimize_recipe_executions"
+    MINIMIZE_RECIPE_TYPES = "minimize_recipe_types"
+    MINIMIZE_GRAPH_DEPTH = "minimize_graph_depth"
 
 
 @dataclass
@@ -174,3 +183,64 @@ class PlanningResponse:
     """Response from planning service."""
     success: bool
     plans: List[PlanCandidate] = field(default_factory=list)
+    rankings: List["RankingResult"] = field(default_factory=list)
+    remaining_plan_ids: List[str] = field(default_factory=list)
+
+
+@dataclass
+class MaterialRequirementSummary:
+    """Summary of a material requirement in a plan."""
+    constraint: ParameterConstraintSpec
+    quantity: float
+
+
+@dataclass
+class PlanSummary:
+    """Summary metrics for a plan used in ranking."""
+    plan_id: str
+    recipe_execution_count: int = 0
+    recipe_type_count: int = 0
+    graph_depth: int = 0
+    material_requirements: List[MaterialRequirementSummary] = field(default_factory=list)
+
+
+@dataclass
+class RankingCriterion:
+    """A single ranking criterion."""
+    id: str
+    type: RankingCriterionType
+    material_constraint: Optional[ParameterConstraintSpec] = None  # For material-based criteria
+
+
+@dataclass
+class RankingRequest:
+    """Request for plan ranking."""
+    max_plans_per_criterion: int = 5
+    criteria: List[RankingCriterion] = field(default_factory=list)
+
+
+@dataclass
+class RankingResult:
+    """Result of ranking plans by a criterion."""
+    criterion_id: str
+    ranked_plan_ids: List[str] = field(default_factory=list)
+
+
+@dataclass
+class MemoizationCacheKey:
+    """Key for memoization cache."""
+    target_constraints: List[ParameterConstraintSpec]
+    target_quantity: float
+    domain_constraints: DomainPlanningConstraints
+    search_depth_remaining: int
+    forbidden_recipe_ids: List[uuid.UUID]
+    forbidden_materials: List[MaterialConstraintRule]
+    do_not_expand_materials: List[MaterialConstraintRule]
+    allow_loops: bool
+
+
+@dataclass
+class MemoizedPlanningResult:
+    """Cached result of a planning subproblem."""
+    success: bool
+    candidate_subplans: List[PlanCandidate] = field(default_factory=list)

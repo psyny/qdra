@@ -37,7 +37,15 @@ from domain.planning.output_planner import (
     DomainPlanningConstraints,
     SearchParameters,
     ObjectiveFunction,
+    RankingRequest,
+    RankingResult,
+    RankingCriterion,
+    RankingCriterionType,
 )
+
+from services.planning.plan_summary_service import PlanSummaryService
+from services.planning.plan_ranking_service import PlanRankingService
+from services.planning.planner_memoization_cache import PlannerMemoizationCache
 
 
 @dataclass
@@ -61,8 +69,11 @@ class PlanningService:
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
         self.project_repo = ProjectRepository(db)
+        self.summary_service = PlanSummaryService()
+        self.ranking_service = PlanRankingService()
+        self.memoization_cache = PlannerMemoizationCache()
 
-    def plan(self, request: PlanningRequest) -> PlanningResponse:
+    def plan(self, request: PlanningRequest, ranking_request: Optional[RankingRequest] = None) -> PlanningResponse:
         """Generate plan candidates for a target requirement."""
         start_time = time.time()
         
@@ -100,19 +111,46 @@ class PlanningService:
             parent_node_id=None
         )
         
-        # Rank plans by objective
-        ranked_plans = self._rank_plans(plans, request.objective)
+        # Generate plan IDs
+        for i, plan in enumerate(plans):
+            plan.plan_id = f"plan_{i:03d}"
         
-        # Limit to max solutions
-        max_solutions = request.search_parameters.max_solutions_returned
-        final_plans = ranked_plans[:max_solutions]
+        # Determine ranking criteria
+        ranking_to_use = ranking_request
+        if ranking_to_use is None:
+            # Use objective function as ranking criteria if available
+            if request.objective.criteria:
+                ranking_to_use = self._objective_to_ranking(request.objective)
+            else:
+                # Default: minimize recipe executions
+                ranking_to_use = RankingRequest(
+                    max_plans_per_criterion=10,
+                    criteria=[
+                        RankingCriterion(
+                            id="default_recipe_executions",
+                            type=RankingCriterionType.MINIMIZE_RECIPE_EXECUTIONS
+                        )
+                    ]
+                )
+        
+        # Rank plans
+        rankings, remaining_plan_ids = self.ranking_service.rank_plans(plans, ranking_to_use)
+        
+        # Return all generated plans (ranking indicates which are top K)
+        # max_solutions_returned limits the search, not the final output
+        final_plans = plans
         
         # Add diagnostics
         elapsed_ms = (time.time() - start_time) * 1000
         for plan in final_plans:
             plan.diagnostics.search_time_ms = elapsed_ms
         
-        return PlanningResponse(success=True, plans=final_plans)
+        return PlanningResponse(
+            success=True,
+            plans=final_plans,
+            rankings=rankings,
+            remaining_plan_ids=remaining_plan_ids
+        )
     
     def _load_recipe_structure(self, recipe_id: uuid.UUID) -> Dict:
         """Load complete recipe structure."""
@@ -356,20 +394,19 @@ class PlanningService:
             
             if slot_success:
                 any_producer_succeeded = True
-                # Only add plan at this level if no deeper sub-call already added one
-                if len(plans) == plans_before:
-                    plan = PlanCandidate(
-                        success=True,
-                        plan_id=self._generate_node_id("plan"),
-                        graph=branch_state.graph,
-                        root_requirements=branch_state.root_requirements,
-                        blocked_requirements=branch_state.blocked_requirements,
-                        score=ObjectiveScore(
-                            material_costs=branch_state.material_costs,
-                            recipe_count=branch_state.recipe_execution_count
-                        )
+                # Add plan for this branch
+                plan = PlanCandidate(
+                    success=True,
+                    plan_id=self._generate_node_id("plan"),
+                    graph=branch_state.graph,
+                    root_requirements=branch_state.root_requirements,
+                    blocked_requirements=branch_state.blocked_requirements,
+                    score=ObjectiveScore(
+                        material_costs=branch_state.material_costs,
+                        recipe_count=branch_state.recipe_execution_count
                     )
-                    plans.append(plan)
+                )
+                plans.append(plan)
         
         state.recursion_stack.pop()
         return any_producer_succeeded
@@ -502,6 +539,45 @@ class PlanningService:
                 tuple_values.append(float(plan.score.recipe_count))
         
         return tuple_values
+    
+    def _objective_to_ranking(self, objective: ObjectiveFunction) -> RankingRequest:
+        """Convert objective function to ranking request."""
+        criteria = []
+        for i, obj_criterion in enumerate(objective.criteria):
+            if obj_criterion.kind == CriterionKind.MATERIAL:
+                criteria.append(
+                    RankingCriterion(
+                        id=f"material_{i}",
+                        type=RankingCriterionType.MINIMIZE_MATERIAL_REQUIREMENT,
+                        material_constraint=obj_criterion.constraints[0] if obj_criterion.constraints else None
+                    )
+                )
+            elif obj_criterion.kind == CriterionKind.RECIPE_COUNT:
+                criteria.append(
+                    RankingCriterion(
+                        id=f"recipe_count_{i}",
+                        type=RankingCriterionType.MINIMIZE_RECIPE_EXECUTIONS
+                    )
+                )
+            elif obj_criterion.kind == CriterionKind.RECIPE_TYPES:
+                criteria.append(
+                    RankingCriterion(
+                        id=f"recipe_types_{i}",
+                        type=RankingCriterionType.MINIMIZE_RECIPE_TYPES
+                    )
+                )
+            elif obj_criterion.kind == CriterionKind.GRAPH_DEPTH:
+                criteria.append(
+                    RankingCriterion(
+                        id=f"graph_depth_{i}",
+                        type=RankingCriterionType.MINIMIZE_GRAPH_DEPTH
+                    )
+                )
+        
+        return RankingRequest(
+            max_plans_per_criterion=10,
+            criteria=criteria
+        )
     
     @staticmethod
     def print_plan_graph(plan_response: dict) -> None:
