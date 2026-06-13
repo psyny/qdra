@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from db.session import get_db
@@ -17,11 +17,9 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     name: str
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)

@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from db.session import get_db
@@ -12,11 +12,9 @@ router = APIRouter()
 
 
 class MaterialResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_id: uuid.UUID
-
-    class Config:
-        from_attributes = True
 
 
 class ParameterCreate(BaseModel):
@@ -28,6 +26,7 @@ class ParameterCreate(BaseModel):
 
 
 class ParameterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     material_id: uuid.UUID
     domain: str
@@ -35,9 +34,6 @@ class ParameterResponse(BaseModel):
     value_string: Optional[str]
     value_number: Optional[float]
     value_boolean: Optional[bool]
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/projects/{project_id}/materials", response_model=MaterialResponse, status_code=201)

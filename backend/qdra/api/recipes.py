@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from db.session import get_db
@@ -16,12 +16,10 @@ class RecipeCreate(BaseModel):
 
 
 class RecipeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_id: uuid.UUID
     name: str
-
-    class Config:
-        from_attributes = True
 
 
 class SlotCreate(BaseModel):
@@ -29,12 +27,10 @@ class SlotCreate(BaseModel):
 
 
 class SlotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     recipe_id: uuid.UUID
     kind: str
-
-    class Config:
-        from_attributes = True
 
 
 class OptionCreate(BaseModel):
@@ -42,12 +38,10 @@ class OptionCreate(BaseModel):
 
 
 class OptionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     slot_id: uuid.UUID
     quantity: float
-
-    class Config:
-        from_attributes = True
 
 
 class ConstraintCreate(BaseModel):
@@ -61,6 +55,7 @@ class ConstraintCreate(BaseModel):
 
 
 class ConstraintResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     option_id: uuid.UUID
     domain: str
@@ -70,9 +65,6 @@ class ConstraintResponse(BaseModel):
     value_number: Optional[float]
     value_boolean: Optional[bool]
     is_wildcard: bool
-
-    class Config:
-        from_attributes = True
 
 
 @router.post("/projects/{project_id}/recipes", response_model=RecipeResponse, status_code=201)

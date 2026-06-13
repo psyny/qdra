@@ -42,13 +42,13 @@ rebuild: ## Rebuild and restart all services
 ps: ## Show running containers
 	docker-compose ps
 
-db-reset: ## Drop and recreate test database
+db-reset: ## Drop and recreate main database
 	docker-compose up -d postgres
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 3
-	docker exec qdra-postgres-1 psql -U qdra -c "DROP DATABASE IF EXISTS qdra_test;"
-	docker exec qdra-postgres-1 psql -U qdra -c "CREATE DATABASE qdra_test;"
-	@echo "Test database reset"
+	docker exec qdra-postgres-1 psql -U qdra -c "DROP DATABASE IF EXISTS qdra;"
+	docker exec qdra-postgres-1 psql -U qdra -c "CREATE DATABASE qdra;"
+	@echo "Main database reset"
 
 # ============================================================================
 # Backend (Qdra) Commands
