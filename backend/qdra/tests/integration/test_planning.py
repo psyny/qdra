@@ -8,28 +8,36 @@ def test_root_material_becomes_root_requirement(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe that produces iron_ingot from iron_ore
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
-    recipe_id = recipe_response.json()["id"]
-    
-    # Create consumes slot for iron_ore
-    consumes_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    consumes_slot_id = consumes_slot_response.json()["id"]
-    consumes_option_response = client.post(f"/slots/{consumes_slot_id}/options", json={"quantity": 1})
-    consumes_option_id = consumes_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"},
-    )
-    
-    # Create produces slot for iron_ingot
-    produces_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "PRODUCES"})
-    produces_slot_id = produces_slot_response.json()["id"]
-    produces_option_response = client.post(f"/slots/{produces_slot_id}/options", json={"quantity": 1})
-    produces_option_id = produces_option_response.json()["id"]
-    client.post(
-        f"/options/{produces_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"},
+    # Create recipe that produces iron_ingot from iron_ore using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for iron_ingot - iron_ore should become root requirement
@@ -71,29 +79,38 @@ def test_simple_planning_one_recipe(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe that produces motor from rotor
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Assembly"})
+    # Create recipe that produces motor from rotor using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Assembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-    
-    # Create consumes slot for rotor
-    consumes_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    consumes_slot_id = consumes_slot_response.json()["id"]
-    consumes_option_response = client.post(f"/slots/{consumes_slot_id}/options", json={"quantity": 1})
-    consumes_option_id = consumes_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
-    )
-    
-    # Create produces slot for motor
-    produces_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "PRODUCES"})
-    produces_slot_id = produces_slot_response.json()["id"]
-    produces_option_response = client.post(f"/slots/{produces_slot_id}/options", json={"quantity": 1})
-    produces_option_id = produces_option_response.json()["id"]
-    client.post(
-        f"/options/{produces_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
     
     # Plan for motor
     plan_response = client.post(
@@ -129,49 +146,71 @@ def test_recursive_planning_two_recipes(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe 1: screw -> rotor
-    recipe1_response = client.post(f"/projects/{project_id}/recipes", json={"name": "RotorAssembly"})
+    # Create recipe 1: screw -> rotor using bulk endpoint
+    recipe1_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "RotorAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "screw"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe1_id = recipe1_response.json()["id"]
     
-    consumes1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "CONSUMES"})
-    consumes1_slot_id = consumes1_slot_response.json()["id"]
-    consumes1_option_response = client.post(f"/slots/{consumes1_slot_id}/options", json={"quantity": 1})
-    consumes1_option_id = consumes1_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "screw"},
+    # Create recipe 2: rotor -> motor using bulk endpoint
+    recipe2_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "MotorAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
-    
-    produces1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "PRODUCES"})
-    produces1_slot_id = produces1_slot_response.json()["id"]
-    produces1_option_response = client.post(f"/slots/{produces1_slot_id}/options", json={"quantity": 1})
-    produces1_option_id = produces1_option_response.json()["id"]
-    client.post(
-        f"/options/{produces1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
-    )
-    
-    # Create recipe 2: rotor -> motor
-    recipe2_response = client.post(f"/projects/{project_id}/recipes", json={"name": "MotorAssembly"})
     recipe2_id = recipe2_response.json()["id"]
-    
-    consumes2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "CONSUMES"})
-    consumes2_slot_id = consumes2_slot_response.json()["id"]
-    consumes2_option_response = client.post(f"/slots/{consumes2_slot_id}/options", json={"quantity": 1})
-    consumes2_option_id = consumes2_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
-    )
-    
-    produces2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "PRODUCES"})
-    produces2_slot_id = produces2_slot_response.json()["id"]
-    produces2_option_response = client.post(f"/slots/{produces2_slot_id}/options", json={"quantity": 1})
-    produces2_option_id = produces2_option_response.json()["id"]
-    client.post(
-        f"/options/{produces2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
     
     # Plan for motor
     plan_response = client.post(
@@ -207,38 +246,47 @@ def test_do_not_expand_power(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe that produces motor using power
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "MotorAssembly"})
-    recipe_id = recipe_response.json()["id"]
-    
-    # Create consumes slot for rotor
-    consumes_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    consumes_slot_id = consumes_slot_response.json()["id"]
-    consumes_option_response = client.post(f"/slots/{consumes_slot_id}/options", json={"quantity": 1})
-    consumes_option_id = consumes_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
-    )
-    
-    # Create requires slot for power
-    requires_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "REQUIRES"})
-    requires_slot_id = requires_slot_response.json()["id"]
-    requires_option_response = client.post(f"/slots/{requires_slot_id}/options", json={"quantity": 10})
-    requires_option_id = requires_option_response.json()["id"]
-    client.post(
-        f"/options/{requires_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "power"},
-    )
-    
-    # Create produces slot for motor
-    produces_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "PRODUCES"})
-    produces_slot_id = produces_slot_response.json()["id"]
-    produces_option_response = client.post(f"/slots/{produces_slot_id}/options", json={"quantity": 1})
-    produces_option_id = produces_option_response.json()["id"]
-    client.post(
-        f"/options/{produces_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
+    # Create recipe that produces motor using power with bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "MotorAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "REQUIRES",
+                    "options": [
+                        {
+                            "quantity": 10,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "power"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for motor with do-not-expand rule for power
@@ -283,28 +331,36 @@ def test_forbidden_material_fails_branch(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe that produces motor from uranium_waste
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "DangerousAssembly"})
-    recipe_id = recipe_response.json()["id"]
-    
-    # Create consumes slot for uranium_waste
-    consumes_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    consumes_slot_id = consumes_slot_response.json()["id"]
-    consumes_option_response = client.post(f"/slots/{consumes_slot_id}/options", json={"quantity": 1})
-    consumes_option_id = consumes_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "uranium_waste"},
-    )
-    
-    # Create produces slot for motor
-    produces_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "PRODUCES"})
-    produces_slot_id = produces_slot_response.json()["id"]
-    produces_option_response = client.post(f"/slots/{produces_slot_id}/options", json={"quantity": 1})
-    produces_option_id = produces_option_response.json()["id"]
-    client.post(
-        f"/options/{produces_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
+    # Create recipe that produces motor from uranium_waste using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "DangerousAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "uranium_waste"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for motor with forbidden material rule
@@ -342,49 +398,71 @@ def test_forbidden_recipe_skipped(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe 1 (forbidden): produces motor from rotor
-    recipe1_response = client.post(f"/projects/{project_id}/recipes", json={"name": "BadAssembly"})
+    # Create recipe 1 (forbidden): produces motor from rotor using bulk endpoint
+    recipe1_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "BadAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe1_id = recipe1_response.json()["id"]
     
-    consumes1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "CONSUMES"})
-    consumes1_slot_id = consumes1_slot_response.json()["id"]
-    consumes1_option_response = client.post(f"/slots/{consumes1_slot_id}/options", json={"quantity": 1})
-    consumes1_option_id = consumes1_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
+    # Create recipe 2 (alternative): produces motor from stator using bulk endpoint
+    recipe2_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "GoodAssembly",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "stator"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
-    
-    produces1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "PRODUCES"})
-    produces1_slot_id = produces1_slot_response.json()["id"]
-    produces1_option_response = client.post(f"/slots/{produces1_slot_id}/options", json={"quantity": 1})
-    produces1_option_id = produces1_option_response.json()["id"]
-    client.post(
-        f"/options/{produces1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
-    
-    # Create recipe 2 (alternative): produces motor from stator
-    recipe2_response = client.post(f"/projects/{project_id}/recipes", json={"name": "GoodAssembly"})
     recipe2_id = recipe2_response.json()["id"]
-    
-    consumes2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "CONSUMES"})
-    consumes2_slot_id = consumes2_slot_response.json()["id"]
-    consumes2_option_response = client.post(f"/slots/{consumes2_slot_id}/options", json={"quantity": 1})
-    consumes2_option_id = consumes2_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "stator"},
-    )
-    
-    produces2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "PRODUCES"})
-    produces2_slot_id = produces2_slot_response.json()["id"]
-    produces2_option_response = client.post(f"/slots/{produces2_slot_id}/options", json={"quantity": 1})
-    produces2_option_id = produces2_option_response.json()["id"]
-    client.post(
-        f"/options/{produces2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
     
     # Plan for motor with forbidden recipe
     plan_response = client.post(
@@ -424,71 +502,101 @@ def test_depth_limit_enforced(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create chain of 3 recipes: A -> B -> C -> D
+    # Create chain of 3 recipes: A -> B -> C -> D using bulk endpoint
     # Recipe 1: C -> D
-    recipe1_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step1"})
-    recipe1_id = recipe1_response.json()["id"]
-    
-    consumes1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "CONSUMES"})
-    consumes1_slot_id = consumes1_slot_response.json()["id"]
-    consumes1_option_response = client.post(f"/slots/{consumes1_slot_id}/options", json={"quantity": 1})
-    consumes1_option_id = consumes1_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "C"},
-    )
-    
-    produces1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "PRODUCES"})
-    produces1_slot_id = produces1_slot_response.json()["id"]
-    produces1_option_response = client.post(f"/slots/{produces1_slot_id}/options", json={"quantity": 1})
-    produces1_option_id = produces1_option_response.json()["id"]
-    client.post(
-        f"/options/{produces1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "D"},
+    recipe1_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step1",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "C"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "D"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Recipe 2: B -> C
-    recipe2_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step2"})
-    recipe2_id = recipe2_response.json()["id"]
-    
-    consumes2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "CONSUMES"})
-    consumes2_slot_id = consumes2_slot_response.json()["id"]
-    consumes2_option_response = client.post(f"/slots/{consumes2_slot_id}/options", json={"quantity": 1})
-    consumes2_option_id = consumes2_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "B"},
-    )
-    
-    produces2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "PRODUCES"})
-    produces2_slot_id = produces2_slot_response.json()["id"]
-    produces2_option_response = client.post(f"/slots/{produces2_slot_id}/options", json={"quantity": 1})
-    produces2_option_id = produces2_option_response.json()["id"]
-    client.post(
-        f"/options/{produces2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "C"},
+    recipe2_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step2",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "B"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "C"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Recipe 3: A -> B
-    recipe3_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step3"})
-    recipe3_id = recipe3_response.json()["id"]
-    
-    consumes3_slot_response = client.post(f"/recipes/{recipe3_id}/slots", json={"kind": "CONSUMES"})
-    consumes3_slot_id = consumes3_slot_response.json()["id"]
-    consumes3_option_response = client.post(f"/slots/{consumes3_slot_id}/options", json={"quantity": 1})
-    consumes3_option_id = consumes3_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes3_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "A"},
-    )
-    
-    produces3_slot_response = client.post(f"/recipes/{recipe3_id}/slots", json={"kind": "PRODUCES"})
-    produces3_slot_id = produces3_slot_response.json()["id"]
-    produces3_option_response = client.post(f"/slots/{produces3_slot_id}/options", json={"quantity": 1})
-    produces3_option_id = produces3_option_response.json()["id"]
-    client.post(
-        f"/options/{produces3_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "B"},
+    recipe3_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step3",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "A"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "B"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for D with max depth 2 (should fail at depth 3)
@@ -520,71 +628,101 @@ def test_loop_detection(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipes that form a loop: A -> B -> C -> B
+    # Create recipes that form a loop: A -> B -> C -> B using bulk endpoint
     # Recipe 1: B -> A
-    recipe1_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step1"})
-    recipe1_id = recipe1_response.json()["id"]
-    
-    consumes1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "CONSUMES"})
-    consumes1_slot_id = consumes1_slot_response.json()["id"]
-    consumes1_option_response = client.post(f"/slots/{consumes1_slot_id}/options", json={"quantity": 1})
-    consumes1_option_id = consumes1_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "B"},
-    )
-    
-    produces1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "PRODUCES"})
-    produces1_slot_id = produces1_slot_response.json()["id"]
-    produces1_option_response = client.post(f"/slots/{produces1_slot_id}/options", json={"quantity": 1})
-    produces1_option_id = produces1_option_response.json()["id"]
-    client.post(
-        f"/options/{produces1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "A"},
+    recipe1_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step1",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "B"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "A"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Recipe 2: C -> B
-    recipe2_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step2"})
-    recipe2_id = recipe2_response.json()["id"]
-    
-    consumes2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "CONSUMES"})
-    consumes2_slot_id = consumes2_slot_response.json()["id"]
-    consumes2_option_response = client.post(f"/slots/{consumes2_slot_id}/options", json={"quantity": 1})
-    consumes2_option_id = consumes2_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "C"},
-    )
-    
-    produces2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "PRODUCES"})
-    produces2_slot_id = produces2_slot_response.json()["id"]
-    produces2_option_response = client.post(f"/slots/{produces2_slot_id}/options", json={"quantity": 1})
-    produces2_option_id = produces2_option_response.json()["id"]
-    client.post(
-        f"/options/{produces2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "B"},
+    recipe2_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step2",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "C"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "B"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Recipe 3: B -> C
-    recipe3_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Step3"})
-    recipe3_id = recipe3_response.json()["id"]
-    
-    consumes3_slot_response = client.post(f"/recipes/{recipe3_id}/slots", json={"kind": "CONSUMES"})
-    consumes3_slot_id = consumes3_slot_response.json()["id"]
-    consumes3_option_response = client.post(f"/slots/{consumes3_slot_id}/options", json={"quantity": 1})
-    consumes3_option_id = consumes3_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes3_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "B"},
-    )
-    
-    produces3_slot_response = client.post(f"/recipes/{recipe3_id}/slots", json={"kind": "PRODUCES"})
-    produces3_slot_id = produces3_slot_response.json()["id"]
-    produces3_option_response = client.post(f"/slots/{produces3_slot_id}/options", json={"quantity": 1})
-    produces3_option_id = produces3_option_response.json()["id"]
-    client.post(
-        f"/options/{produces3_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "C"},
+    recipe3_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Step3",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "B"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "C"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for A with loops disabled
@@ -616,26 +754,36 @@ def test_quantity_propagation(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe: 1 iron_ore -> 2 iron_ingot
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
-    recipe_id = recipe_response.json()["id"]
-    
-    consumes_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    consumes_slot_id = consumes_slot_response.json()["id"]
-    consumes_option_response = client.post(f"/slots/{consumes_slot_id}/options", json={"quantity": 1})
-    consumes_option_id = consumes_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"},
-    )
-    
-    produces_slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "PRODUCES"})
-    produces_slot_id = produces_slot_response.json()["id"]
-    produces_option_response = client.post(f"/slots/{produces_slot_id}/options", json={"quantity": 2})
-    produces_option_id = produces_option_response.json()["id"]
-    client.post(
-        f"/options/{produces_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"},
+    # Create recipe: 1 iron_ore -> 2 iron_ingot using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 2,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
     
     # Plan for 10 iron_ingot
@@ -674,67 +822,93 @@ def test_objective_ranking(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe 1: produces motor using 5 power
-    recipe1_response = client.post(f"/projects/{project_id}/recipes", json={"name": "HighPowerAssembly"})
+    # Create recipe 1: produces motor using 5 power using bulk endpoint
+    recipe1_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "HighPowerAssembly",
+            "slots": [
+                {
+                    "kind": "REQUIRES",
+                    "options": [
+                        {
+                            "quantity": 5,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "power"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe1_id = recipe1_response.json()["id"]
     
-    requires1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "REQUIRES"})
-    requires1_slot_id = requires1_slot_response.json()["id"]
-    requires1_option_response = client.post(f"/slots/{requires1_slot_id}/options", json={"quantity": 5})
-    requires1_option_id = requires1_option_response.json()["id"]
-    client.post(
-        f"/options/{requires1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "power"},
+    # Create recipe 2: produces motor using 2 power using bulk endpoint
+    recipe2_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "LowPowerAssembly",
+            "slots": [
+                {
+                    "kind": "REQUIRES",
+                    "options": [
+                        {
+                            "quantity": 2,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "power"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "stator"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
-    
-    consumes1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "CONSUMES"})
-    consumes1_slot_id = consumes1_slot_response.json()["id"]
-    consumes1_option_response = client.post(f"/slots/{consumes1_slot_id}/options", json={"quantity": 1})
-    consumes1_option_id = consumes1_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "rotor"},
-    )
-    
-    produces1_slot_response = client.post(f"/recipes/{recipe1_id}/slots", json={"kind": "PRODUCES"})
-    produces1_slot_id = produces1_slot_response.json()["id"]
-    produces1_option_response = client.post(f"/slots/{produces1_slot_id}/options", json={"quantity": 1})
-    produces1_option_id = produces1_option_response.json()["id"]
-    client.post(
-        f"/options/{produces1_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
-    
-    # Create recipe 2: produces motor using 2 power
-    recipe2_response = client.post(f"/projects/{project_id}/recipes", json={"name": "LowPowerAssembly"})
     recipe2_id = recipe2_response.json()["id"]
-    
-    requires2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "REQUIRES"})
-    requires2_slot_id = requires2_slot_response.json()["id"]
-    requires2_option_response = client.post(f"/slots/{requires2_slot_id}/options", json={"quantity": 2})
-    requires2_option_id = requires2_option_response.json()["id"]
-    client.post(
-        f"/options/{requires2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "power"},
-    )
-    
-    consumes2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "CONSUMES"})
-    consumes2_slot_id = consumes2_slot_response.json()["id"]
-    consumes2_option_response = client.post(f"/slots/{consumes2_slot_id}/options", json={"quantity": 1})
-    consumes2_option_id = consumes2_option_response.json()["id"]
-    client.post(
-        f"/options/{consumes2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "stator"},
-    )
-    
-    produces2_slot_response = client.post(f"/recipes/{recipe2_id}/slots", json={"kind": "PRODUCES"})
-    produces2_slot_id = produces2_slot_response.json()["id"]
-    produces2_option_response = client.post(f"/slots/{produces2_slot_id}/options", json={"quantity": 1})
-    produces2_option_id = produces2_option_response.json()["id"]
-    client.post(
-        f"/options/{produces2_option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "motor"},
-    )
     
     # Plan for motor with objective to minimize power
     plan_response = client.post(

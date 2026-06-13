@@ -7,29 +7,34 @@ def test_constraint_matching_exists(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with metal classification
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with metal classification using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with exists constraint
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -47,29 +52,34 @@ def test_constraint_matching_gte(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with quality 78
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with quality 78 using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "stat", "key": "quality", "value_number": 78}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "stat", "key": "quality", "value_number": 78},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with >= constraint
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -86,29 +96,34 @@ def test_constraint_matching_lt(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with quality 50
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with quality 50 using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "stat", "key": "quality", "value_number": 50}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "stat", "key": "quality", "value_number": 50},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "stat", "key": "quality", "operator": "<", "value_number": 60}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with < constraint
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "stat", "key": "quality", "operator": "<", "value_number": 60},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -125,29 +140,34 @@ def test_constraint_matching_eq(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with name iron_ore
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with name iron_ore using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "identity", "key": "name", "value_string": "iron_ore"},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with = constraint
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -164,32 +184,37 @@ def test_quantity_matching_sufficient(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 3 materials with metal classification
+    # Create 3 materials with metal classification using bulk endpoint
     material_ids = []
     for _ in range(3):
-        material_response = client.post(f"/projects/{project_id}/materials")
-        material_id = material_response.json()["id"]
-        client.post(
-            f"/materials/{material_id}/parameters",
-            json={"domain": "classification", "key": "metal", "value_boolean": True},
+        material_response = client.post(
+            f"/projects/{project_id}/materials/bulk",
+            json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
+        material_id = material_response.json()["id"]
         material_ids.append(material_id)
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
-    recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option requiring 2 materials
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 2})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 2,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
+    recipe_id = recipe_response.json()["id"]
 
     # Evaluate recipe
     eval_response = client.post(
@@ -207,32 +232,37 @@ def test_quantity_matching_insufficient(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 2 materials with metal classification
+    # Create 2 materials with metal classification using bulk endpoint
     material_ids = []
     for _ in range(2):
-        material_response = client.post(f"/projects/{project_id}/materials")
-        material_id = material_response.json()["id"]
-        client.post(
-            f"/materials/{material_id}/parameters",
-            json={"domain": "classification", "key": "metal", "value_boolean": True},
+        material_response = client.post(
+            f"/projects/{project_id}/materials/bulk",
+            json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
+        material_id = material_response.json()["id"]
         material_ids.append(material_id)
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
-    recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option requiring 3 materials
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 3})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 3,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
     )
+    recipe_id = recipe_response.json()["id"]
 
     # Evaluate recipe
     eval_response = client.post(
@@ -249,37 +279,40 @@ def test_option_matching_or_semantics(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with metal classification
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with metal classification using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 2,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        },
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "precious_metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option A: requires 2 metals
-    option_a_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 2})
-    option_a_id = option_a_response.json()["id"]
-    client.post(
-        f"/options/{option_a_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-
-    # Create option B: requires 1 precious metal
-    option_b_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_b_id = option_b_response.json()["id"]
-    client.post(
-        f"/options/{option_b_id}/constraints",
-        json={"domain": "classification", "key": "precious_metal", "operator": "exists"},
-    )
 
     # Evaluate recipe - should fail because option A requires 2 but only 1 available
     eval_response = client.post(
@@ -296,13 +329,12 @@ def test_option_matching_second_option_succeeds(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with precious metal classification
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "precious_metal", "value_boolean": True},
+    # Create material with precious metal classification using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "precious_metal", "value_boolean": True}]}
     )
+    material_id = material_response.json()["id"]
 
     # Create recipe
     recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
@@ -346,40 +378,48 @@ def test_slot_matching_and_semantics(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 2 metal materials
+    # Create 2 metal materials using bulk endpoint
     metal_ids = []
     for _ in range(2):
-        material_response = client.post(f"/projects/{project_id}/materials")
-        material_id = material_response.json()["id"]
-        client.post(
-            f"/materials/{material_id}/parameters",
-            json={"domain": "classification", "key": "metal", "value_boolean": True},
+        material_response = client.post(
+            f"/projects/{project_id}/materials/bulk",
+            json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
+        material_id = material_response.json()["id"]
         metal_ids.append(material_id)
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot 1: requires 1 metal
-    slot1_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot1_id = slot1_response.json()["id"]
-    option1_response = client.post(f"/slots/{slot1_id}/options", json={"quantity": 1})
-    option1_id = option1_response.json()["id"]
-    client.post(
-        f"/options/{option1_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-
-    # Create slot 2: requires 1 metal
-    slot2_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot2_id = slot2_response.json()["id"]
-    option2_response = client.post(f"/slots/{slot2_id}/options", json={"quantity": 1})
-    option2_id = option2_response.json()["id"]
-    client.post(
-        f"/options/{option2_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -398,37 +438,45 @@ def test_slot_matching_one_slot_fails(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 1 metal material
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create 1 metal material using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot 1: requires 1 metal
-    slot1_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot1_id = slot1_response.json()["id"]
-    option1_response = client.post(f"/slots/{slot1_id}/options", json={"quantity": 1})
-    option1_id = option1_response.json()["id"]
-    client.post(
-        f"/options/{option1_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-
-    # Create slot 2: requires 1 metal (but only 1 total available)
-    slot2_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot2_id = slot2_response.json()["id"]
-    option2_response = client.post(f"/slots/{slot2_id}/options", json={"quantity": 1})
-    option2_id = option2_response.json()["id"]
-    client.post(
-        f"/options/{option2_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate recipe
     eval_response = client.post(
@@ -448,37 +496,45 @@ def test_allocation_material_reuse_forbidden(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 1 metal material
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create 1 metal material using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot 1: requires 1 metal
-    slot1_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot1_id = slot1_response.json()["id"]
-    option1_response = client.post(f"/slots/{slot1_id}/options", json={"quantity": 1})
-    option1_id = option1_response.json()["id"]
-    client.post(
-        f"/options/{option1_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-
-    # Create slot 2: requires 1 metal
-    slot2_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot2_id = slot2_response.json()["id"]
-    option2_response = client.post(f"/slots/{slot2_id}/options", json={"quantity": 1})
-    option2_id = option2_response.json()["id"]
-    client.post(
-        f"/options/{option2_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate recipe - should fail because material can't be reused
     eval_response = client.post(
@@ -495,40 +551,48 @@ def test_allocation_distinct_materials(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create 2 metal materials
+    # Create 2 metal materials using bulk endpoint
     material_ids = []
     for _ in range(2):
-        material_response = client.post(f"/projects/{project_id}/materials")
-        material_id = material_response.json()["id"]
-        client.post(
-            f"/materials/{material_id}/parameters",
-            json={"domain": "classification", "key": "metal", "value_boolean": True},
+        material_response = client.post(
+            f"/projects/{project_id}/materials/bulk",
+            json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
+        material_id = material_response.json()["id"]
         material_ids.append(material_id)
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot 1: requires 1 metal
-    slot1_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot1_id = slot1_response.json()["id"]
-    option1_response = client.post(f"/slots/{slot1_id}/options", json={"quantity": 1})
-    option1_id = option1_response.json()["id"]
-    client.post(
-        f"/options/{option1_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-
-    # Create slot 2: requires 1 metal
-    slot2_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot2_id = slot2_response.json()["id"]
-    option2_response = client.post(f"/slots/{slot2_id}/options", json={"quantity": 1})
-    option2_id = option2_response.json()["id"]
-    client.post(
-        f"/options/{option2_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate recipe - should succeed with distinct allocations
     eval_response = client.post(
@@ -549,29 +613,34 @@ def test_recipe_evaluation_single_slot_success(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate
     eval_response = client.post(
@@ -589,29 +658,34 @@ def test_recipe_evaluation_single_slot_failure(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material without required classification
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material without required classification using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={"parameters": [{"domain": "identity", "key": "name", "value_string": "stone"}]}
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "identity", "key": "name", "value_string": "stone"},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot requiring metal
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
 
     # Evaluate
     eval_response = client.post(
@@ -628,37 +702,40 @@ def test_recipe_evaluation_multiple_constraints(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with metal classification and quality >= 70
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with metal classification and quality >= 70 using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={
+            "parameters": [
+                {"domain": "classification", "key": "metal", "value_boolean": True},
+                {"domain": "stat", "key": "quality", "value_number": 78}
+            ]
+        }
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "stat", "key": "quality", "value_number": 78},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"},
+                                {"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with multiple constraints
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70},
-    )
 
     # Evaluate
     eval_response = client.post(
@@ -675,37 +752,40 @@ def test_recipe_evaluation_multiple_constraints_fail(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
-    # Create material with metal classification but low quality
-    material_response = client.post(f"/projects/{project_id}/materials")
+    # Create material with metal classification but low quality using bulk endpoint
+    material_response = client.post(
+        f"/projects/{project_id}/materials/bulk",
+        json={
+            "parameters": [
+                {"domain": "classification", "key": "metal", "value_boolean": True},
+                {"domain": "stat", "key": "quality", "value_number": 50}
+            ]
+        }
+    )
     material_id = material_response.json()["id"]
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "classification", "key": "metal", "value_boolean": True},
-    )
-    client.post(
-        f"/materials/{material_id}/parameters",
-        json={"domain": "stat", "key": "quality", "value_number": 50},
-    )
 
-    # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    # Create recipe using bulk endpoint
+    recipe_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Smelting",
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "classification", "key": "metal", "operator": "exists"},
+                                {"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
     recipe_id = recipe_response.json()["id"]
-
-    # Create slot
-    slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
-    slot_id = slot_response.json()["id"]
-
-    # Create option with multiple constraints
-    option_response = client.post(f"/slots/{slot_id}/options", json={"quantity": 1})
-    option_id = option_response.json()["id"]
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "classification", "key": "metal", "operator": "exists"},
-    )
-    client.post(
-        f"/options/{option_id}/constraints",
-        json={"domain": "stat", "key": "quality", "operator": ">=", "value_number": 70},
-    )
 
     # Evaluate
     eval_response = client.post(

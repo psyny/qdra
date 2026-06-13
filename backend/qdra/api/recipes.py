@@ -17,6 +17,31 @@ class RecipeCreate(BaseModel):
     name: str
 
 
+class ConstraintCreate(BaseModel):
+    domain: str
+    key: str
+    operator: str
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+    is_wildcard: bool = False
+
+
+class OptionBulkCreate(BaseModel):
+    quantity: float
+    constraints: List[ConstraintCreate] = []
+
+
+class SlotBulkCreate(BaseModel):
+    kind: str
+    options: List[OptionBulkCreate] = []
+
+
+class RecipeBulkCreate(BaseModel):
+    name: str
+    slots: List[SlotBulkCreate] = []
+
+
 class RecipeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -44,16 +69,6 @@ class OptionResponse(BaseModel):
     id: uuid.UUID
     slot_id: uuid.UUID
     quantity: float
-
-
-class ConstraintCreate(BaseModel):
-    domain: str
-    key: str
-    operator: str
-    value_string: Optional[str] = None
-    value_number: Optional[float] = None
-    value_boolean: Optional[bool] = None
-    is_wildcard: bool = False
 
 
 class ConstraintResponse(BaseModel):
@@ -115,6 +130,35 @@ def create_recipe(project_id: uuid.UUID, recipe_data: RecipeCreate, db: Session 
         return recipe
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/projects/{project_id}/recipes/bulk", response_model=RecipeResponse, status_code=201)
+def create_recipe_bulk(project_id: uuid.UUID, recipe_data: RecipeBulkCreate, db: Session = Depends(get_db)):
+    service = RecipeService(db)
+    try:
+        recipe = service.create_recipe(project_id, recipe_data.name)
+        
+        for slot_data in recipe_data.slots:
+            slot = service.create_slot(recipe.id, slot_data.kind)
+            
+            for option_data in slot_data.options:
+                option = service.create_option(slot.id, option_data.quantity)
+                
+                for constraint_data in option_data.constraints:
+                    service.create_constraint(
+                        option_id=option.id,
+                        domain=constraint_data.domain,
+                        key=constraint_data.key,
+                        operator=constraint_data.operator,
+                        value_string=constraint_data.value_string,
+                        value_number=constraint_data.value_number,
+                        value_boolean=constraint_data.value_boolean,
+                        is_wildcard=constraint_data.is_wildcard,
+                    )
+        
+        return recipe
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/projects/{project_id}/recipes", response_model=list[RecipeResponse])

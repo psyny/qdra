@@ -25,6 +25,10 @@ class ParameterCreate(BaseModel):
     value_boolean: Optional[bool] = None
 
 
+class MaterialBulkCreate(BaseModel):
+    parameters: list[ParameterCreate] = []
+
+
 class ParameterResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -44,6 +48,27 @@ def create_material(project_id: uuid.UUID, db: Session = Depends(get_db)):
         return material
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/projects/{project_id}/materials/bulk", response_model=MaterialResponse, status_code=201)
+def create_material_bulk(project_id: uuid.UUID, material_data: MaterialBulkCreate, db: Session = Depends(get_db)):
+    service = MaterialService(db)
+    try:
+        material = service.create_material(project_id)
+
+        for param_data in material_data.parameters:
+            service.add_parameter(
+                material_id=material.id,
+                domain=param_data.domain,
+                key=param_data.key,
+                value_string=param_data.value_string,
+                value_number=param_data.value_number,
+                value_boolean=param_data.value_boolean,
+            )
+
+        return material
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/projects/{project_id}/materials", response_model=list[MaterialResponse])
