@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from services.recipe_service import RecipeService
+from services.recipe_evaluation_service import RecipeEvaluationService
 
 router = APIRouter()
 
@@ -65,6 +66,30 @@ class ConstraintResponse(BaseModel):
     value_number: Optional[float]
     value_boolean: Optional[bool]
     is_wildcard: bool
+
+
+class RecipeEvaluationRequest(BaseModel):
+    materials: List[uuid.UUID]
+
+
+class AllocationResponse(BaseModel):
+    material_id: uuid.UUID
+    slot_id: uuid.UUID
+    option_id: uuid.UUID
+
+
+class SlotMatchResultResponse(BaseModel):
+    slot_id: uuid.UUID
+    success: bool
+    matched_option_id: Optional[uuid.UUID] = None
+    allocated_materials: List[uuid.UUID] = []
+
+
+class RecipeEvaluationResponse(BaseModel):
+    success: bool
+    recipe_id: uuid.UUID
+    slot_results: List[SlotMatchResultResponse]
+    allocations: List[AllocationResponse]
 
 
 @router.post("/projects/{project_id}/recipes", response_model=RecipeResponse, status_code=201)
@@ -134,3 +159,33 @@ def create_constraint(
         return constraint
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/recipes/{recipe_id}/evaluate", response_model=RecipeEvaluationResponse)
+def evaluate_recipe(
+    recipe_id: uuid.UUID, evaluation_data: RecipeEvaluationRequest, db: Session = Depends(get_db)
+):
+    service = RecipeEvaluationService(db)
+    result = service.evaluate_recipe(recipe_id, evaluation_data.materials)
+    
+    return RecipeEvaluationResponse(
+        success=result.success,
+        recipe_id=result.recipe_id,
+        slot_results=[
+            SlotMatchResultResponse(
+                slot_id=slot.slot_id,
+                success=slot.success,
+                matched_option_id=slot.matched_option_id,
+                allocated_materials=slot.allocated_materials
+            )
+            for slot in result.slot_results
+        ],
+        allocations=[
+            AllocationResponse(
+                material_id=alloc.material_id,
+                slot_id=alloc.slot_id,
+                option_id=alloc.option_id
+            )
+            for alloc in result.allocations
+        ]
+    )
