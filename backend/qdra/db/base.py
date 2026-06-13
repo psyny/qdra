@@ -1,0 +1,7 @@
+from sqlalchemy import MetaData
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    metadata = MetaData()
+    metadata.info = {"extend_existing": True}

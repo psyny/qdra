@@ -1,33 +1,13 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from qdra.infrastructure.db.session import engine
-from qdra.infrastructure.db.init_db import init_db
-from qdra.api.routes import projects, schemas, objects, relationships, reasoning_jobs
-import asyncio
 
-app = FastAPI(title="Qdra API")
+from api.health import router as health_router
+from api.projects import router as projects_router
+from api.materials import router as materials_router
+from api.recipes import router as recipes_router
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="Qdra")
 
-app.include_router(projects.router, prefix="/projects", tags=["projects"])
-app.include_router(schemas.router, prefix="/projects/{project_id}/types", tags=["schemas"])
-app.include_router(objects.router, prefix="/projects/{project_id}/objects", tags=["objects"])
-app.include_router(relationships.router, prefix="/projects/{project_id}/relationships", tags=["relationships"])
-app.include_router(reasoning_jobs.router, prefix="/projects/{project_id}/reasoning-jobs", tags=["reasoning-jobs"])
-
-
-@app.on_event("startup")
-async def startup_event():
-    async with engine.begin() as conn:
-        await conn.run_sync(lambda conn: init_db(conn))
-
-
-@app.get("/")
-async def root():
-    return {"message": "Qdra API"}
+app.include_router(health_router)
+app.include_router(projects_router)
+app.include_router(materials_router)
+app.include_router(recipes_router)
