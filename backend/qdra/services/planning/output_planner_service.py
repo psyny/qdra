@@ -232,15 +232,8 @@ class PlanningService:
             target_node.constraints,
             request.domain_constraints.do_not_expand_materials_matching
         ):
-            # Emit as external requirement
-            external_node = MaterialRequirementNode(
-                id=self._generate_node_id("external"),
-                role=MaterialRole.EXTERNAL_REQUIREMENT,
-                quantity=target_node.quantity,
-                constraints=target_node.constraints
-            )
-            state.graph.nodes.append(external_node)
-            state.root_requirements.append(external_node)
+            # Emit as leaf node (will become root requirement later)
+            state.graph.nodes.append(target_node)
             
             # Track cost
             cost_key = self._constraint_key(target_node.constraints)
@@ -250,7 +243,7 @@ class PlanningService:
             if parent_node_id:
                 state.graph.edges.append(Edge(
                     from_node=parent_node_id,
-                    to_node=external_node.id,
+                    to_node=target_node.id,
                     kind=EdgeKind.SATISFIES
                 ))
             
@@ -273,16 +266,14 @@ class PlanningService:
         )
         
         if not producers:
-            # No producer found - mark target node as root requirement
-            target_node.role = MaterialRole.ROOT_REQUIREMENT
+            # No producer found - add node to graph as a leaf (will become root requirement later)
             state.graph.nodes.append(target_node)
-            state.root_requirements.append(target_node)
             
             # Track cost
             cost_key = self._constraint_key(target_node.constraints)
             state.material_costs[cost_key] = state.material_costs.get(cost_key, 0) + target_node.quantity
             
-            # Add edge from parent to this root requirement
+            # Add edge from parent to this node
             if parent_node_id:
                 state.graph.edges.append(Edge(
                     from_node=parent_node_id,
@@ -391,8 +382,8 @@ class PlanningService:
             if slot_success:
                 any_producer_succeeded = True
                 # Always add plan at this level (after all recursive calls complete)
-                # Collect all ROOT_REQUIREMENT and EXTERNAL_REQUIREMENT nodes from the graph
-                root_req_nodes = [n for n in branch_state.graph.nodes if isinstance(n, MaterialRequirementNode) and n.role in (MaterialRole.ROOT_REQUIREMENT, MaterialRole.EXTERNAL_REQUIREMENT)]
+                # Compute root requirements as nodes with no incoming edges
+                root_req_nodes = self._compute_root_requirements(branch_state.graph)
                 plan = PlanCandidate(
                     success=True,
                     plan_id=self._generate_node_id("plan"),
@@ -408,6 +399,21 @@ class PlanningService:
         
         state.recursion_stack.pop()
         return any_producer_succeeded
+    
+    def _compute_root_requirements(self, graph: PlanGraph) -> List[MaterialRequirementNode]:
+        """Compute root requirements as material nodes with no incoming edges."""
+        # Collect all node IDs that have incoming edges
+        nodes_with_incoming = set()
+        for edge in graph.edges:
+            nodes_with_incoming.add(edge.to_node)
+        
+        # Root requirements are material nodes with no incoming edges
+        root_reqs = []
+        for node in graph.nodes:
+            if isinstance(node, MaterialRequirementNode) and node.id not in nodes_with_incoming:
+                root_reqs.append(node)
+        
+        return root_reqs
     
     def _find_producer_recipes(
         self,

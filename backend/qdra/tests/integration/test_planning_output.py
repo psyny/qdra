@@ -1,5 +1,11 @@
 import pytest
+import json
 from services.planning.output_planner_service import PlanningService
+
+
+def print_pretty(obj):
+    """Print a Python structure as formatted JSON."""
+    print(json.dumps(obj, indent=2))
 
 
 def test_root_material_becomes_root_requirement(client):
@@ -88,7 +94,7 @@ def test_root_material_becomes_root_requirement(client):
     assert plan_response.status_code == 200
     data = plan_response.json()
 
-    print(data)
+    print_pretty(data)
 
     print("----------------------------")
     graph = data['plans'][0]["graph"]
@@ -368,9 +374,8 @@ def test_do_not_expand_power(client):
     assert len(data["plans"]) > 0
     
     plan = data["plans"][0]
-    # Should have external requirement for power
-    external_reqs = [r for r in plan["root_requirements"] if r["role"] == "external_requirement"]
-    power_reqs = [r for r in external_reqs if any(c["value_string"] == "power" for c in r["constraints"])]
+    # Should have root requirement for power (do-not-expand makes it a leaf node)
+    power_reqs = [r for r in plan["root_requirements"] if any(c["value_string"] == "power" for c in r["constraints"])]
     assert len(power_reqs) > 0
     # Power should have quantity 10 (from requires slot)
     assert power_reqs[0]["quantity"] == 10
