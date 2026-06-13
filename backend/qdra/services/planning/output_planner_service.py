@@ -16,7 +16,7 @@ from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
 
-from domain.planning import (
+from domain.planning.output_planner import (
     PlanningRequest,
     PlanningResponse,
     PlanCandidate,

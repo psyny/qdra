@@ -9,9 +9,9 @@ from db.session import get_db
 from repositories.project_repository import ProjectRepository
 from services.material_service import MaterialService
 from services.recipe_service import RecipeService
-from services.planning_service import PlanningService
+from services.planning.output_planner_service import PlanningService
 
-from domain.planning import (
+from domain.planning.output_planner import (
     PlanningRequest,
     PlanningResponse,
     PlanCandidate,
@@ -182,7 +182,7 @@ def get_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
     return project
 
 
-@router.post("/projects/{project_id}/plan", response_model=PlanningResponseModel)
+@router.post("/projects/{project_id}/plan/output", response_model=PlanningResponseModel)
 def plan_target(project_id: uuid.UUID, request_data: PlanningRequestModel, db: Session = Depends(get_db)):
     """Generate plan candidates for a target material requirement."""
     service = PlanningService(db)

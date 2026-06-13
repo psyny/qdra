@@ -1,5 +1,5 @@
 import pytest
-from services.planning_service import PlanningService
+from services.planning.output_planner_service import PlanningService
 
 
 def test_root_material_becomes_root_requirement(client):
@@ -42,7 +42,7 @@ def test_root_material_becomes_root_requirement(client):
     
     # Plan for iron_ingot - iron_ore should become root requirement
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 10,
@@ -114,7 +114,7 @@ def test_simple_planning_one_recipe(client):
     
     # Plan for motor
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 5,
@@ -214,7 +214,7 @@ def test_recursive_planning_two_recipes(client):
     
     # Plan for motor
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -291,7 +291,7 @@ def test_do_not_expand_power(client):
     
     # Plan for motor with do-not-expand rule for power
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -365,7 +365,7 @@ def test_forbidden_material_fails_branch(client):
     
     # Plan for motor with forbidden material rule
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -466,7 +466,7 @@ def test_forbidden_recipe_skipped(client):
     
     # Plan for motor with forbidden recipe
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -601,7 +601,7 @@ def test_depth_limit_enforced(client):
     
     # Plan for D with max depth 2 (should fail at depth 3)
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -727,7 +727,7 @@ def test_loop_detection(client):
     
     # Plan for A with loops disabled
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
@@ -788,7 +788,7 @@ def test_quantity_propagation(client):
     
     # Plan for 10 iron_ingot
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 10,
@@ -912,7 +912,7 @@ def test_objective_ranking(client):
     
     # Plan for motor with objective to minimize power
     plan_response = client.post(
-        f"/projects/{project_id}/plan",
+        f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 1,
