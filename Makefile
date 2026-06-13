@@ -75,14 +75,20 @@ be-install: ## Install backend dependencies into venv (creates venv if needed)
 	@echo "Backend dependencies installed"
 
 # Unit tests require venv with dependencies installed
-be-qdra-tests-unit: ## Run backend unit tests (no external dependencies)
+# Usage: make be-qdra-tests-unit TARGET=tests/unit/test_materials.py
+be-qdra-tests-unit: ## Run backend unit tests (no external dependencies). Optional: TARGET=path/to/test
 	@echo "Running unit tests..."
 	@echo "Note: Requires venv with dependencies installed"
 	@echo "Run 'make be-install' first if needed"
-	$(BE_PYTEST) $(BE_SRC_DIR)/tests/unit/ -v
+	@if [ -z "$(TARGET)" ]; then \
+		$(BE_PYTEST) $(BE_SRC_DIR)/tests/unit/ -v; \
+	else \
+		$(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
+	fi
 
 # Integration tests require Docker Postgres running
-be-qdra-tests-integration: ## Run backend integration tests (requires Docker)
+# Usage: make be-qdra-tests-integration TARGET=integration/test_planning.py
+be-qdra-tests-integration: ## Run backend integration tests (requires Docker). Optional: TARGET=path/to/test
 	@echo "Running integration tests..."
 	@echo "Checking if Postgres is accessible..."
 	@docker exec qdra-postgres-1 psql -U qdra -c "SELECT 1;" > /dev/null 2>&1 || (echo "ERROR: Postgres is not accessible. Run 'make up' to start Docker services." && exit 1)
@@ -91,7 +97,11 @@ be-qdra-tests-integration: ## Run backend integration tests (requires Docker)
 	@echo "Running migrations on test database..."
 	cd $(BE_DIR)/qdra && DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" ../venv/bin/python -m alembic upgrade head
 	@echo "Running integration tests..."
-	DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/integration/ -v
+	@if [ -z "$(TARGET)" ]; then \
+		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/integration/ -v; \
+	else \
+		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
+	fi
 
 
 
