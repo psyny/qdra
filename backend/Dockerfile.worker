@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir -e .
+
+COPY qdra ./qdra
+
+ENV APP_ENV=development
+ENV DATABASE_URL=postgresql://qdra:qdra@postgres:5432/qdra
+ENV REDIS_URL=redis://redis:6379/0
+ENV GRAPH_JOB_QUEUE=graph_reasoning_jobs
+ENV WORKER_CONCURRENCY=1
+
+CMD ["python", "-m", "qdra.worker"]
