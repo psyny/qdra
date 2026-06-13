@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from services.recipe_service import RecipeService
 from services.recipe_evaluation_service import RecipeEvaluationService
+from services.recipe_execution_service import RecipeExecutionService
 
 router = APIRouter()
 
@@ -90,6 +91,20 @@ class RecipeEvaluationResponse(BaseModel):
     recipe_id: uuid.UUID
     slot_results: List[SlotMatchResultResponse]
     allocations: List[AllocationResponse]
+
+
+class RecipeExecutionRequest(BaseModel):
+    materials: List[uuid.UUID]
+
+
+class RecipeExecutionResponse(BaseModel):
+    success: bool
+    recipe_id: uuid.UUID
+    consumed_material_ids: List[uuid.UUID]
+    required_material_ids: List[uuid.UUID]
+    produced_material_ids: List[uuid.UUID]
+    state_before: List[uuid.UUID]
+    state_after: List[uuid.UUID]
 
 
 @router.post("/projects/{project_id}/recipes", response_model=RecipeResponse, status_code=201)
@@ -188,4 +203,22 @@ def evaluate_recipe(
             )
             for alloc in result.allocations
         ]
+    )
+
+
+@router.post("/recipes/{recipe_id}/execute", response_model=RecipeExecutionResponse)
+def execute_recipe(
+    recipe_id: uuid.UUID, execution_data: RecipeExecutionRequest, db: Session = Depends(get_db)
+):
+    service = RecipeExecutionService(db)
+    result = service.execute_recipe(recipe_id, execution_data.materials)
+    
+    return RecipeExecutionResponse(
+        success=result.success,
+        recipe_id=result.recipe_id,
+        consumed_material_ids=result.consumed_material_ids,
+        required_material_ids=result.required_material_ids,
+        produced_material_ids=result.produced_material_ids,
+        state_before=result.state_before,
+        state_after=result.state_after
     )

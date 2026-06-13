@@ -1,6 +1,7 @@
 import uuid
 from dataclasses import dataclass
 from typing import List, Optional, Dict
+from models.material import Material
 
 
 @dataclass
@@ -31,3 +32,27 @@ class RecipeMatchResult:
     recipe_id: uuid.UUID
     slot_results: List[SlotMatchResult]
     allocations: List[Allocation]
+
+
+@dataclass
+class RecipeExecutionResult:
+    """Result of executing a recipe."""
+    success: bool
+    recipe_id: uuid.UUID
+    consumed_material_ids: List[uuid.UUID]
+    required_material_ids: List[uuid.UUID]
+    produced_material_ids: List[uuid.UUID]
+    state_before: List[uuid.UUID]
+    state_after: List[uuid.UUID]
+    
+    def __post_init__(self):
+        if self.consumed_material_ids is None:
+            self.consumed_material_ids = []
+        if self.required_material_ids is None:
+            self.required_material_ids = []
+        if self.produced_material_ids is None:
+            self.produced_material_ids = []
+        if self.state_before is None:
+            self.state_before = []
+        if self.state_after is None:
+            self.state_after = []

@@ -83,6 +83,15 @@ def add_parameter(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/materials/{material_id}/parameters", response_model=list[ParameterResponse])
+def list_parameters(material_id: uuid.UUID, db: Session = Depends(get_db)):
+    service = MaterialService(db)
+    try:
+        return service.get_material_parameters(material_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.delete("/parameters/{parameter_id}")
 def delete_parameter(parameter_id: uuid.UUID, db: Session = Depends(get_db)):
     service = MaterialService(db)

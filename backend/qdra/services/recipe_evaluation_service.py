@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from models.material import Material
 from models.recipe import Recipe
-from models.slot import Slot
+from models.slot import Slot, SlotKind
 from models.option import Option
 from models.parameter import Parameter
 from models.parameter_constraint import ParameterConstraint
@@ -69,6 +69,16 @@ class RecipeEvaluationService:
 
         # Evaluate each slot
         for slot in slots:
+            # PRODUCES slots don't require material matching - they create materials
+            if slot.kind == SlotKind.PRODUCES:
+                slot_results.append(SlotMatchResult(
+                    success=True,
+                    slot_id=slot.id,
+                    matched_option_id=None,
+                    allocated_materials=[]
+                ))
+                continue
+            
             slot_result = self._evaluate_slot(
                 slot=slot,
                 materials=materials,
