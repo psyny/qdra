@@ -8,8 +8,29 @@ def test_root_material_becomes_root_requirement(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
     
-    # Create recipe that produces iron_ingot from iron_ore using bulk endpoint
-    recipe_response = client.post(
+    # Create recipe that produces iron_ore from nothing (mining)
+    mining_response = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "name": "Mining",
+            "slots": [
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    )
+    
+    # Create recipe that produces steel_ingot from iron_ore and coal_ore using bulk endpoint
+    smelting_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
             "name": "Smelting",
@@ -26,12 +47,23 @@ def test_root_material_becomes_root_requirement(client):
                     ]
                 },
                 {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "coal_ore"}
+                            ]
+                        }
+                    ]
+                },
+                {
                     "kind": "PRODUCES",
                     "options": [
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "steel_ingot"}
                             ]
                         }
                     ]
@@ -40,14 +72,14 @@ def test_root_material_becomes_root_requirement(client):
         }
     )
     
-    # Plan for iron_ingot - iron_ore should become root requirement
+    # Plan for steel_ingot - coal_ore should become root requirement (no recipe produces it)
     plan_response = client.post(
         f"/projects/{project_id}/plan/output",
         json={
             "target": {
                 "quantity": 10,
                 "constraints": [
-                    {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ingot"}
+                    {"domain": "identity", "key": "name", "operator": "=", "value_string": "steel_ingot"}
                 ]
             }
         }
@@ -55,6 +87,8 @@ def test_root_material_becomes_root_requirement(client):
     
     assert plan_response.status_code == 200
     data = plan_response.json()
+
+    print(data)
 
     print("----------------------------")
     graph = data['plans'][0]["graph"]
@@ -73,21 +107,21 @@ def test_root_material_becomes_root_requirement(client):
 
     PlanningService.print_plan_graph(data)
 
-    
+
     assert data["success"] is True
     assert len(data["plans"]) == 1
 
     # Verify plan structure
     plan = data["plans"][0]
-    assert plan["root_requirements"][0]["constraints"][0]["value_string"] == "iron_ore"
+    assert plan["root_requirements"][0]["constraints"][0]["value_string"] == "coal_ore"
     assert plan["root_requirements"][0]["quantity"] == 10
 
-    # Should have root requirement for iron_ore
+    # Should have root requirement for coal_ore (no recipe produces it)
     root_reqs = [r for r in plan["root_requirements"] if r["role"] == "root_requirement"]
     assert len(root_reqs) > 0
-    # Check that one of them is iron_ore
-    iron_ore_reqs = [r for r in root_reqs if any(c["value_string"] == "iron_ore" for c in r["constraints"])]
-    assert len(iron_ore_reqs) > 0
+    # Check that one of them is coal_ore
+    coal_ore_reqs = [r for r in root_reqs if any(c["value_string"] == "coal_ore" for c in r["constraints"])]
+    assert len(coal_ore_reqs) > 0
 
 
 def test_simple_planning_one_recipe(client):

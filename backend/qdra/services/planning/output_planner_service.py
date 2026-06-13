@@ -273,25 +273,20 @@ class PlanningService:
         )
         
         if not producers:
-            # No producer found - emit as root requirement
-            root_node = MaterialRequirementNode(
-                id=self._generate_node_id("root"),
-                role=MaterialRole.ROOT_REQUIREMENT,
-                quantity=target_node.quantity,
-                constraints=target_node.constraints
-            )
-            state.graph.nodes.append(root_node)
-            state.root_requirements.append(root_node)
+            # No producer found - mark target node as root requirement
+            target_node.role = MaterialRole.ROOT_REQUIREMENT
+            state.graph.nodes.append(target_node)
+            state.root_requirements.append(target_node)
             
             # Track cost
             cost_key = self._constraint_key(target_node.constraints)
             state.material_costs[cost_key] = state.material_costs.get(cost_key, 0) + target_node.quantity
             
-            # Add edge
+            # Add edge from parent to this root requirement
             if parent_node_id:
                 state.graph.edges.append(Edge(
                     from_node=parent_node_id,
-                    to_node=root_node.id,
+                    to_node=target_node.id,
                     kind=EdgeKind.SATISFIES
                 ))
             
@@ -323,11 +318,11 @@ class PlanningService:
             if produced_quantity > 0:
                 recipe_exec_node.execution_count = math.ceil(target_node.quantity / produced_quantity)
             
-            # Add edge from parent to recipe
+            # Add edge from recipe to parent (satisfies the requirement)
             if parent_node_id:
                 branch_state.graph.edges.append(Edge(
-                    from_node=parent_node_id,
-                    to_node=recipe_exec_node.id,
+                    from_node=recipe_exec_node.id,
+                    to_node=parent_node_id,
                     kind=EdgeKind.SATISFIES
                 ))
             
@@ -368,11 +363,12 @@ class PlanningService:
                             quantity=scaled_quantity,
                             constraints=slot_option["constraints"]
                         )
+                        branch_state.graph.nodes.append(sub_req_node)
                         
-                        # Add edge
+                        # Add edge from material to recipe (more intuitive flow)
                         branch_state.graph.edges.append(Edge(
-                            from_node=recipe_exec_node.id,
-                            to_node=sub_req_node.id,
+                            from_node=sub_req_node.id,
+                            to_node=recipe_exec_node.id,
                             kind=edge_kind
                         ))
                         
@@ -394,12 +390,14 @@ class PlanningService:
             
             if slot_success:
                 any_producer_succeeded = True
-                # Add plan for this branch
+                # Always add plan at this level (after all recursive calls complete)
+                # Collect all ROOT_REQUIREMENT and EXTERNAL_REQUIREMENT nodes from the graph
+                root_req_nodes = [n for n in branch_state.graph.nodes if isinstance(n, MaterialRequirementNode) and n.role in (MaterialRole.ROOT_REQUIREMENT, MaterialRole.EXTERNAL_REQUIREMENT)]
                 plan = PlanCandidate(
                     success=True,
                     plan_id=self._generate_node_id("plan"),
                     graph=branch_state.graph,
-                    root_requirements=branch_state.root_requirements,
+                    root_requirements=root_req_nodes,
                     blocked_requirements=branch_state.blocked_requirements,
                     score=ObjectiveScore(
                         material_costs=branch_state.material_costs,
