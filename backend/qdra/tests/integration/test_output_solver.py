@@ -76,6 +76,20 @@ def test_root_material_becomes_root_requirement(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
+    # Create materials with identity.name for human-readable labels
+    iron_ore = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]
+    }).json()
+    coal_ore = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "coal_ore"}]
+    }).json()
+    steel_ingot = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "steel_ingot"}]
+    }).json()
+    polution = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "polution"}]
+    }).json()
+
     # Mining: produces iron_ore (no inputs)
     client.post(
         f"/projects/{project_id}/recipes/bulk",
@@ -91,7 +105,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(iron_ore["id"])}
                             ],
                         }
                     ],
@@ -115,7 +129,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "iron_ore"}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(iron_ore["id"])}
                             ],
                         }
                     ],
@@ -126,7 +140,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "coal_ore"}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(coal_ore["id"])}
                             ],
                         }
                     ],
@@ -137,7 +151,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "steel_ingot"}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(steel_ingot["id"])}
                             ],
                         }
                     ],
@@ -148,7 +162,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 2,
                             "constraints": [
-                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "polution"}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(polution["id"])}
                             ],
                         }
                     ],
@@ -164,7 +178,7 @@ def test_root_material_becomes_root_requirement(client):
             "target": {
                 "quantity": 10,
                 "constraints": [
-                    {"domain": "identity", "key": "name", "operator": "=", "value_string": "steel_ingot"}
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(steel_ingot["id"])}
                 ],
             }
         },
@@ -175,7 +189,25 @@ def test_root_material_becomes_root_requirement(client):
 
     print_pretty(data)
 
-    print_graphviz(data)
+    # Build label mappings for graphviz
+    material_id_to_label = {
+        iron_ore["id"]: "iron_ore",
+        coal_ore["id"]: "coal_ore",
+        steel_ingot["id"]: "steel_ingot",
+        polution["id"]: "polution",
+    }
+
+    # Get recipe IDs and build label mapping
+    recipes = client.get(f"/projects/{project_id}/recipes").json()
+    recipe_id_to_label = {}
+    for recipe in recipes:
+        params = client.get(f"/recipes/{recipe['id']}/parameters").json()
+        for param in params:
+            if param["domain"] == "identity" and param["key"] == "name":
+                recipe_id_to_label[recipe["id"]] = param["value_string"]
+                break
+
+    print_graphviz(data, material_id_to_label=material_id_to_label, recipe_id_to_label=recipe_id_to_label)
     print("----------------------------")
 
     graph = data["plans"][0]["graph"]
@@ -198,7 +230,7 @@ def test_root_material_becomes_root_requirement(client):
     coal_ore_nodes = [
         n for n in plan["graph"]["nodes"]
         if n.get("kind") != "recipe_execution" and
-        any(c.get("value_string") == "coal_ore" for c in n.get("material_constraints", []))
+        any(c.get("key") == "material_id" and c.get("value_string") == str(coal_ore["id"]) for c in n.get("material_constraints", []))
     ]
     assert len(coal_ore_nodes) > 0
     assert "root" in coal_ore_nodes[0].get("tags", [])
