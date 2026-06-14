@@ -40,8 +40,13 @@ def print_graphviz(data, material_id_to_label=None, recipe_id_to_label=None):
                 exec_count = node.get("execution_count", 1)
                 print(f'  "{node["id"]}" [label="{label}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
             else:
-                nid = node.get("id", "unknown")
-                label = material_id_to_label.get(nid, "?")
+                # Extract material_id from constraints
+                material_id = None
+                for c in node.get("material_constraints", []):
+                    if c.get("domain") == "identity" and c.get("key") == "material_id":
+                        material_id = c.get("value_string")
+                        break
+                label = material_id_to_label.get(material_id, "?") if material_id else "?"
                 prod = node.get("produced_qty", 0)
                 cons_qty = node.get("consumed_qty", 0)
                 tags = node.get("tags", [])
