@@ -483,18 +483,26 @@ class OutputSolverService:
             db_materials = self.db.query(Material).filter(
                 Material.id.in_(material_ids), Material.project_id == project_id
             ).all()
+            from repositories.parameter_repository import ParameterRepository
+            param_repo = ParameterRepository(self.db)
             for m in db_materials:
+                params = param_repo.list_by_material(m.id)
                 materials[m.id] = EntityData(
-                    id=m.id, project_id=m.project_id, created_at=m.created_at
+                    id=m.id, project_id=m.project_id, created_at=m.created_at,
+                    parameters=[self._to_spec(p) for p in params]
                 )
 
         if recipe_ids:
             db_recipes = self.db.query(Recipe).filter(
                 Recipe.id.in_(recipe_ids), Recipe.project_id == project_id
             ).all()
+            from repositories.recipe_parameter_repository import RecipeParameterRepository
+            recipe_param_repo = RecipeParameterRepository(self.db)
             for r in db_recipes:
+                params = recipe_param_repo.list_by_recipe(r.id)
                 recipes[r.id] = EntityData(
-                    id=r.id, project_id=r.project_id, created_at=r.created_at
+                    id=r.id, project_id=r.project_id, created_at=r.created_at,
+                    parameters=[self._to_spec(p) for p in params]
                 )
 
         return Entities(materials=materials, recipes=recipes)
@@ -536,10 +544,13 @@ class OutputSolverService:
         return structure
 
     def _to_spec(self, c) -> ConstraintSpec:
+        # Handle both ParameterConstraint (has operator) and Parameter (no operator)
+        operator = getattr(c, "operator", "=")
+        is_wildcard = getattr(c, "is_wildcard", False)
         return ConstraintSpec(
-            domain=c.domain, key=c.key, operator=c.operator,
+            domain=c.domain, key=c.key, operator=operator,
             value_string=c.value_string, value_number=c.value_number,
-            value_boolean=c.value_boolean, is_wildcard=c.is_wildcard,
+            value_boolean=c.value_boolean, is_wildcard=is_wildcard,
         )
 
     @staticmethod

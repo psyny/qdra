@@ -162,6 +162,7 @@ class EntityData:
     id: uuid.UUID
     project_id: uuid.UUID
     created_at: datetime
+    parameters: List[ConstraintSpec] = field(default_factory=list)
 
 
 @dataclass

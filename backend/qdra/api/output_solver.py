@@ -126,6 +126,7 @@ class EntityDataModel(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     created_at: datetime
+    parameters: List[ConstraintSpecModel] = []
 
 
 class EntitiesModel(BaseModel):
@@ -274,11 +275,25 @@ def solve_output(
     entities_data = result.entities
     entities_model = EntitiesModel(
         materials={
-            k: EntityDataModel(id=v.id, project_id=v.project_id, created_at=v.created_at)
+            k: EntityDataModel(
+                id=v.id, project_id=v.project_id, created_at=v.created_at,
+                parameters=[ConstraintSpecModel(
+                    domain=p.domain, key=p.key, operator=p.operator,
+                    value_string=p.value_string, value_number=p.value_number,
+                    value_boolean=p.value_boolean, is_wildcard=p.is_wildcard,
+                ) for p in v.parameters]
+            )
             for k, v in entities_data.materials.items()
         },
         recipes={
-            k: EntityDataModel(id=v.id, project_id=v.project_id, created_at=v.created_at)
+            k: EntityDataModel(
+                id=v.id, project_id=v.project_id, created_at=v.created_at,
+                parameters=[ConstraintSpecModel(
+                    domain=p.domain, key=p.key, operator=p.operator,
+                    value_string=p.value_string, value_number=p.value_number,
+                    value_boolean=p.value_boolean, is_wildcard=p.is_wildcard,
+                ) for p in v.parameters]
+            )
             for k, v in entities_data.recipes.items()
         },
     )
