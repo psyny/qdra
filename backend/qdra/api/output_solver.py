@@ -1,7 +1,7 @@
 import uuid
-from typing import List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from services.planning.output_solver_service import OutputSolverService
 from domain.planning.output_solver_domain import (
     ConstraintSpec, ConstraintRule, TargetSpec,
     DomainConstraints, SearchParameters, SolverRequest,
+    UserVariableDef, ScoreFormulaDef, ScoreRules,
     MaterialNodeType, RecipeEdgeType,
 )
 
@@ -53,10 +54,37 @@ class SearchParametersModel(BaseModel):
     max_solutions_returned: int = 10
 
 
+class ConstraintSpecForVarModel(BaseModel):
+    domain: str
+    key: str
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+
+
+class UserVariableDefModel(BaseModel):
+    name: str
+    parameter_domain: str
+    parameter_key: str
+    variable_type: str  # "material" or "recipe"
+    constraints: List[List[ConstraintSpecForVarModel]] = []
+
+
+class ScoreFormulaDefModel(BaseModel):
+    name: str
+    formula: str
+
+
+class ScoreRulesModel(BaseModel):
+    user_variables: List[UserVariableDefModel] = []
+    score_formulas: List[ScoreFormulaDefModel] = []
+
+
 class SolverRequestModel(BaseModel):
     target: TargetSpecModel
     domain_constraints: DomainConstraintsModel = DomainConstraintsModel()
     search_parameters: SearchParametersModel = SearchParametersModel()
+    score_rules: Optional[ScoreRulesModel] = None
 
 
 # ---------------------------------------------------------------------------
@@ -92,14 +120,10 @@ class GraphModel(BaseModel):
     edges: List[EdgeModel] = []
 
 
-class PlanScoreModel(BaseModel):
-    recipe_count: int = 0
-
-
 class SolvedPlanModel(BaseModel):
     plan_id: str
     graph: GraphModel
-    score: PlanScoreModel
+    score: Dict[str, float]
 
 
 class SolverResponseModel(BaseModel):
@@ -148,15 +172,49 @@ def solve_output(
         max_solutions_returned=sp.max_solutions_returned,
     )
 
+    score_rules = None
+    if request_data.score_rules is not None:
+        sr = request_data.score_rules
+        user_vars = [
+            UserVariableDef(
+                name=v.name,
+                parameter_domain=v.parameter_domain,
+                parameter_key=v.parameter_key,
+                variable_type=v.variable_type,
+                constraints=[
+                    [
+                        ConstraintSpec(
+                            domain=c.domain, key=c.key, operator="=",
+                            value_string=c.value_string,
+                            value_number=c.value_number,
+                            value_boolean=c.value_boolean,
+                        )
+                        for c in option
+                    ]
+                    for option in v.constraints
+                ],
+            )
+            for v in sr.user_variables
+        ]
+        formulas = [
+            ScoreFormulaDef(name=f.name, formula=f.formula)
+            for f in sr.score_formulas
+        ]
+        score_rules = ScoreRules(user_variables=user_vars, score_formulas=formulas)
+
     solver_request = SolverRequest(
         project_id=project_id,
         target=target,
         domain_constraints=domain_constraints,
         search_parameters=search_parameters,
+        score_rules=score_rules,
     )
 
     service = OutputSolverService(db)
-    result = service.solve(solver_request)
+    try:
+        result = service.solve(solver_request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     plans = []
     for plan in result.plans:
@@ -196,9 +254,7 @@ def solve_output(
         plans.append(SolvedPlanModel(
             plan_id=plan.plan_id,
             graph=GraphModel(nodes=nodes, edges=edges),
-            score=PlanScoreModel(
-                recipe_count=plan.score.recipe_count,
-            ),
+            score=plan.score,
         ))
 
     return SolverResponseModel(success=result.success, plans=plans)

@@ -1,5 +1,6 @@
 import copy
 import math
+import re
 import uuid
 from typing import List, Dict, Optional, Set, Tuple, FrozenSet
 from dataclasses import dataclass, field
@@ -15,7 +16,8 @@ from repositories.project_repository import ProjectRepository
 from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,
     MaterialNodeType, RecipeEdgeType, ConstraintSpec, ConstraintRule,
-    PlanScore, SolvedPlan, SolverRequest, SolverResponse,
+    SolvedPlan, SolverRequest, SolverResponse,
+    UserVariableDef, ScoreFormulaDef, ScoreRules, SYSTEM_VARIABLE_NAMES,
 )
 
 
@@ -62,6 +64,22 @@ def _sig(constraints: List[ConstraintSpec]) -> str:
 _SLOT_ORDER = {SlotKind.PRODUCES: 0, SlotKind.CONSUMES: 1, SlotKind.REQUIRES: 2}
 
 
+def validate_formula(formula: str, variable_names: Set[str]) -> None:
+    """Validate a score formula string. Raises ValueError if invalid."""
+    identifiers = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', formula))
+    unknown = identifiers - variable_names
+    if unknown:
+        raise ValueError(f"Unknown variables in formula '{formula}': {unknown}")
+    test_vars = {name: 1.0 for name in variable_names}
+    try:
+        result = eval(formula, {"__builtins__": {}}, test_vars)
+        float(result)
+    except ZeroDivisionError:
+        pass
+    except Exception as e:
+        raise ValueError(f"Invalid formula '{formula}': {e}")
+
+
 class OutputSolverService:
     def __init__(self, db: Session):
         self.db = db
@@ -75,8 +93,21 @@ class OutputSolverService:
         if not self.project_repo.get_by_id(request.project_id):
             return SolverResponse(success=False)
 
+        if request.score_rules and request.score_rules.score_formulas:
+            system_names = set(SYSTEM_VARIABLE_NAMES)
+            user_names = {v.name for v in request.score_rules.user_variables}
+            all_names = system_names | user_names
+            for fdef in request.score_rules.score_formulas:
+                validate_formula(fdef.formula, all_names)
+
         recipes = self.recipe_repo.list_by_project(request.project_id)
         recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
+
+        recipe_params: Dict[str, List[ConstraintSpec]] = {}
+        if request.score_rules and any(
+            v.variable_type == "recipe" for v in request.score_rules.user_variables
+        ):
+            recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         target_node = MaterialNode(
             id="T_0001",
@@ -96,7 +127,7 @@ class OutputSolverService:
 
         plans: List[SolvedPlan] = []
         seen_fps: Set[str] = set()
-        self._explore(initial, recipe_structures, request, plans, seen_fps, frozenset())
+        self._explore(initial, recipe_structures, request, plans, seen_fps, frozenset(), recipe_params)
 
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
@@ -145,7 +176,7 @@ class OutputSolverService:
 
             node.tags = list(tags)
 
-    def _explore(self, state, recipe_structures, request, plans, seen_fps, ancestor_sigs):
+    def _explore(self, state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params):
         if len(plans) >= request.search_parameters.max_solutions_returned:
             return
 
@@ -158,7 +189,7 @@ class OutputSolverService:
                 break
 
         if current_id is None:
-            self._emit_plan(state, plans, seen_fps, request.target.constraints)
+            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params)
             return
 
         current = state.material_nodes[current_id]
@@ -175,11 +206,11 @@ class OutputSolverService:
         if surplus_id is not None:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
-            self._explore(branch, recipe_structures, request, plans, seen_fps, ancestor_sigs)
+            self._explore(branch, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.do_not_expand_materials_matching):
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs)
+            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.forbidden_materials_matching):
@@ -191,7 +222,7 @@ class OutputSolverService:
         )
 
         if not producers:
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs)
+            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
             return
 
         producers = producers[: request.search_parameters.max_branch_width]
@@ -203,7 +234,7 @@ class OutputSolverService:
             branch = state.clone()
             self._apply_recipe(branch, current_id, recipe_id, produces_option, recipe_structures)
             branch.recipe_depth += 1
-            self._explore(branch, recipe_structures, request, plans, seen_fps, new_sigs)
+            self._explore(branch, recipe_structures, request, plans, seen_fps, new_sigs, recipe_params)
 
     def _apply_recipe(self, state, need_id, recipe_id, produces_option, recipe_structures):
         need = state.material_nodes[need_id]
@@ -270,21 +301,21 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, target_constraints):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
         seen_fps.add(fp)
 
-        recipe_count = sum(n.execution_count for n in state.recipe_nodes.values())
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
+        score = self._compute_score(state, score_rules, recipe_params)
 
         plans.append(SolvedPlan(
             plan_id="",
             graph_nodes=all_nodes,
             material_edges=list(state.material_edges),
             recipe_edges=list(state.recipe_edges),
-            score=PlanScore(recipe_count=recipe_count),
+            score=score,
         ))
 
     def _fingerprint(self, state) -> str:
@@ -327,6 +358,120 @@ class OutputSolverService:
     def _matches_rule(self, constraints, rules) -> bool:
         return any(self._constraints_match(constraints, r.constraints) for r in rules)
 
+    def _compute_score(
+        self, state: "_State", score_rules, recipe_params: Dict
+    ) -> Dict[str, float]:
+        """Compute all scores for a finished plan state."""
+        scores: Dict[str, float] = {}
+
+        # System: RecipeExecution
+        scores["RecipeExecution"] = float(
+            sum(n.execution_count for n in state.recipe_nodes.values())
+        )
+
+        # System: MaterialSplit
+        n_mat_edges = len(state.material_edges)
+        scores["MaterialSplit"] = (
+            len(state.material_nodes) / n_mat_edges if n_mat_edges > 0 else 0.0
+        )
+
+        if score_rules:
+            var_values: Dict[str, float] = dict(scores)
+            for var_def in score_rules.user_variables:
+                value = self._compute_user_variable(state, var_def, recipe_params)
+                var_values[var_def.name] = value
+                scores[var_def.name] = value
+            for fdef in score_rules.score_formulas:
+                scores[fdef.name] = self._evaluate_formula(fdef.formula, var_values)
+
+        return scores
+
+    def _compute_user_variable(
+        self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict
+    ) -> float:
+        total = 0.0
+        if var_def.variable_type == "material":
+            for node in state.material_nodes.values():
+                if self._node_matches_var_constraints(node.material_constraints, var_def.constraints):
+                    param_value = self._extract_param_value(
+                        node.material_constraints, var_def.parameter_domain, var_def.parameter_key
+                    )
+                    total += param_value * node.produced_qty
+        else:  # "recipe"
+            for rn in state.recipe_nodes.values():
+                params = recipe_params.get(str(rn.recipe_id), [])
+                if self._node_matches_var_constraints(params, var_def.constraints):
+                    param_value = self._extract_param_value(
+                        params, var_def.parameter_domain, var_def.parameter_key
+                    )
+                    total += param_value * rn.execution_count
+        return total
+
+    @staticmethod
+    def _node_matches_var_constraints(
+        node_constraints: List[ConstraintSpec],
+        var_constraints: List[List[ConstraintSpec]],
+    ) -> bool:
+        """Returns True if node matches any option group (OR of AND groups)."""
+        if not var_constraints:
+            return True
+        for option in var_constraints:
+            if all(
+                any(
+                    nc.domain == sc.domain and nc.key == sc.key
+                    and nc.value_string == sc.value_string
+                    and nc.value_number == sc.value_number
+                    and nc.value_boolean == sc.value_boolean
+                    for nc in node_constraints
+                )
+                for sc in option
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_param_value(
+        constraints: List[ConstraintSpec], domain: str, key: str
+    ) -> float:
+        """Extract a numeric value from a constraint list for aggregation."""
+        for c in constraints:
+            if c.domain == domain and c.key == key:
+                if c.value_number is not None:
+                    return c.value_number
+                if c.value_string is not None:
+                    return 1.0  # count strings
+                if c.value_boolean is True:
+                    return 1.0  # count trues
+        return 0.0
+
+    @staticmethod
+    def _evaluate_formula(formula: str, variables: Dict[str, float]) -> float:
+        try:
+            result = eval(formula, {"__builtins__": {}}, dict(variables))
+            return float(result)
+        except ZeroDivisionError:
+            return 0.0
+
+    def _load_recipe_params(
+        self, recipe_ids: List[uuid.UUID]
+    ) -> Dict[str, List[ConstraintSpec]]:
+        """Load recipe parameters as ConstraintSpec lists, keyed by str(recipe_id)."""
+        from repositories.recipe_parameter_repository import RecipeParameterRepository
+        param_repo = RecipeParameterRepository(self.db)
+        result: Dict[str, List[ConstraintSpec]] = {}
+        for rid in recipe_ids:
+            params = param_repo.list_by_recipe(rid)
+            result[str(rid)] = [
+                ConstraintSpec(
+                    domain=p.domain, key=p.key, operator="=",
+                    value_string=p.value_string,
+                    value_number=p.value_number,
+                    value_boolean=p.value_boolean,
+                )
+                for p in params
+            ]
+        return result
+
     def _load_recipe_structure(self, recipe_id: uuid.UUID) -> Dict:
         slots = self.slot_repo.list_by_recipe(recipe_id)
         structure = {"recipe_id": recipe_id, "slots": []}
@@ -351,21 +496,69 @@ class OutputSolverService:
         )
 
     @staticmethod
-    def print_plan_graph(data: dict) -> None:
+    def print_plan_graph(
+        data: dict,
+        material_label_param: Optional[Tuple[str, str]] = None,
+        recipe_label_param: Optional[Tuple[str, str]] = None,
+    ) -> None:
         print("\n" + "=" * 60)
         print(f"SOLVER OUTPUT  success={data.get('success')}  plans={len(data.get('plans', []))}")
         for i, plan in enumerate(data.get("plans", []), 1):
             print(f"\n--- Plan {i}: {plan.get('plan_id')} ---")
             graph = plan.get("graph", {})
-            for n in graph.get("nodes", []):
+            nodes = graph.get("nodes", [])
+            edges = graph.get("edges", [])
+
+            # Build label mappings
+            node_id_to_label: Dict[str, str] = {}
+            for n in nodes:
+                nid = n["id"]
                 if n.get("kind") == "recipe_execution":
-                    print(f"  [R] {n['id']} recipe={n.get('recipe_id')} exec={n.get('execution_count')}")
+                    label = str(n.get("recipe_id", nid))[:8]
+                    if recipe_label_param:
+                        domain, key = recipe_label_param
+                        # Recipe params aren't in the node data, so we can't extract them here
+                        # Use the recipe_id as fallback
+                        pass
+                    node_id_to_label[nid] = label
                 else:
-                    cs = ", ".join(f"{c['key']}={c.get('value_string','?')}" for c in n.get("material_constraints", []))
+                    label = nid
+                    if material_label_param:
+                        domain, key = material_label_param
+                        for c in n.get("material_constraints", []):
+                            if c.get("domain") == domain and c.get("key") == key:
+                                val = c.get("value_string") or c.get("value_number") or c.get("value_boolean")
+                                if val is not None:
+                                    label = str(val)
+                                    break
+                    node_id_to_label[nid] = label
+
+            # Print nodes
+            print("Nodes:")
+            for n in nodes:
+                label = node_id_to_label[n["id"]]
+                if n.get("kind") == "recipe_execution":
+                    print(f"  {label}: recipe exec={n.get('execution_count')}")
+                else:
+                    node_type = n.get("type", "?")
+                    prod = n.get("produced_qty", 0)
+                    cons = n.get("consumed_qty", 0)
                     tags = n.get("tags", [])
-                    print(f"  [M] {n['id']} type={n.get('type')} {cs} prod={n.get('produced_qty')} cons={n.get('consumed_qty')} tags={tags}")
-            for e in graph.get("edges", []):
-                print(f"  {e.get('from_node_id')} --[{e.get('edge_type','?')}:{e.get('qty')}]--> {e.get('to_node_id')}")
+                    print(f"  {label}: material type={node_type} prod={prod} cons={cons} tags={tags}")
+
+            # Print edges
+            print("Edges:")
+            for e in edges:
+                from_label = node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
+                to_label = node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
+                edge_type = e.get("edge_type", "?")
+                qty = e.get("qty", 0)
+                print(f"  {from_label} --> {to_label}: type={edge_type} qty={qty}")
+
+            # Print scores
+            print("Scores:")
             score = plan.get("score", {})
-            print(f"  score: recipe_count={score.get('recipe_count')}")
+            for name, value in score.items():
+                print(f"  {name}: {value}")
+
         print("=" * 60 + "\n")

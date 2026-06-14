@@ -4,6 +4,9 @@ from typing import List, Optional, Dict, Union
 from enum import Enum
 
 
+SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit"}
+
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -114,16 +117,34 @@ class SearchParameters:
 
 
 @dataclass
+class UserVariableDef:
+    name: str
+    parameter_domain: str
+    parameter_key: str
+    variable_type: str  # "material" or "recipe"
+    # list of options (OR semantics); each option is a list of ConstraintSpec (AND semantics)
+    constraints: List[List[ConstraintSpec]] = field(default_factory=list)
+
+
+@dataclass
+class ScoreFormulaDef:
+    name: str
+    formula: str
+
+
+@dataclass
+class ScoreRules:
+    user_variables: List[UserVariableDef] = field(default_factory=list)
+    score_formulas: List[ScoreFormulaDef] = field(default_factory=list)
+
+
+@dataclass
 class SolverRequest:
     project_id: uuid.UUID
     target: TargetSpec
     domain_constraints: DomainConstraints = field(default_factory=DomainConstraints)
     search_parameters: SearchParameters = field(default_factory=SearchParameters)
-
-
-@dataclass
-class PlanScore:
-    recipe_count: int = 0
+    score_rules: Optional[ScoreRules] = None
 
 
 @dataclass
@@ -132,7 +153,7 @@ class SolvedPlan:
     graph_nodes: List[Union[MaterialNode, RecipeExecNode]]
     material_edges: List[MaterialEdge]
     recipe_edges: List[RecipeEdge]
-    score: PlanScore
+    score: Dict[str, float]
 
 
 @dataclass

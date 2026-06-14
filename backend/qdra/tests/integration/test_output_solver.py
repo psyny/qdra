@@ -96,11 +96,12 @@ def test_root_material_becomes_root_requirement(client):
     }).json()
 
     # Mining: produces iron_ore (no inputs)
-    client.post(
+    mining_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [
-                {"domain": "identity", "key": "name", "value_string": "Mining"}
+                {"domain": "identity", "key": "name", "value_string": "Mining"},
+                {"domain": "resource", "key": "power", "value_number": 5.0}
             ],
             "slots": [
                 {
@@ -117,13 +118,15 @@ def test_root_material_becomes_root_requirement(client):
             ],
         },
     )
+    mining_id = mining_response.json()["id"]
 
     # Smelting: consumes iron_ore + coal_ore, produces steel_ingot
-    client.post(
+    smelting_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [
-                {"domain": "identity", "key": "name", "value_string": "Smelting"}
+                {"domain": "identity", "key": "name", "value_string": "Smelting"},
+                {"domain": "resource", "key": "power", "value_number": 15.0}
             ],
             "slots": [
                 {
@@ -173,6 +176,7 @@ def test_root_material_becomes_root_requirement(client):
             ],
         },
     )
+    smelting_id = smelting_response.json()["id"]
 
     # Plan for 10 steel_ingot — coal_ore has no producer, becomes root requirement
     plan_response = client.post(
@@ -183,6 +187,23 @@ def test_root_material_becomes_root_requirement(client):
                 "constraints": [
                     {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(steel_ingot["id"])}
                 ],
+            },
+            "score_rules": {
+                "user_variables": [
+                    {
+                        "name": "TotalPower",
+                        "parameter_domain": "resource",
+                        "parameter_key": "power",
+                        "variable_type": "recipe",
+                        "constraints": []
+                    }
+                ],
+                "score_formulas": [
+                    {
+                        "name": "PowerEfficiency",
+                        "formula": "TotalPower / RecipeExecution"
+                    }
+                ]
             }
         },
     )
@@ -222,7 +243,11 @@ def test_root_material_becomes_root_requirement(client):
         print(f"  Edge: {edge}")
 
     print("----------------------------")
-    OutputSolverService.print_plan_graph(data)
+    OutputSolverService.print_plan_graph(
+        data,
+        material_label_param=("identity", "name"),
+        recipe_label_param=("identity", "name"),
+    )
 
     assert data["success"] is True
     assert len(data["plans"]) == 1
@@ -237,3 +262,19 @@ def test_root_material_becomes_root_requirement(client):
     ]
     assert len(coal_ore_nodes) > 0
     assert "root" in coal_ore_nodes[0].get("tags", [])
+
+    # Verify scores
+    score = plan["score"]
+    assert "RecipeExecution" in score
+    assert "MaterialSplit" in score
+    assert "TotalPower" in score
+    assert "PowerEfficiency" in score
+
+    # RecipeExecution should be 20 (10 smelting + 10 mining)
+    assert score["RecipeExecution"] == 20.0
+
+    # TotalPower = (10 * 15) + (10 * 5) = 150 + 50 = 200
+    assert score["TotalPower"] == 200.0
+
+    # PowerEfficiency = TotalPower / RecipeExecution = 200 / 20 = 10
+    assert score["PowerEfficiency"] == 10.0
