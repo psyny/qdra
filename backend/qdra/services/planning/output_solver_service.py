@@ -633,4 +633,48 @@ class OutputSolverService:
             for name, value in score.items():
                 print(f"  {name}: {value}")
 
+            # Print graphviz dot code
+            print(f"\n// Graphviz for Plan {i}")
+            print("digraph {")
+            print("  rankdir=LR;")
+
+            # Calculate max edge qty for width scaling
+            max_qty = max((e.get("qty", 0) for e in edges), default=1)
+            if max_qty == 0:
+                max_qty = 1
+
+            # Print graphviz nodes
+            for n in nodes:
+                label = node_id_to_label[n["id"]]
+                if n.get("kind") == "recipe_execution":
+                    exec_count = n.get("execution_count", 1)
+                    print(f'  "{n["id"]}" [label="{label}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
+                else:
+                    prod = n.get("produced_qty", 0)
+                    cons_qty = n.get("consumed_qty", 0)
+                    tags = n.get("tags", [])
+
+                    # Determine color based on tags
+                    if "excess" in tags:
+                        color = "#ff6b6b"  # red
+                    elif "root" in tags:
+                        color = "#4dabf7"  # blue
+                    elif "leaf" in tags:
+                        color = "#69db7c"  # green
+                    else:
+                        color = "#ffd43b"  # yellow
+
+                    print(f'  "{n["id"]}" [label="{label}\\n{cons_qty}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+
+            # Print graphviz edges
+            for e in edges:
+                qty = e.get("qty", 0)
+                width = 1 + (qty / max_qty) * 3  # scale 1-4
+                width = min(max(width, 1), 4)
+                from_label = node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
+                to_label = node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
+                print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty}", penwidth={width:.1f}];')
+
+            print("}")
+
         print("=" * 60 + "\n")
