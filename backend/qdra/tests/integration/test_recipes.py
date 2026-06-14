@@ -5,10 +5,9 @@ def test_create_recipe(client):
     project_id = project_response.json()["id"]
 
     # Create a recipe
-    response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    response = client.post(f"/projects/{project_id}/recipes")
     assert response.status_code == 201
     data = response.json()
-    assert data["name"] == "Smelting"
     assert data["project_id"] == project_id
     assert "id" in data
 
@@ -20,8 +19,8 @@ def test_list_recipes(client):
     project_id = project_response.json()["id"]
 
     # Create recipes
-    client.post(f"/projects/{project_id}/recipes", json={"name": "Recipe 1"})
-    client.post(f"/projects/{project_id}/recipes", json={"name": "Recipe 2"})
+    client.post(f"/projects/{project_id}/recipes")
+    client.post(f"/projects/{project_id}/recipes")
 
     # List recipes
     response = client.get(f"/projects/{project_id}/recipes")
@@ -37,7 +36,7 @@ def test_get_recipe(client):
     project_id = project_response.json()["id"]
 
     # Create a recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Get recipe
@@ -52,7 +51,7 @@ def test_create_slot(client):
     # Create a project and recipe
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Create a slot
@@ -68,7 +67,7 @@ def test_create_option(client):
     # Create a project, recipe, and slot
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
     slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
     slot_id = slot_response.json()["id"]
@@ -86,7 +85,7 @@ def test_create_constraint(client):
     # Create a project, recipe, slot, and option
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
     slot_response = client.post(f"/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"})
     slot_id = slot_response.json()["id"]
@@ -115,7 +114,7 @@ def test_add_recipe_parameter(client):
     # Create a project and recipe
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Add a parameter
@@ -140,7 +139,7 @@ def test_list_recipe_parameters(client):
     # Create a project and recipe
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Add parameters
@@ -165,7 +164,7 @@ def test_delete_recipe_parameter(client):
     # Create a project and recipe
     project_response = client.post("/projects", json={"name": "Factory Test"})
     project_id = project_response.json()["id"]
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Add a parameter
@@ -195,7 +194,6 @@ def test_create_recipe_bulk_with_parameters(client):
     response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "parameters": [
                 {"domain": "identity", "key": "name", "value_string": "steel_ingot"},
                 {"domain": "classification", "key": "metal", "value_boolean": True},

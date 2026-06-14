@@ -10,8 +10,8 @@ class RecipeRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, project_id: uuid.UUID, name: str) -> Recipe:
-        recipe = Recipe(project_id=project_id, name=name)
+    def create(self, project_id: uuid.UUID) -> Recipe:
+        recipe = Recipe(project_id=project_id)
         self.db.add(recipe)
         self.db.commit()
         self.db.refresh(recipe)

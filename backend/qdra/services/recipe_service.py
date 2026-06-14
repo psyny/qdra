@@ -26,11 +26,11 @@ class RecipeService:
         self.project_repository = ProjectRepository(db)
         self.recipe_parameter_repository = RecipeParameterRepository(db)
 
-    def create_recipe(self, project_id: uuid.UUID, name: str) -> Recipe:
+    def create_recipe(self, project_id: uuid.UUID) -> Recipe:
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project with id '{project_id}' not found")
-        return self.recipe_repository.create(project_id, name)
+        return self.recipe_repository.create(project_id)
 
     def get_recipe(self, recipe_id: uuid.UUID) -> Recipe:
         recipe = self.recipe_repository.get_by_id(recipe_id)

@@ -18,7 +18,6 @@ def test_constraint_matching_exists(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -63,7 +62,6 @@ def test_constraint_matching_gte(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -107,7 +105,6 @@ def test_constraint_matching_lt(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -151,7 +148,6 @@ def test_constraint_matching_eq(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -198,7 +194,6 @@ def test_quantity_matching_sufficient(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -246,7 +241,6 @@ def test_quantity_matching_insufficient(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -290,7 +284,6 @@ def test_option_matching_or_semantics(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -337,7 +330,7 @@ def test_option_matching_second_option_succeeds(client):
     material_id = material_response.json()["id"]
 
     # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={"name": "Smelting"})
+    recipe_response = client.post(f"/projects/{project_id}/recipes")
     recipe_id = recipe_response.json()["id"]
 
     # Create slot
@@ -392,7 +385,6 @@ def test_slot_matching_and_semantics(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -449,7 +441,6 @@ def test_slot_matching_one_slot_fails(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -507,7 +498,6 @@ def test_allocation_material_reuse_forbidden(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -565,7 +555,6 @@ def test_allocation_distinct_materials(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -624,7 +613,6 @@ def test_recipe_evaluation_single_slot_success(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -669,7 +657,6 @@ def test_recipe_evaluation_single_slot_failure(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -718,7 +705,6 @@ def test_recipe_evaluation_multiple_constraints(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -768,7 +754,6 @@ def test_recipe_evaluation_multiple_constraints_fail(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",

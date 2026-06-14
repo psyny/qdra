@@ -99,7 +99,6 @@ def test_root_material_becomes_root_requirement(client):
     client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Mining",
             "parameters": [
                 {"domain": "identity", "key": "name", "value_string": "Mining"}
             ],
@@ -123,7 +122,6 @@ def test_root_material_becomes_root_requirement(client):
     client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "parameters": [
                 {"domain": "identity", "key": "name", "value_string": "Smelting"}
             ],

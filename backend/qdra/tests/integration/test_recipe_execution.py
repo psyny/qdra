@@ -24,7 +24,6 @@ def test_consumed_materials_are_removed(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -74,7 +73,6 @@ def test_only_allocated_materials_are_removed(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -128,7 +126,6 @@ def test_required_materials_remain_available(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "REQUIRES",
@@ -196,7 +193,6 @@ def test_required_materials_can_participate_in_future_executions(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "REQUIRES",
@@ -261,7 +257,6 @@ def test_produced_materials_are_created(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -322,7 +317,6 @@ def test_produced_material_parameters_are_correct(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -385,7 +379,6 @@ def test_multiple_produced_materials_can_be_created(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -441,7 +434,6 @@ def test_execution_failure_does_not_modify_state(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "REQUIRES",
@@ -491,7 +483,6 @@ def test_no_materials_removed_on_failure(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -537,7 +528,6 @@ def test_no_materials_created_on_failure(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "REQUIRES",
@@ -603,7 +593,6 @@ def test_state_transition_complete(client):
     recipe_response = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "name": "Smelting",
             "slots": [
                 {
                     "kind": "CONSUMES",

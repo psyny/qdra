@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 class RecipeCreate(BaseModel):
-    name: str
+    pass
 
 
 class RecipeParameterCreate(BaseModel):
@@ -46,7 +46,6 @@ class SlotBulkCreate(BaseModel):
 
 
 class RecipeBulkCreate(BaseModel):
-    name: str
     parameters: List[RecipeParameterCreate] = []
     slots: List[SlotBulkCreate] = []
 
@@ -66,7 +65,6 @@ class RecipeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_id: uuid.UUID
-    name: str
 
 
 class SlotCreate(BaseModel):
@@ -143,10 +141,10 @@ class RecipeExecutionResponse(BaseModel):
 
 
 @router.post("/projects/{project_id}/recipes", response_model=RecipeResponse, status_code=201)
-def create_recipe(project_id: uuid.UUID, recipe_data: RecipeCreate, db: Session = Depends(get_db)):
+def create_recipe(project_id: uuid.UUID, db: Session = Depends(get_db)):
     service = RecipeService(db)
     try:
-        recipe = service.create_recipe(project_id, recipe_data.name)
+        recipe = service.create_recipe(project_id)
         return recipe
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -156,7 +154,7 @@ def create_recipe(project_id: uuid.UUID, recipe_data: RecipeCreate, db: Session 
 def create_recipe_bulk(project_id: uuid.UUID, recipe_data: RecipeBulkCreate, db: Session = Depends(get_db)):
     service = RecipeService(db)
     try:
-        recipe = service.create_recipe(project_id, recipe_data.name)
+        recipe = service.create_recipe(project_id)
 
         for param_data in recipe_data.parameters:
             service.add_parameter(
