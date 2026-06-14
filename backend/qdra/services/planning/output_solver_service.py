@@ -15,7 +15,7 @@ from repositories.project_repository import ProjectRepository
 from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,
     MaterialNodeType, RecipeEdgeType, ConstraintSpec, ConstraintRule,
-    RootRequirement, PlanScore, SolvedPlan, SolverRequest, SolverResponse,
+    PlanScore, SolvedPlan, SolverRequest, SolverResponse,
 )
 
 
@@ -276,24 +276,6 @@ class OutputSolverService:
             return
         seen_fps.add(fp)
 
-        nodes_with_incoming: Set[str] = set()
-        for e in state.material_edges:
-            nodes_with_incoming.add(e.to_node_id)
-        for e in state.recipe_edges:
-            if e.type == RecipeEdgeType.PRODUCES:
-                nodes_with_incoming.add(e.to_node_id)
-
-        root_reqs: List[RootRequirement] = []
-        material_costs: Dict[str, float] = {}
-        for node in state.material_nodes.values():
-            if node.id not in nodes_with_incoming:
-                key = _sig(node.material_constraints)
-                qty = node.consumed_qty
-                root_reqs.append(RootRequirement(id=node.id, role="root_requirement", quantity=qty, constraints=node.material_constraints))
-                material_costs[key] = material_costs.get(key, 0.0) + qty
-
-        root_reqs.sort(key=lambda r: _sig(r.constraints))
-
         recipe_count = sum(n.execution_count for n in state.recipe_nodes.values())
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
 
@@ -302,8 +284,7 @@ class OutputSolverService:
             graph_nodes=all_nodes,
             material_edges=list(state.material_edges),
             recipe_edges=list(state.recipe_edges),
-            root_requirements=root_reqs,
-            score=PlanScore(material_costs=material_costs, recipe_count=recipe_count),
+            score=PlanScore(recipe_count=recipe_count),
         ))
 
     def _fingerprint(self, state) -> str:
@@ -381,12 +362,10 @@ class OutputSolverService:
                     print(f"  [R] {n['id']} recipe={n.get('recipe_id')} exec={n.get('execution_count')}")
                 else:
                     cs = ", ".join(f"{c['key']}={c.get('value_string','?')}" for c in n.get("material_constraints", []))
-                    print(f"  [M] {n['id']} type={n.get('type')} {cs} prod={n.get('produced_qty')} cons={n.get('consumed_qty')}")
+                    tags = n.get("tags", [])
+                    print(f"  [M] {n['id']} type={n.get('type')} {cs} prod={n.get('produced_qty')} cons={n.get('consumed_qty')} tags={tags}")
             for e in graph.get("edges", []):
                 print(f"  {e.get('from_node_id')} --[{e.get('edge_type','?')}:{e.get('qty')}]--> {e.get('to_node_id')}")
-            for rr in plan.get("root_requirements", []):
-                cs = ", ".join(f"{c['key']}={c.get('value_string','?')}" for c in rr.get("constraints", []))
-                print(f"  ROOT {rr.get('role')} qty={rr.get('quantity')} {cs}")
             score = plan.get("score", {})
-            print(f"  score: material_costs={score.get('material_costs')} recipe_count={score.get('recipe_count')}")
+            print(f"  score: recipe_count={score.get('recipe_count')}")
         print("=" * 60 + "\n")

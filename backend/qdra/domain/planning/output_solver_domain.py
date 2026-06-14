@@ -123,16 +123,7 @@ class SolverRequest:
 
 @dataclass
 class PlanScore:
-    material_costs: Dict[str, float] = field(default_factory=dict)
     recipe_count: int = 0
-
-
-@dataclass
-class RootRequirement:
-    id: str
-    role: str
-    quantity: float
-    constraints: List[ConstraintSpec]
 
 
 @dataclass
@@ -141,7 +132,6 @@ class SolvedPlan:
     graph_nodes: List[Union[MaterialNode, RecipeExecNode]]
     material_edges: List[MaterialEdge]
     recipe_edges: List[RecipeEdge]
-    root_requirements: List[RootRequirement]
     score: PlanScore
 
 

@@ -92,22 +92,13 @@ class GraphModel(BaseModel):
     edges: List[EdgeModel] = []
 
 
-class RootRequirementModel(BaseModel):
-    id: str
-    role: str
-    quantity: float
-    constraints: List[ConstraintSpecModel]
-
-
 class PlanScoreModel(BaseModel):
-    material_costs: dict = {}
     recipe_count: int = 0
 
 
 class SolvedPlanModel(BaseModel):
     plan_id: str
     graph: GraphModel
-    root_requirements: List[RootRequirementModel]
     score: PlanScoreModel
 
 
@@ -202,27 +193,10 @@ def solve_output(
         for e in plan.recipe_edges:
             edges.append(EdgeModel(from_node_id=e.from_node_id, to_node_id=e.to_node_id, qty=e.qty, edge_type=e.type.value))
 
-        root_reqs = [
-            RootRequirementModel(
-                id=rr.id, role=rr.role, quantity=rr.quantity,
-                constraints=[
-                    ConstraintSpecModel(
-                        domain=c.domain, key=c.key, operator=c.operator,
-                        value_string=c.value_string, value_number=c.value_number,
-                        value_boolean=c.value_boolean, is_wildcard=c.is_wildcard,
-                    )
-                    for c in rr.constraints
-                ],
-            )
-            for rr in plan.root_requirements
-        ]
-
         plans.append(SolvedPlanModel(
             plan_id=plan.plan_id,
             graph=GraphModel(nodes=nodes, edges=edges),
-            root_requirements=root_reqs,
             score=PlanScoreModel(
-                material_costs=plan.score.material_costs,
                 recipe_count=plan.score.recipe_count,
             ),
         ))

@@ -185,15 +185,11 @@ def test_root_material_becomes_root_requirement(client):
 
     plan = data["plans"][0]
 
-    # coal_ore has no producer -> must appear as a root requirement
-    assert plan["root_requirements"][0]["constraints"][0]["value_string"] == "coal_ore"
-    assert plan["root_requirements"][0]["quantity"] == 10
-
-    root_reqs = [r for r in plan["root_requirements"] if r["role"] == "root_requirement"]
-    assert len(root_reqs) > 0
-
-    coal_ore_reqs = [
-        r for r in root_reqs
-        if any(c["value_string"] == "coal_ore" for c in r["constraints"])
+    # coal_ore has no producer -> should be tagged as "root"
+    coal_ore_nodes = [
+        n for n in plan["graph"]["nodes"]
+        if n.get("kind") != "recipe_execution" and
+        any(c.get("value_string") == "coal_ore" for c in n.get("material_constraints", []))
     ]
-    assert len(coal_ore_reqs) > 0
+    assert len(coal_ore_nodes) > 0
+    assert "root" in coal_ore_nodes[0].get("tags", [])
