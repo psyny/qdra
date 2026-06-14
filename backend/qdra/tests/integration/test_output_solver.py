@@ -7,8 +7,13 @@ def print_pretty(obj):
     print(json.dumps(obj, indent=2))
 
 
-def print_graphviz(data):
+def print_graphviz(data, material_id_to_label=None, recipe_id_to_label=None):
     """Print graphviz dot code for each plan graph."""
+    if material_id_to_label is None:
+        material_id_to_label = {}
+    if recipe_id_to_label is None:
+        recipe_id_to_label = {}
+
     print("\n" + "=" * 60)
     print("GRAPHVIZ DOT OUTPUT")
     print("=" * 60)
@@ -31,14 +36,12 @@ def print_graphviz(data):
         for node in nodes:
             if node.get("kind") == "recipe_execution":
                 rid = node.get("recipe_id", "unknown")
+                label = recipe_id_to_label.get(rid, str(rid)[:8])
                 exec_count = node.get("execution_count", 1)
-                print(f'  "{node["id"]}" [label="{rid}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
+                print(f'  "{node["id"]}" [label="{label}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
             else:
-                cons = node.get("material_constraints", [])
-                if cons:
-                    name = cons[0].get("value_string", cons[0].get("value_number", "?"))
-                else:
-                    name = "?"
+                nid = node.get("id", "unknown")
+                label = material_id_to_label.get(nid, "?")
                 prod = node.get("produced_qty", 0)
                 cons_qty = node.get("consumed_qty", 0)
                 tags = node.get("tags", [])
@@ -53,7 +56,7 @@ def print_graphviz(data):
                 else:
                     color = "#ffd43b"  # yellow
 
-                print(f'  "{node["id"]}" [label="{name}\\n{cons_qty}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+                print(f'  "{node["id"]}" [label="{label}\\n{cons_qty}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
 
         # Print edges
         for edge in edges:
@@ -78,6 +81,9 @@ def test_root_material_becomes_root_requirement(client):
         f"/projects/{project_id}/recipes/bulk",
         json={
             "name": "Mining",
+            "parameters": [
+                {"domain": "identity", "key": "name", "value_string": "Mining"}
+            ],
             "slots": [
                 {
                     "kind": "PRODUCES",
@@ -99,6 +105,9 @@ def test_root_material_becomes_root_requirement(client):
         f"/projects/{project_id}/recipes/bulk",
         json={
             "name": "Smelting",
+            "parameters": [
+                {"domain": "identity", "key": "name", "value_string": "Smelting"}
+            ],
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -143,7 +152,7 @@ def test_root_material_becomes_root_requirement(client):
                             ],
                         }
                     ],
-                },                
+                },
             ],
         },
     )
