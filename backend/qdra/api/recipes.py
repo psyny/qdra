@@ -17,6 +17,14 @@ class RecipeCreate(BaseModel):
     name: str
 
 
+class RecipeParameterCreate(BaseModel):
+    domain: str
+    key: str
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+
+
 class ConstraintCreate(BaseModel):
     domain: str
     key: str
@@ -39,7 +47,19 @@ class SlotBulkCreate(BaseModel):
 
 class RecipeBulkCreate(BaseModel):
     name: str
+    parameters: List[RecipeParameterCreate] = []
     slots: List[SlotBulkCreate] = []
+
+
+class RecipeParameterResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    recipe_id: uuid.UUID
+    domain: str
+    key: str
+    value_string: Optional[str]
+    value_number: Optional[float]
+    value_boolean: Optional[bool]
 
 
 class RecipeResponse(BaseModel):
@@ -137,13 +157,23 @@ def create_recipe_bulk(project_id: uuid.UUID, recipe_data: RecipeBulkCreate, db:
     service = RecipeService(db)
     try:
         recipe = service.create_recipe(project_id, recipe_data.name)
-        
+
+        for param_data in recipe_data.parameters:
+            service.add_parameter(
+                recipe_id=recipe.id,
+                domain=param_data.domain,
+                key=param_data.key,
+                value_string=param_data.value_string,
+                value_number=param_data.value_number,
+                value_boolean=param_data.value_boolean,
+            )
+
         for slot_data in recipe_data.slots:
             slot = service.create_slot(recipe.id, slot_data.kind)
-            
+
             for option_data in slot_data.options:
                 option = service.create_option(slot.id, option_data.quantity)
-                
+
                 for constraint_data in option_data.constraints:
                     service.create_constraint(
                         option_id=option.id,
@@ -155,7 +185,7 @@ def create_recipe_bulk(project_id: uuid.UUID, recipe_data: RecipeBulkCreate, db:
                         value_boolean=constraint_data.value_boolean,
                         is_wildcard=constraint_data.is_wildcard,
                     )
-        
+
         return recipe
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -256,7 +286,7 @@ def execute_recipe(
 ):
     service = RecipeExecutionService(db)
     result = service.execute_recipe(recipe_id, execution_data.materials)
-    
+
     return RecipeExecutionResponse(
         success=result.success,
         recipe_id=result.recipe_id,
@@ -266,3 +296,40 @@ def execute_recipe(
         state_before=result.state_before,
         state_after=result.state_after
     )
+
+
+@router.post("/recipes/{recipe_id}/parameters", response_model=RecipeParameterResponse, status_code=201)
+def add_recipe_parameter(
+    recipe_id: uuid.UUID, param_data: RecipeParameterCreate, db: Session = Depends(get_db)
+):
+    service = RecipeService(db)
+    try:
+        parameter = service.add_parameter(
+            recipe_id=recipe_id,
+            domain=param_data.domain,
+            key=param_data.key,
+            value_string=param_data.value_string,
+            value_number=param_data.value_number,
+            value_boolean=param_data.value_boolean,
+        )
+        return parameter
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/recipes/{recipe_id}/parameters", response_model=list[RecipeParameterResponse])
+def list_recipe_parameters(recipe_id: uuid.UUID, db: Session = Depends(get_db)):
+    service = RecipeService(db)
+    try:
+        return service.get_recipe_parameters(recipe_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/recipe_parameters/{parameter_id}")
+def delete_recipe_parameter(parameter_id: uuid.UUID, db: Session = Depends(get_db)):
+    service = RecipeService(db)
+    deleted = service.delete_parameter(parameter_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Parameter not found")
+    return {"message": "Parameter deleted"}

@@ -7,11 +7,13 @@ from models.recipe import Recipe
 from models.slot import Slot, SlotKind
 from models.option import Option
 from models.parameter_constraint import ParameterConstraint, Operator
+from models.recipe_parameter import RecipeParameter
 from repositories.recipe_repository import RecipeRepository
 from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
+from repositories.recipe_parameter_repository import RecipeParameterRepository
 
 
 class RecipeService:
@@ -22,6 +24,7 @@ class RecipeService:
         self.option_repository = OptionRepository(db)
         self.constraint_repository = ParameterConstraintRepository(db)
         self.project_repository = ProjectRepository(db)
+        self.recipe_parameter_repository = RecipeParameterRepository(db)
 
     def create_recipe(self, project_id: uuid.UUID, name: str) -> Recipe:
         project = self.project_repository.get_by_id(project_id)
@@ -89,3 +92,33 @@ class RecipeService:
             value_boolean=value_boolean,
             is_wildcard=is_wildcard,
         )
+
+    def add_parameter(
+        self,
+        recipe_id: uuid.UUID,
+        domain: str,
+        key: str,
+        value_string: Optional[str] = None,
+        value_number: Optional[float] = None,
+        value_boolean: Optional[bool] = None,
+    ) -> RecipeParameter:
+        recipe = self.recipe_repository.get_by_id(recipe_id)
+        if not recipe:
+            raise ValueError(f"Recipe with id '{recipe_id}' not found")
+        return self.recipe_parameter_repository.create(
+            recipe_id=recipe_id,
+            domain=domain,
+            key=key,
+            value_string=value_string,
+            value_number=value_number,
+            value_boolean=value_boolean,
+        )
+
+    def get_recipe_parameters(self, recipe_id: uuid.UUID) -> List[RecipeParameter]:
+        recipe = self.recipe_repository.get_by_id(recipe_id)
+        if not recipe:
+            raise ValueError(f"Recipe with id '{recipe_id}' not found")
+        return self.recipe_parameter_repository.list_by_recipe(recipe_id)
+
+    def delete_parameter(self, parameter_id: uuid.UUID) -> bool:
+        return self.recipe_parameter_repository.delete(parameter_id)
