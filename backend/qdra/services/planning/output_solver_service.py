@@ -567,7 +567,8 @@ class OutputSolverService:
             nodes = graph.get("nodes", [])
             edges = graph.get("edges", [])
 
-            # Build label mappings
+            # Build label mappings using entities data
+            entities = data.get("entities", {})
             node_id_to_label: Dict[str, str] = {}
             for n in nodes:
                 nid = n["id"]
@@ -575,20 +576,33 @@ class OutputSolverService:
                     label = str(n.get("recipe_id", nid))[:8]
                     if recipe_label_param:
                         domain, key = recipe_label_param
-                        # Recipe params aren't in the node data, so we can't extract them here
-                        # Use the recipe_id as fallback
-                        pass
+                        recipe_id = n.get("recipe_id")
+                        if recipe_id and "recipes" in entities:
+                            recipe_data = entities["recipes"].get(str(recipe_id))
+                            if recipe_data and "parameters" in recipe_data:
+                                for p in recipe_data["parameters"]:
+                                    if p.get("domain") == domain and p.get("key") == key:
+                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                        if val is not None:
+                                            label = str(val)
+                                            break
                     node_id_to_label[nid] = label
                 else:
                     label = nid
                     if material_label_param:
                         domain, key = material_label_param
                         for c in n.get("material_constraints", []):
-                            if c.get("domain") == domain and c.get("key") == key:
-                                val = c.get("value_string") or c.get("value_number") or c.get("value_boolean")
-                                if val is not None:
-                                    label = str(val)
-                                    break
+                            if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
+                                material_id = c.get("value_string")
+                                if material_id and "materials" in entities:
+                                    mat_data = entities["materials"].get(material_id)
+                                    if mat_data and "parameters" in mat_data:
+                                        for p in mat_data["parameters"]:
+                                            if p.get("domain") == domain and p.get("key") == key:
+                                                val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                                if val is not None:
+                                                    label = str(val)
+                                                    break
                     node_id_to_label[nid] = label
 
             # Print nodes
