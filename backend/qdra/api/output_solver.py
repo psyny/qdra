@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +13,7 @@ from domain.planning.output_solver_domain import (
     DomainConstraints, SearchParameters, SolverRequest,
     UserVariableDef, ScoreFormulaDef, ScoreRules,
     MaterialNodeType, RecipeEdgeType,
+    Entities, EntityData,
 )
 
 router = APIRouter()
@@ -120,6 +122,17 @@ class GraphModel(BaseModel):
     edges: List[EdgeModel] = []
 
 
+class EntityDataModel(BaseModel):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    created_at: datetime
+
+
+class EntitiesModel(BaseModel):
+    materials: Dict[uuid.UUID, EntityDataModel] = {}
+    recipes: Dict[uuid.UUID, EntityDataModel] = {}
+
+
 class SolvedPlanModel(BaseModel):
     plan_id: str
     graph: GraphModel
@@ -129,6 +142,7 @@ class SolvedPlanModel(BaseModel):
 class SolverResponseModel(BaseModel):
     success: bool
     plans: List[SolvedPlanModel] = []
+    entities: EntitiesModel = EntitiesModel()
 
 
 # ---------------------------------------------------------------------------
@@ -257,4 +271,16 @@ def solve_output(
             score=plan.score,
         ))
 
-    return SolverResponseModel(success=result.success, plans=plans)
+    entities_data = result.entities
+    entities_model = EntitiesModel(
+        materials={
+            k: EntityDataModel(id=v.id, project_id=v.project_id, created_at=v.created_at)
+            for k, v in entities_data.materials.items()
+        },
+        recipes={
+            k: EntityDataModel(id=v.id, project_id=v.project_id, created_at=v.created_at)
+            for k, v in entities_data.recipes.items()
+        },
+    )
+
+    return SolverResponseModel(success=result.success, plans=plans, entities=entities_model)

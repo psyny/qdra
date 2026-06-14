@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Union
 from enum import Enum
@@ -157,6 +158,20 @@ class SolvedPlan:
 
 
 @dataclass
+class EntityData:
+    id: uuid.UUID
+    project_id: uuid.UUID
+    created_at: datetime
+
+
+@dataclass
+class Entities:
+    materials: Dict[uuid.UUID, EntityData] = field(default_factory=dict)
+    recipes: Dict[uuid.UUID, EntityData] = field(default_factory=dict)
+
+
+@dataclass
 class SolverResponse:
     success: bool
     plans: List[SolvedPlan] = field(default_factory=list)
+    entities: Entities = field(default_factory=Entities)

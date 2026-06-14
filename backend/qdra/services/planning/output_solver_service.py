@@ -7,7 +7,10 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from models.slot import SlotKind
+from models.material import Material
+from models.recipe import Recipe
 from repositories.recipe_repository import RecipeRepository
+from repositories.material_repository import MaterialRepository
 from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
@@ -18,6 +21,7 @@ from domain.planning.output_solver_domain import (
     MaterialNodeType, RecipeEdgeType, ConstraintSpec, ConstraintRule,
     SolvedPlan, SolverRequest, SolverResponse,
     UserVariableDef, ScoreFormulaDef, ScoreRules, SYSTEM_VARIABLE_NAMES,
+    Entities, EntityData,
 )
 
 
@@ -84,6 +88,7 @@ class OutputSolverService:
     def __init__(self, db: Session):
         self.db = db
         self.recipe_repo = RecipeRepository(db)
+        self.material_repo = MaterialRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
@@ -132,7 +137,9 @@ class OutputSolverService:
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
             self._tag_nodes(plan)
-        return SolverResponse(success=True, plans=plans)
+
+        entities = self._collect_entities(plans, request.project_id)
+        return SolverResponse(success=True, plans=plans, entities=entities)
 
     def _tag_nodes(self, plan: SolvedPlan) -> None:
         """Tag material nodes based on graph topology and quantities."""
@@ -451,6 +458,46 @@ class OutputSolverService:
             return float(result)
         except ZeroDivisionError:
             return 0.0
+
+    def _collect_entities(self, plans: List[SolvedPlan], project_id: uuid.UUID) -> Entities:
+        """Collect all materials and recipes referenced in the plans."""
+        material_ids: Set[uuid.UUID] = set()
+        recipe_ids: Set[uuid.UUID] = set()
+
+        for plan in plans:
+            for node in plan.graph_nodes:
+                if isinstance(node, RecipeExecNode):
+                    recipe_ids.add(node.recipe_id)
+                else:
+                    for c in node.material_constraints:
+                        if c.domain == "identity" and c.key == "material_id" and c.value_string:
+                            try:
+                                material_ids.add(uuid.UUID(c.value_string))
+                            except ValueError:
+                                pass
+
+        materials: Dict[uuid.UUID, EntityData] = {}
+        recipes: Dict[uuid.UUID, EntityData] = {}
+
+        if material_ids:
+            db_materials = self.db.query(Material).filter(
+                Material.id.in_(material_ids), Material.project_id == project_id
+            ).all()
+            for m in db_materials:
+                materials[m.id] = EntityData(
+                    id=m.id, project_id=m.project_id, created_at=m.created_at
+                )
+
+        if recipe_ids:
+            db_recipes = self.db.query(Recipe).filter(
+                Recipe.id.in_(recipe_ids), Recipe.project_id == project_id
+            ).all()
+            for r in db_recipes:
+                recipes[r.id] = EntityData(
+                    id=r.id, project_id=r.project_id, created_at=r.created_at
+                )
+
+        return Entities(materials=materials, recipes=recipes)
 
     def _load_recipe_params(
         self, recipe_ids: List[uuid.UUID]
