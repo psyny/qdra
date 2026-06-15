@@ -670,11 +670,22 @@ class OutputSolverService:
                 remaining -= reduce_by
 
         if new_exec <= 0:
+            orphan_input_ids = [
+                e.from_node_id for e in r_input_edges
+            ]
+            orphan_output_ids = [
+                e.to_node_id for e in r_output_edges
+                if e.to_node_id in state.material_nodes
+            ]
             state.recipe_edges = [
                 e for e in state.recipe_edges
                 if e.from_node_id != r_id and e.to_node_id != r_id
             ]
             state.recipe_nodes.pop(r_id, None)
+            for nid in orphan_input_ids:
+                state.material_nodes.pop(nid, None)
+            for nid in orphan_output_ids:
+                state.material_nodes.pop(nid, None)
 
         for mid in upstream_to_cascade:
             if mid in state.material_nodes:
