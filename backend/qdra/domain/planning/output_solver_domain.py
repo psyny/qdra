@@ -107,7 +107,7 @@ class TargetSpec:
 class DomainConstraints:
     do_not_expand_materials_matching: List[ConstraintRule] = field(default_factory=list)
     forbidden_materials_matching: List[ConstraintRule] = field(default_factory=list)
-    forbidden_recipe_ids: List[uuid.UUID] = field(default_factory=list)
+    forbidden_recipe_matching: List[ConstraintRule] = field(default_factory=list)
     max_recipe_depth: int = 10
     allow_partial_recipe_execution: bool = False
 

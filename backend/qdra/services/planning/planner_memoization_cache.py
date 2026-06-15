@@ -41,7 +41,7 @@ class PlannerMemoizationCache:
             str(key.target_quantity),
             self._serialize_domain_constraints(key.domain_constraints),
             str(key.search_depth_remaining),
-            self._serialize_uuid_list(key.forbidden_recipe_ids),
+            self._serialize_constraint_rules(key.forbidden_recipes),
             self._serialize_constraint_rules(key.forbidden_materials),
             self._serialize_constraint_rules(key.do_not_expand_materials),
             str(key.allow_loops),
@@ -76,7 +76,7 @@ class PlannerMemoizationCache:
         return json.dumps(
             {
                 "max_recipe_depth": constraints.max_recipe_depth,
-                "forbidden_recipe_ids": [str(id) for id in sorted(constraints.forbidden_recipe_ids)],
+                "forbidden_recipe_matching": self._serialize_constraint_rules(constraints.forbidden_recipe_matching),
             }
         )
 

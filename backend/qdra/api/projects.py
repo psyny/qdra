@@ -78,7 +78,7 @@ class MaterialConstraintRuleModel(BaseModel):
 class DomainPlanningConstraintsModel(BaseModel):
     do_not_expand_materials_matching: List[MaterialConstraintRuleModel] = []
     forbidden_materials_matching: List[MaterialConstraintRuleModel] = []
-    forbidden_recipe_ids: List[uuid.UUID] = []
+    forbidden_recipe_matching: List[MaterialConstraintRuleModel] = []
     max_recipe_depth: int = 10
 
 
@@ -262,7 +262,23 @@ def plan_target(project_id: uuid.UUID, request_data: PlanningRequestModel, db: S
             )
             for rule in request_data.domain_constraints.forbidden_materials_matching
         ],
-        forbidden_recipe_ids=request_data.domain_constraints.forbidden_recipe_ids,
+        forbidden_recipe_matching=[
+            MaterialConstraintRule(
+                constraints=[
+                    ParameterConstraintSpec(
+                        domain=c.domain,
+                        key=c.key,
+                        operator=c.operator,
+                        value_string=c.value_string,
+                        value_number=c.value_number,
+                        value_boolean=c.value_boolean,
+                        is_wildcard=c.is_wildcard
+                    )
+                    for c in rule.constraints
+                ]
+            )
+            for rule in request_data.domain_constraints.forbidden_recipe_matching
+        ],
         max_recipe_depth=request_data.domain_constraints.max_recipe_depth
     )
     

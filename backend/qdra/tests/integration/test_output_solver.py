@@ -464,7 +464,7 @@ def test_final_product_unrestricted(client):
             "domain_constraints": {
                 "do_not_expand_materials_matching": [],
                 "forbidden_materials_matching": [],
-                "forbidden_recipe_ids": [],
+                "forbidden_recipe_matching": [],
                 "max_recipe_depth": 100,
                 "allow_partial_recipe_execution": True,
             },
@@ -517,7 +517,13 @@ def test_final_product_recipe_restricted(client):
             "domain_constraints": {
                 "do_not_expand_materials_matching": [],
                 "forbidden_materials_matching": [],
-                "forbidden_recipe_ids": [str(recipes["refining_c2"]["id"])],
+                "forbidden_recipe_matching": [
+                    {
+                        "constraints": [
+                            {"domain": "identity", "key": "name", "operator": "=", "value_string": "Refining_C2"}
+                        ]
+                    }
+                ],
                 "max_recipe_depth": 100,
                 "allow_partial_recipe_execution": True,
             },

@@ -72,7 +72,7 @@ class DomainPlanningConstraints:
     """Domain-level planning constraints."""
     do_not_expand_materials_matching: List[MaterialConstraintRule] = field(default_factory=list)
     forbidden_materials_matching: List[MaterialConstraintRule] = field(default_factory=list)
-    forbidden_recipe_ids: List[uuid.UUID] = field(default_factory=list)
+    forbidden_recipe_matching: List[MaterialConstraintRule] = field(default_factory=list)
     max_recipe_depth: int = 10
 
 
@@ -233,7 +233,7 @@ class MemoizationCacheKey:
     target_quantity: float
     domain_constraints: DomainPlanningConstraints
     search_depth_remaining: int
-    forbidden_recipe_ids: List[uuid.UUID]
+    forbidden_recipes: List[MaterialConstraintRule]
     forbidden_materials: List[MaterialConstraintRule]
     do_not_expand_materials: List[MaterialConstraintRule]
     allow_loops: bool

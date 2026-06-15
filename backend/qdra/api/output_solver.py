@@ -46,7 +46,7 @@ class ConstraintRuleModel(BaseModel):
 class DomainConstraintsModel(BaseModel):
     do_not_expand_materials_matching: List[ConstraintRuleModel] = []
     forbidden_materials_matching: List[ConstraintRuleModel] = []
-    forbidden_recipe_ids: List[uuid.UUID] = []
+    forbidden_recipe_matching: List[ConstraintRuleModel] = []
     max_recipe_depth: int = 10
     allow_partial_recipe_execution: bool = False
 
@@ -191,7 +191,7 @@ def solve_output(
     domain_constraints = DomainConstraints(
         do_not_expand_materials_matching=[to_rule(r) for r in dc.do_not_expand_materials_matching],
         forbidden_materials_matching=[to_rule(r) for r in dc.forbidden_materials_matching],
-        forbidden_recipe_ids=dc.forbidden_recipe_ids,
+        forbidden_recipe_matching=[to_rule(r) for r in dc.forbidden_recipe_matching],
         max_recipe_depth=dc.max_recipe_depth,
         allow_partial_recipe_execution=dc.allow_partial_recipe_execution,
     )

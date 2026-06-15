@@ -109,10 +109,10 @@ class OutputSolverService:
         recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
-        # Load recipe params if needed for score rules OR recipe target matching
+        # Load recipe params if needed for score rules, recipe target matching, OR forbidden_recipe_matching
         if request.target.target_type == "recipe" or (request.score_rules and any(
             v.variable_type == "recipe" for v in request.score_rules.user_variables
-        )):
+        )) or request.domain_constraints.forbidden_recipe_matching:
             recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         # Initialize state based on target type (material or recipe)
@@ -283,7 +283,7 @@ class OutputSolverService:
 
         producers = self._find_producers(
             current.material_constraints, recipe_structures,
-            request.domain_constraints.forbidden_recipe_ids,
+            request.domain_constraints.forbidden_recipe_matching, recipe_params,
         )
 
         if not producers:
@@ -504,10 +504,11 @@ class OutputSolverService:
             parts.append(f"{rid}:{mkey}:{e.qty}:{e.type.value}")
         return "|".join(sorted(parts))
 
-    def _find_producers(self, constraints, recipe_structures, forbidden_ids) -> List[Tuple]:
+    def _find_producers(self, constraints, recipe_structures, forbidden_recipe_matching, recipe_params) -> List[Tuple]:
         producers = []
         for rid, structure in recipe_structures.items():
-            if rid in forbidden_ids:
+            # Check if recipe is forbidden by matching its parameters
+            if str(rid) in recipe_params and self._matches_rule(recipe_params[str(rid)], forbidden_recipe_matching):
                 continue
             for slot in structure["slots"]:
                 if slot["kind"] == SlotKind.PRODUCES:

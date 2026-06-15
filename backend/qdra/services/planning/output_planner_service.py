@@ -15,6 +15,7 @@ from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
+from repositories.recipe_parameter_repository import RecipeParameterRepository
 
 from domain.planning.output_planner import (
     PlanningRequest,
@@ -69,6 +70,7 @@ class PlanningService:
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
         self.project_repo = ProjectRepository(db)
+        self.recipe_param_repo = RecipeParameterRepository(db)
         self.summary_service = PlanSummaryService()
         self.ranking_service = PlanRankingService()
         self.memoization_cache = PlannerMemoizationCache()
@@ -90,6 +92,11 @@ class PlanningService:
         for recipe in recipes:
             recipe_structures[recipe.id] = self._load_recipe_structure(recipe.id)
         
+        # Load recipe params if needed for forbidden_recipe_matching
+        recipe_params = {}
+        if request.domain_constraints.forbidden_recipe_matching:
+            recipe_params = self._load_recipe_params([r.id for r in recipes])
+        
         # Find candidate plans
         plans = []
         
@@ -106,6 +113,7 @@ class PlanningService:
             target_node=target_node,
             request=request,
             recipe_structures=recipe_structures,
+            recipe_params=recipe_params,
             plans=plans,
             state=PlanningState(),
             parent_node_id=None
@@ -204,6 +212,7 @@ class PlanningService:
         target_node: MaterialRequirementNode,
         request: PlanningRequest,
         recipe_structures: Dict[uuid.UUID, Dict],
+        recipe_params: Dict[uuid.UUID, List[ParameterConstraintSpec]],
         plans: List[PlanCandidate],
         state: PlanningState,
         parent_node_id: Optional[str]
@@ -262,7 +271,8 @@ class PlanningService:
         producers = self._find_producer_recipes(
             target_node.constraints,
             recipe_structures,
-            request.domain_constraints.forbidden_recipe_ids
+            request.domain_constraints.forbidden_recipe_matching,
+            recipe_params
         )
         
         if not producers:
@@ -369,6 +379,7 @@ class PlanningService:
                             target_node=sub_req_node,
                             request=request,
                             recipe_structures=recipe_structures,
+                            recipe_params=recipe_params,
                             plans=plans,
                             state=branch_state,
                             parent_node_id=recipe_exec_node.id
