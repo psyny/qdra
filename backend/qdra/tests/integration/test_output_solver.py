@@ -272,7 +272,7 @@ def create_comprehensive_test_dataset(client, project_id):
                     "kind": "PRODUCES",
                     "options": [
                         {
-                            "quantity": 1.5,
+                            "quantity": 1,
                             "constraints": [
                                 {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
                             ],
