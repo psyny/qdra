@@ -272,7 +272,7 @@ def create_comprehensive_test_dataset(client, project_id):
                     "kind": "PRODUCES",
                     "options": [
                         {
-                            "quantity": 1,
+                            "quantity": 1.5,
                             "constraints": [
                                 {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
                             ],
@@ -434,7 +434,7 @@ def test_root_material_becomes_root_requirement(client):
                 "do_not_expand_materials_matching": [],
                 "forbidden_materials_matching": [],
                 "forbidden_recipe_ids": [],
-                "max_recipe_depth": 10,
+                "max_recipe_depth": 100,
                 "allow_partial_recipe_execution": True,
             },
             "search_parameters": {
@@ -456,6 +456,7 @@ def test_root_material_becomes_root_requirement(client):
         data,
         material_label_param=("identity", "name"),
         recipe_label_param=("identity", "name"),
+        simplify_graphviz=False,
     )
 
     assert data["success"] is True

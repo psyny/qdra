@@ -745,6 +745,7 @@ class OutputSolverService:
         data: dict,
         material_label_param: Optional[Tuple[str, str]] = None,
         recipe_label_param: Optional[Tuple[str, str]] = None,
+        simplify_graphviz: bool = True,
     ) -> None:
         print("\n" + "=" * 60)
         print(f"SOLVER OUTPUT  success={data.get('success')}  plans={len(data.get('plans', []))}")
@@ -827,96 +828,145 @@ class OutputSolverService:
             for name, value in score.items():
                 print(f"  {name}: {value}")
 
-            # Simplify graph for graphviz output
-            simplified_graph = OutputSolverService.simplify_graph(graph)
-            simplified_nodes = simplified_graph["nodes"]
-            simplified_edges = simplified_graph["edges"]
-
-            # Rebuild label mapping for simplified nodes
-            simplified_node_id_to_label = {}
-            for n in simplified_nodes:
-                nid = n["id"]
-                if n.get("kind") == "recipe_execution":
-                    label = str(n.get("recipe_id", nid))[:8]
-                    if recipe_label_param:
-                        domain, key = recipe_label_param
-                        recipe_id = n.get("recipe_id")
-                        if recipe_id and "recipes" in entities:
-                            recipe_data = entities["recipes"].get(str(recipe_id))
-                            if recipe_data and "parameters" in recipe_data:
-                                for p in recipe_data["parameters"]:
-                                    if p.get("domain") == domain and p.get("key") == key:
-                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                        if val is not None:
-                                            label = str(val)
-                                            break
-                    simplified_node_id_to_label[nid] = label
-                else:
-                    # For collapsed material nodes, use entities to get label
-                    label = nid
-                    if material_label_param:
-                        domain, key = material_label_param
-                        for c in n.get("material_constraints", []):
-                            if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
-                                material_id = c.get("value_string")
-                                if material_id and "materials" in entities:
-                                    mat_data = entities["materials"].get(material_id)
-                                    if mat_data and "parameters" in mat_data:
-                                        for p in mat_data["parameters"]:
-                                            if p.get("domain") == domain and p.get("key") == key:
-                                                val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                                if val is not None:
-                                                    label = str(val)
-                                                    break
-                    simplified_node_id_to_label[nid] = label
-
             # Print graphviz dot code
-            print(f"\n// Graphviz for Plan {i} (simplified)")
-            print("digraph {")
-            print("  rankdir=LR;")
+            if simplify_graphviz:
+                # Simplify graph for graphviz output
+                simplified_graph = OutputSolverService.simplify_graph(graph)
+                simplified_nodes = simplified_graph["nodes"]
+                simplified_edges = simplified_graph["edges"]
 
-            # Calculate max edge qty for width scaling
-            max_qty = max((e.get("qty", 0) for e in simplified_edges), default=1)
-            if max_qty == 0:
-                max_qty = 1
-
-            # Print graphviz nodes
-            for n in simplified_nodes:
-                label = simplified_node_id_to_label[n["id"]]
-                if n.get("kind") == "recipe_execution":
-                    exec_count = n.get("execution_count", 1)
-                    exec_str = f"{exec_count:.1f}" if exec_count != int(exec_count) else str(int(exec_count))
-                    print(f'  "{n["id"]}" [label="{label}\\n({exec_str})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
-                else:
-                    prod = n.get("produced_qty", 0)
-                    cons_qty = n.get("consumed_qty", 0)
-                    prod_str = f"{prod:.1f}" if prod != int(prod) else str(int(prod))
-                    cons_str = f"{cons_qty:.1f}" if cons_qty != int(cons_qty) else str(int(cons_qty))
-                    tags = n.get("tags", [])
-
-                    # Determine color based on tags
-                    if "excess" in tags:
-                        color = "#ff6b6b"  # red
-                    elif "root" in tags:
-                        color = "#4dabf7"  # blue
-                    elif "leaf" in tags:
-                        color = "#69db7c"  # green
+                # Rebuild label mapping for simplified nodes
+                simplified_node_id_to_label = {}
+                for n in simplified_nodes:
+                    nid = n["id"]
+                    if n.get("kind") == "recipe_execution":
+                        label = str(n.get("recipe_id", nid))[:8]
+                        if recipe_label_param:
+                            domain, key = recipe_label_param
+                            recipe_id = n.get("recipe_id")
+                            if recipe_id and "recipes" in entities:
+                                recipe_data = entities["recipes"].get(str(recipe_id))
+                                if recipe_data and "parameters" in recipe_data:
+                                    for p in recipe_data["parameters"]:
+                                        if p.get("domain") == domain and p.get("key") == key:
+                                            val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                            if val is not None:
+                                                label = str(val)
+                                                break
+                        simplified_node_id_to_label[nid] = label
                     else:
-                        color = "#ffd43b"  # yellow
+                        # For collapsed material nodes, use entities to get label
+                        label = nid
+                        if material_label_param:
+                            domain, key = material_label_param
+                            for c in n.get("material_constraints", []):
+                                if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
+                                    material_id = c.get("value_string")
+                                    if material_id and "materials" in entities:
+                                        mat_data = entities["materials"].get(material_id)
+                                        if mat_data and "parameters" in mat_data:
+                                            for p in mat_data["parameters"]:
+                                                if p.get("domain") == domain and p.get("key") == key:
+                                                    val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                                    if val is not None:
+                                                        label = str(val)
+                                                        break
+                        simplified_node_id_to_label[nid] = label
 
-                    print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+                print(f"\n// Graphviz for Plan {i} (simplified)")
+                print("digraph {")
+                print("  rankdir=LR;")
 
-            # Print graphviz edges
-            for e in simplified_edges:
-                qty = e.get("qty", 0)
-                qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
-                width = 1 + (qty / max_qty) * 3  # scale 1-4
-                width = min(max(width, 1), 4)
-                from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
-                to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
-                print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
+                # Calculate max edge qty for width scaling
+                max_qty = max((e.get("qty", 0) for e in simplified_edges), default=1)
+                if max_qty == 0:
+                    max_qty = 1
 
-            print("}")
+                # Print graphviz nodes
+                for n in simplified_nodes:
+                    label = simplified_node_id_to_label[n["id"]]
+                    if n.get("kind") == "recipe_execution":
+                        exec_count = n.get("execution_count", 1)
+                        exec_str = f"{exec_count:.1f}" if exec_count != int(exec_count) else str(int(exec_count))
+                        print(f'  "{n["id"]}" [label="{label}\\n({exec_str})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
+                    else:
+                        prod = n.get("produced_qty", 0)
+                        cons_qty = n.get("consumed_qty", 0)
+                        prod_str = f"{prod:.1f}" if prod != int(prod) else str(int(prod))
+                        cons_str = f"{cons_qty:.1f}" if cons_qty != int(cons_qty) else str(int(cons_qty))
+                        tags = n.get("tags", [])
+
+                        # Determine color based on tags
+                        if "excess" in tags:
+                            color = "#ff6b6b"  # red
+                        elif "root" in tags:
+                            color = "#4dabf7"  # blue
+                        elif "leaf" in tags:
+                            color = "#69db7c"  # green
+                        else:
+                            color = "#ffd43b"  # yellow
+
+                        print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+
+                # Print graphviz edges
+                for e in simplified_edges:
+                    qty = e.get("qty", 0)
+                    qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
+                    width = 1 + (qty / max_qty) * 3  # scale 1-4
+                    width = min(max(width, 1), 4)
+                    from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
+                    to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
+                    print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
+
+                print("}")
+            else:
+                # Print unsimplified graphviz
+                print(f"\n// Graphviz for Plan {i} (unsimplified)")
+                print("digraph {")
+                print("  rankdir=LR;")
+
+                # Calculate max edge qty for width scaling
+                max_qty = max((e.get("qty", 0) for e in edges), default=1)
+                if max_qty == 0:
+                    max_qty = 1
+
+                # Print graphviz nodes
+                for n in nodes:
+                    label = node_id_to_label[n["id"]]
+                    if n.get("kind") == "recipe_execution":
+                        exec_count = n.get("execution_count", 1)
+                        exec_str = f"{exec_count:.1f}" if exec_count != int(exec_count) else str(int(exec_count))
+                        print(f'  "{n["id"]}" [label="{label}\\n({exec_str})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
+                    else:
+                        prod = n.get("produced_qty", 0)
+                        cons_qty = n.get("consumed_qty", 0)
+                        prod_str = f"{prod:.1f}" if prod != int(prod) else str(int(prod))
+                        cons_str = f"{cons_qty:.1f}" if cons_qty != int(cons_qty) else str(int(cons_qty))
+                        tags = n.get("tags", [])
+
+                        # Determine color based on tags
+                        if "excess" in tags:
+                            color = "#ff6b6b"  # red
+                        elif "root" in tags:
+                            color = "#4dabf7"  # blue
+                        elif "leaf" in tags:
+                            color = "#69db7c"  # green
+                        else:
+                            color = "#ffd43b"  # yellow
+
+                        print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+
+                # Print graphviz edges
+                for e in edges:
+                    qty = e.get("qty", 0)
+                    qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
+                    width = 1 + (qty / max_qty) * 3  # scale 1-4
+                    width = min(max(width, 1), 4)
+                    from_label = node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
+                    to_label = node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
+                    print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
+
+                print("}")
 
         print("=" * 60 + "\n")
 
