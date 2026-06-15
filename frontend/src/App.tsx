@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 import { ProjectHomePage } from './pages/ProjectHomePage';
 import { ProjectWorkspaceWrapper } from './components/ProjectWorkspaceWrapper';
-import { MaterialsPlaceholderPage } from './pages/MaterialsPlaceholderPage';
+import { MaterialCatalogPage } from './pages/MaterialCatalogPage';
 import { RecipesPlaceholderPage } from './pages/RecipesPlaceholderPage';
 import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
@@ -19,7 +19,7 @@ function App() {
           path="/projects/:projectId/materials"
           element={
             <ProjectWorkspaceWrapper>
-              {(project) => <MaterialsPlaceholderPage />}
+              {(project) => <MaterialCatalogPage projectId={project.id} />}
             </ProjectWorkspaceWrapper>
           }
         />

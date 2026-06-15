@@ -322,3 +322,15 @@
 .workspace-content__card {
   min-height: 400px;
 }
+
+/* Catalog Header */
+.catalog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.catalog-header__title {
+  flex: 1;
+}
