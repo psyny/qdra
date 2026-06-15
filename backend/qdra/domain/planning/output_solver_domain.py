@@ -59,6 +59,7 @@ class MaterialNode:
     consumed_qty: float = 0.0
     type: MaterialNodeType = MaterialNodeType.INPUT
     tags: List[str] = field(default_factory=list)
+    rank: int = 0
     kind: str = "material"
 
 
@@ -68,6 +69,7 @@ class RecipeExecNode:
     recipe_id: uuid.UUID
     execution_count: float = 1.0
     tags: List[str] = field(default_factory=list)
+    rank: int = 0
     kind: str = "recipe_execution"
 
 
@@ -118,6 +120,7 @@ class SearchParameters:
     max_branch_width: int = 10
     allow_loops: bool = False
     max_solutions_returned: int = 10
+    optimization_level: int = 0
 
 
 @dataclass

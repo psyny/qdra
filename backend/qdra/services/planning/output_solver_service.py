@@ -247,7 +247,7 @@ class OutputSolverService:
                 break
 
         if current_id is None:
-            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params)
+            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level)
             return
 
         current = state.material_nodes[current_id]
@@ -312,8 +312,9 @@ class OutputSolverService:
         else:
             exec_count = math.ceil(need.consumed_qty / per_exec) if per_exec > 0 else 1
 
+        need_rank = need.rank
         rn_id = state.next_id("R")
-        state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count)
+        state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=need_rank)
 
         slots = sorted(recipe_structures[recipe_id]["slots"], key=lambda s: _SLOT_ORDER.get(s["kind"], 9))
         new_inputs: List[str] = []
@@ -326,6 +327,7 @@ class OutputSolverService:
                         id=oid, material_constraints=opt["constraints"],
                         produced_qty=opt["quantity"] * exec_count,
                         consumed_qty=0.0, type=MaterialNodeType.OUTPUT,
+                        rank=need_rank,
                     )
                     state.material_nodes[oid] = onode
                     state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
@@ -339,7 +341,7 @@ class OutputSolverService:
                 for opt in slot["options"]:
                     scaled = opt["quantity"] * exec_count
                     iid = state.next_id("I")
-                    state.material_nodes[iid] = MaterialNode(id=iid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.INPUT)
+                    state.material_nodes[iid] = MaterialNode(id=iid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.INPUT, rank=need_rank + 1)
                     state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
                     new_inputs.append(iid)
 
@@ -347,7 +349,7 @@ class OutputSolverService:
                 for opt in slot["options"]:
                     scaled = opt["quantity"] * exec_count
                     qid = state.next_id("Rq")
-                    state.material_nodes[qid] = MaterialNode(id=qid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.REQUIRES)
+                    state.material_nodes[qid] = MaterialNode(id=qid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.REQUIRES, rank=need_rank + 1)
                     state.recipe_edges.append(RecipeEdge(from_node_id=qid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.REQUIRES))
                     new_inputs.append(qid)
 
@@ -397,7 +399,7 @@ class OutputSolverService:
         
         # Create recipe execution node
         rn_id = state.next_id("R")
-        state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count)
+        state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=0)
         
         # Load recipe structure
         structure = recipe_structures[recipe_id]
@@ -414,7 +416,8 @@ class OutputSolverService:
                         material_constraints=opt["constraints"],
                         produced_qty=opt["quantity"] * exec_count,
                         consumed_qty=0.0, 
-                        type=MaterialNodeType.TARGET,  # Mark as target
+                        type=MaterialNodeType.TARGET,
+                        rank=0,
                     )
                     state.material_nodes[oid] = onode
                     state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
@@ -429,7 +432,8 @@ class OutputSolverService:
                         material_constraints=opt["constraints"], 
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
-                        type=MaterialNodeType.INPUT
+                        type=MaterialNodeType.INPUT,
+                        rank=1,
                     )
                     state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
                     new_inputs.append(iid)
@@ -444,7 +448,8 @@ class OutputSolverService:
                         material_constraints=opt["constraints"], 
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
-                        type=MaterialNodeType.REQUIRES
+                        type=MaterialNodeType.REQUIRES,
+                        rank=1,
                     )
                     state.recipe_edges.append(RecipeEdge(from_node_id=qid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.REQUIRES))
                     new_inputs.append(qid)
@@ -472,11 +477,14 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
         seen_fps.add(fp)
+
+        if optimization_level >= 1:
+            state = self._optimize_level1(state)
 
         # Tag state nodes before computing scores
         self._tag_state_nodes(state)
@@ -491,6 +499,186 @@ class OutputSolverService:
             recipe_edges=list(state.recipe_edges),
             score=score,
         ))
+
+    def _optimize_level1(self, state: "_State") -> "_State":
+        """Optimization Level 1: replace each demand node's sources with a single
+        surplus 'o' node where possible, then cascade execution-count reductions."""
+        opt = _State(
+            material_nodes={k: copy.copy(v) for k, v in state.material_nodes.items()},
+            recipe_nodes={k: copy.copy(v) for k, v in state.recipe_nodes.items()},
+            material_edges=[copy.copy(e) for e in state.material_edges],
+            recipe_edges=[copy.copy(e) for e in state.recipe_edges],
+            needs_queue=list(state.needs_queue),
+            recipe_depth=state.recipe_depth,
+            _counter=state._counter,
+        )
+
+        candidates = sorted(
+            (n for n in opt.material_nodes.values()
+             if n.type in (MaterialNodeType.INPUT, MaterialNodeType.TARGET)),
+            key=lambda n: (n.rank, n.consumed_qty),
+        )
+
+        for snap in candidates:
+            node_a_id = snap.id
+            if node_a_id not in opt.material_nodes:
+                continue
+            node_a = opt.material_nodes[node_a_id]
+            if node_a.consumed_qty <= 1e-9:
+                continue
+
+            initial_qty = node_a.consumed_qty
+            node_a_sig = _sig(node_a.material_constraints)
+            existing_sources = {me.from_node_id for me in opt.material_edges if me.to_node_id == node_a_id}
+
+            best_c: Optional[Tuple[float, str]] = None
+            for nid, node in opt.material_nodes.items():
+                if node.type != MaterialNodeType.OUTPUT:
+                    continue
+                if nid in existing_sources:
+                    continue
+                if _sig(node.material_constraints) != node_a_sig:
+                    continue
+                surplus = node.produced_qty - node.consumed_qty
+                if surplus >= initial_qty - 1e-9:
+                    if best_c is None or surplus < best_c[0]:
+                        best_c = (surplus, nid)
+
+            if best_c is None:
+                continue
+
+            node_c_id = best_c[1]
+            node_c = opt.material_nodes[node_c_id]
+
+            edges_to_remove = [me for me in opt.material_edges if me.to_node_id == node_a_id]
+            opt.material_edges = [me for me in opt.material_edges if me.to_node_id != node_a_id]
+
+            b_ids_to_cascade: List[str] = []
+            for me in edges_to_remove:
+                b_node = opt.material_nodes.get(me.from_node_id)
+                node_a = opt.material_nodes.get(node_a_id)
+                if node_a is not None:
+                    node_a.produced_qty = max(0.0, node_a.produced_qty - me.qty)
+                if b_node is not None:
+                    b_node.consumed_qty = max(0.0, b_node.consumed_qty - me.qty)
+                    b_ids_to_cascade.append(me.from_node_id)
+
+            node_c.consumed_qty += initial_qty
+            if node_a_id in opt.material_nodes:
+                opt.material_nodes[node_a_id].produced_qty += initial_qty
+            opt.material_edges.append(MaterialEdge(from_node_id=node_c_id, to_node_id=node_a_id, qty=initial_qty))
+
+            for bid in b_ids_to_cascade:
+                if bid in opt.material_nodes:
+                    self._cascade_reduction(opt, bid)
+
+        return opt
+
+    def _cascade_reduction(self, state: "_State", node_b_id: str) -> None:
+        """Cascade Reduction: called after node_b.consumed_qty has been decreased.
+        Recalculates the producing recipe's execution count and propagates upward."""
+        if node_b_id not in state.material_nodes:
+            return
+        node_b = state.material_nodes[node_b_id]
+
+        r_edge = next(
+            (e for e in state.recipe_edges
+             if e.to_node_id == node_b_id and e.type == RecipeEdgeType.PRODUCES),
+            None,
+        )
+
+        if r_edge is None:
+            if node_b.consumed_qty <= 1e-9:
+                state.material_nodes.pop(node_b_id, None)
+                state.material_edges = [e for e in state.material_edges if e.from_node_id != node_b_id]
+            return
+
+        r_id = r_edge.from_node_id
+        r_node = state.recipe_nodes.get(r_id)
+        if r_node is None:
+            return
+
+        if node_b.consumed_qty <= 1e-9:
+            node_b.consumed_qty = 0.0
+            state.material_nodes.pop(node_b_id, None)
+            state.recipe_edges = [
+                e for e in state.recipe_edges
+                if not (e.from_node_id == r_id and e.to_node_id == node_b_id)
+            ]
+            state.material_edges = [e for e in state.material_edges if e.from_node_id != node_b_id]
+
+        r_output_edges = [
+            e for e in state.recipe_edges
+            if e.from_node_id == r_id and e.type == RecipeEdgeType.PRODUCES
+        ]
+        old_exec = r_node.execution_count
+
+        if not r_output_edges:
+            new_exec = 0.0
+        else:
+            new_exec = 0.0
+            for e in r_output_edges:
+                out_node = state.material_nodes.get(e.to_node_id)
+                if out_node is None or old_exec <= 0:
+                    continue
+                slot_qty = e.qty / old_exec
+                if slot_qty > 0:
+                    new_exec = max(new_exec, math.ceil(out_node.consumed_qty / slot_qty))
+
+        if new_exec >= old_exec:
+            return
+
+        r_node.execution_count = new_exec
+
+        for e in r_output_edges:
+            out_node = state.material_nodes.get(e.to_node_id)
+            if out_node is None or old_exec <= 0:
+                continue
+            slot_qty = e.qty / old_exec
+            e.qty = slot_qty * new_exec
+            out_node.produced_qty = slot_qty * new_exec
+
+        r_input_edges = [
+            e for e in state.recipe_edges
+            if e.to_node_id == r_id and e.type in (RecipeEdgeType.CONSUMES, RecipeEdgeType.REQUIRES)
+        ]
+        upstream_to_cascade: List[str] = []
+        for e in r_input_edges:
+            i_node = state.material_nodes.get(e.from_node_id)
+            if i_node is None or old_exec <= 0:
+                continue
+            slot_qty = e.qty / old_exec
+            new_consumed = slot_qty * new_exec
+            delta = e.qty - new_consumed
+            if delta <= 1e-9:
+                continue
+            e.qty = new_consumed
+            i_node.consumed_qty = max(0.0, i_node.consumed_qty - delta)
+            remaining = delta
+            for me in list(state.material_edges):
+                if me.to_node_id != e.from_node_id or remaining <= 1e-9:
+                    continue
+                m_node = state.material_nodes.get(me.from_node_id)
+                reduce_by = min(remaining, me.qty)
+                me.qty = max(0.0, me.qty - reduce_by)
+                if me.qty <= 1e-9:
+                    state.material_edges = [x for x in state.material_edges if x is not me]
+                if m_node is not None:
+                    m_node.consumed_qty = max(0.0, m_node.consumed_qty - reduce_by)
+                    if reduce_by > 1e-9:
+                        upstream_to_cascade.append(m_node.id)
+                remaining -= reduce_by
+
+        if new_exec <= 0:
+            state.recipe_edges = [
+                e for e in state.recipe_edges
+                if e.from_node_id != r_id and e.to_node_id != r_id
+            ]
+            state.recipe_nodes.pop(r_id, None)
+
+        for mid in upstream_to_cascade:
+            if mid in state.material_nodes:
+                self._cascade_reduction(state, mid)
 
     def _fingerprint(self, state) -> str:
         parts = []

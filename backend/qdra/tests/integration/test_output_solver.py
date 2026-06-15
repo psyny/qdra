@@ -473,6 +473,7 @@ def test_final_product_unrestricted(client):
                 "max_branch_width": 10,
                 "allow_loops": False,
                 "max_solutions_returned": 10,
+                "optimization_level": 1,
             },
         },
     )
@@ -532,6 +533,7 @@ def test_final_product_recipe_restricted(client):
                 "max_branch_width": 10,
                 "allow_loops": False,
                 "max_solutions_returned": 10,
+                "optimization_level": 0,
             },
         },
     )

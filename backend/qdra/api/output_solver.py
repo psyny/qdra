@@ -56,6 +56,7 @@ class SearchParametersModel(BaseModel):
     max_branch_width: int = 10
     allow_loops: bool = False
     max_solutions_returned: int = 10
+    optimization_level: int = 0
 
 
 class ConstraintSpecForVarModel(BaseModel):
@@ -201,6 +202,7 @@ def solve_output(
         max_branch_width=sp.max_branch_width,
         allow_loops=sp.allow_loops,
         max_solutions_returned=sp.max_solutions_returned,
+        optimization_level=sp.optimization_level,
     )
 
     score_rules = None
