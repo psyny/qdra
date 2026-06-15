@@ -876,11 +876,7 @@ class OutputSolverService:
             print("digraph {")
             print("  rankdir=LR;")
 
-            # Calculate max edge qty for width scaling
-            max_qty = max((e.get("qty", 0) for e in simplified_edges), default=1)
-            if max_qty == 0:
-                max_qty = 1
-
+            # Calculate min and max edge qty for width scaling
             # Print graphviz nodes
             for n in simplified_nodes:
                 label = simplified_node_id_to_label[n["id"]]
@@ -908,11 +904,27 @@ class OutputSolverService:
                     print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
 
             # Print graphviz edges
+            qtys = []
+            for e in simplified_edges:
+                qty = e.get("qty")
+                if qty != None:
+                    qtys.append(qty)
+            min_qty = min(qtys, default=1)
+            max_qty = max(qtys, default=1)
+
+            if max_qty == 0:
+                max_qty = 1
+            if min_qty == max_qty:
+                min_qty = 0  # Avoid division by zero when all qtys are equal
+
             for e in simplified_edges:
                 qty = e.get("qty", 0)
+                if qty == None:
+                    qty = min_qty                    
                 qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
-                width = 1 + (qty / max_qty) * 3  # scale 1-4
-                width = min(max(width, 1), 4)
+
+                width = 1 + (((qty - min_qty) / (max_qty - min_qty)) * 4.0)
+                width = min(max(width, 1), 5)
                 from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
                 to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
                 print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
