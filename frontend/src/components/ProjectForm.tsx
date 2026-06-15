@@ -31,9 +31,9 @@ export function ProjectForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+    <form onSubmit={handleSubmit}>
+      <div className="form-field">
+        <label htmlFor="name" className="form-label">
           Name *
         </label>
         <input
@@ -42,11 +42,11 @@ export function ProjectForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={isSubmitting}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+          className="form-input"
         />
       </div>
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+      <div className="form-field">
+        <label htmlFor="description" className="form-label">
           Description
         </label>
         <textarea
@@ -55,17 +55,17 @@ export function ProjectForm({
           onChange={(e) => setDescription(e.target.value)}
           disabled={isSubmitting}
           rows={3}
-          className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+          className="form-textarea"
         />
       </div>
       {errorMessage && (
-        <p className="text-sm text-red-600">{errorMessage}</p>
+        <p className="form-error">{errorMessage}</p>
       )}
-      <div className="flex space-x-2">
+      <div className="form-actions">
         <button
           type="submit"
           disabled={isSubmitting || !name.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="button button--primary"
         >
           {isSubmitting ? 'Saving...' : submitLabel}
         </button>
@@ -74,7 +74,7 @@ export function ProjectForm({
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            className="button button--secondary"
           >
             Cancel
           </button>

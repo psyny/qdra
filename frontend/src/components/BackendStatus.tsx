@@ -11,10 +11,11 @@ export function BackendStatus() {
   }, []);
 
   return (
-    <div className="text-sm text-gray-600">
-      Backend: {status === 'loading' && 'Loading...'}
-      {status === 'connected' && <span className="text-green-600 font-semibold">Connected</span>}
-      {status === 'disconnected' && <span className="text-red-600 font-semibold">Disconnected</span>}
+    <div className={`status-pill ${status === 'connected' ? 'status-pill--success' : status === 'disconnected' ? 'status-pill--danger' : 'status-pill--loading'}`}>
+      <span className="status-pill__dot"></span>
+      {status === 'loading' && 'Loading...'}
+      {status === 'connected' && 'Connected'}
+      {status === 'disconnected' && 'Disconnected'}
     </div>
   );
 }

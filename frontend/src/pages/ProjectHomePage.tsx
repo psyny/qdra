@@ -30,10 +30,12 @@ export function ProjectHomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-gray-900">Qdra</h1>
-          <p className="text-gray-600 mt-4">Loading project...</p>
+      <div className="page">
+        <div className="page-header">
+          <h1 className="page-title">Qdra</h1>
+        </div>
+        <div className="card state-message">
+          <p className="state-message__text">Loading project...</p>
         </div>
       </div>
     );
@@ -41,21 +43,25 @@ export function ProjectHomePage() {
 
   if (error || !project) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-3xl font-bold text-gray-900">Qdra</h1>
-          <p className="text-xl text-gray-600 mt-4">Project not found</p>
+      <div className="page">
+        <div className="page-header">
+          <h1 className="page-title">Qdra</h1>
+        </div>
+        <div className="card state-message">
+          <p className="state-message__text">Project not found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900">Qdra &gt; {project.name}</h1>
-        <h2 className="text-2xl font-semibold text-gray-800 mt-4">Project Home</h2>
-        <p className="text-gray-600 mt-2">
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">Qdra &gt; {project.name}</h1>
+      </div>
+      <div className="card">
+        <h2 className="card-title">Project Home</h2>
+        <p className="card-description">
           This is the workspace for the {project.name} project.
         </p>
       </div>
