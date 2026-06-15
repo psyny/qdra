@@ -483,8 +483,10 @@ class OutputSolverService:
             return
         seen_fps.add(fp)
 
-        if optimization_level >= 1:
+        if optimization_level == 1:
             state = self._optimize_level1(state)
+        elif optimization_level >= 2:
+            state = self._optimize_level2(state)
 
         # Tag state nodes before computing scores
         self._tag_state_nodes(state)
@@ -567,6 +569,112 @@ class OutputSolverService:
             if node_a_id in opt.material_nodes:
                 opt.material_nodes[node_a_id].produced_qty += initial_qty
             opt.material_edges.append(MaterialEdge(from_node_id=node_c_id, to_node_id=node_a_id, qty=initial_qty))
+
+            for bid in b_ids_to_cascade:
+                if bid in opt.material_nodes:
+                    self._cascade_reduction(opt, bid)
+
+        return opt
+
+    def _optimize_level2(self, state: "_State") -> "_State":
+        """Optimization Level 2: like Level 1 but multiple Node Cs can jointly
+        satisfy Node A, and existing Node B edges are stripped smallest-first
+        (partial reduction of the last edge allowed)."""
+        opt = _State(
+            material_nodes={k: copy.copy(v) for k, v in state.material_nodes.items()},
+            recipe_nodes={k: copy.copy(v) for k, v in state.recipe_nodes.items()},
+            material_edges=[copy.copy(e) for e in state.material_edges],
+            recipe_edges=[copy.copy(e) for e in state.recipe_edges],
+            needs_queue=list(state.needs_queue),
+            recipe_depth=state.recipe_depth,
+            _counter=state._counter,
+        )
+
+        candidates = sorted(
+            (n for n in opt.material_nodes.values()
+             if n.type in (MaterialNodeType.INPUT, MaterialNodeType.TARGET)),
+            key=lambda n: (n.rank, n.consumed_qty),
+        )
+
+        for snap in candidates:
+            node_a_id = snap.id
+            if node_a_id not in opt.material_nodes:
+                continue
+            node_a = opt.material_nodes[node_a_id]
+            if node_a.consumed_qty <= 1e-9:
+                continue
+
+            initial_qty = node_a.consumed_qty
+            node_a_sig = _sig(node_a.material_constraints)
+            existing_sources = {me.from_node_id for me in opt.material_edges if me.to_node_id == node_a_id}
+
+            c1: List[Tuple[float, str]] = []
+            c2: List[Tuple[float, str]] = []
+            for nid, node in opt.material_nodes.items():
+                if node.type != MaterialNodeType.OUTPUT:
+                    continue
+                if nid in existing_sources:
+                    continue
+                if _sig(node.material_constraints) != node_a_sig:
+                    continue
+                surplus = node.produced_qty - node.consumed_qty
+                if surplus >= initial_qty - 1e-9:
+                    c1.append((surplus, nid))
+                elif surplus > 1e-9:
+                    c2.append((surplus, nid))
+
+            if not c1 and not c2:
+                continue
+
+            selected: List[Tuple[str, float]] = []
+            if c1:
+                c1.sort(key=lambda x: x[0])
+                selected.append((c1[0][1], initial_qty))
+            else:
+                c2.sort(key=lambda x: x[0], reverse=True)
+                remaining_need = initial_qty
+                for surplus, nid in c2:
+                    if remaining_need <= 1e-9:
+                        break
+                    contribution = min(surplus, remaining_need)
+                    selected.append((nid, contribution))
+                    remaining_need -= contribution
+
+            total_covered = sum(q for _, q in selected)
+            selected_ids = {nid for nid, _ in selected}
+
+            # Step A — add new source edges
+            for node_c_id, contribution in selected:
+                opt.material_nodes[node_c_id].consumed_qty += contribution
+                opt.material_nodes[node_a_id].produced_qty += contribution
+                opt.material_edges.append(MaterialEdge(from_node_id=node_c_id, to_node_id=node_a_id, qty=contribution))
+
+            # Step B — remove/reduce existing B edges, smallest first
+            b_edges = sorted(
+                [me for me in opt.material_edges
+                 if me.to_node_id == node_a_id and me.from_node_id not in selected_ids],
+                key=lambda me: me.qty,
+            )
+            remaining_to_remove = total_covered
+            b_ids_to_cascade: List[str] = []
+            for me in b_edges:
+                if remaining_to_remove <= 1e-9:
+                    break
+                b_node = opt.material_nodes.get(me.from_node_id)
+                if b_node is None:
+                    continue
+                if remaining_to_remove >= me.qty - 1e-9:
+                    reduce_by = me.qty
+                    opt.material_edges = [x for x in opt.material_edges if x is not me]
+                    b_node.consumed_qty = max(0.0, b_node.consumed_qty - reduce_by)
+                    opt.material_nodes[node_a_id].produced_qty = max(0.0, opt.material_nodes[node_a_id].produced_qty - reduce_by)
+                    remaining_to_remove = max(0.0, remaining_to_remove - reduce_by)
+                else:
+                    me.qty = max(0.0, me.qty - remaining_to_remove)
+                    b_node.consumed_qty = max(0.0, b_node.consumed_qty - remaining_to_remove)
+                    opt.material_nodes[node_a_id].produced_qty = max(0.0, opt.material_nodes[node_a_id].produced_qty - remaining_to_remove)
+                    remaining_to_remove = 0.0
+                b_ids_to_cascade.append(me.from_node_id)
 
             for bid in b_ids_to_cascade:
                 if bid in opt.material_nodes:
