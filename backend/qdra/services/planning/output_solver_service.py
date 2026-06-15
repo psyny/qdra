@@ -289,14 +289,18 @@ class OutputSolverService:
             if len(plans) >= request.search_parameters.max_solutions_returned:
                 return
             branch = state.clone()
-            self._apply_recipe(branch, current_id, recipe_id, produces_option, recipe_structures)
+            self._apply_recipe(branch, current_id, recipe_id, produces_option, recipe_structures, request)
             branch.recipe_depth += 1
             self._explore(branch, recipe_structures, request, plans, seen_fps, new_sigs, recipe_params)
 
-    def _apply_recipe(self, state, need_id, recipe_id, produces_option, recipe_structures):
+    def _apply_recipe(self, state, need_id, recipe_id, produces_option, recipe_structures, request):
         need = state.material_nodes[need_id]
         per_exec = produces_option["quantity"]
-        exec_count = math.ceil(need.consumed_qty / per_exec) if per_exec > 0 else 1
+        
+        if request.domain_constraints.allow_partial_recipe_execution and per_exec > 0:
+            exec_count = need.consumed_qty / per_exec
+        else:
+            exec_count = math.ceil(need.consumed_qty / per_exec) if per_exec > 0 else 1
 
         rn_id = state.next_id("R")
         state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count)
@@ -369,6 +373,7 @@ class OutputSolverService:
         if recipe_id is None:
             raise ValueError(f"No recipe found matching constraints: {request.target.constraints}")
         
+        # Use quantity directly as execution count (can be fractional if allowed)
         exec_count = request.target.quantity
         
         state = _State(
@@ -783,7 +788,13 @@ class OutputSolverService:
                 label = node_id_to_label[n["id"]]
                 if n.get("kind") == "recipe_execution":
                     tags = n.get("tags", [])
-                    print(f"  {label}: recipe exec={n.get('execution_count')} tags={tags}")
+                    exec_count = n.get('execution_count', 0)
+                    # Format execution count to show decimals if fractional
+                    if exec_count == int(exec_count):
+                        exec_str = str(int(exec_count))
+                    else:
+                        exec_str = f"{exec_count:.2f}"
+                    print(f"  {label}: recipe exec={exec_str} tags={tags}")
                 else:
                     node_type = n.get("type", "?")
                     prod = n.get("produced_qty", 0)

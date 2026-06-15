@@ -66,7 +66,7 @@ class MaterialNode:
 class RecipeExecNode:
     id: str
     recipe_id: uuid.UUID
-    execution_count: int = 1
+    execution_count: float = 1.0
     tags: List[str] = field(default_factory=list)
     kind: str = "recipe_execution"
 
@@ -109,6 +109,7 @@ class DomainConstraints:
     forbidden_materials_matching: List[ConstraintRule] = field(default_factory=list)
     forbidden_recipe_ids: List[uuid.UUID] = field(default_factory=list)
     max_recipe_depth: int = 10
+    allow_partial_recipe_execution: bool = False
 
 
 @dataclass
