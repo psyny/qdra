@@ -17,6 +17,10 @@ up: ## Start all services
 	@echo "Services started. Click here to access the frontend: http://localhost:3000"
 	@echo ""
 
+prepare: ## Prepare the application (run migrations after up)
+	@echo "Running database migrations..."
+	docker exec qdra-backend-api-1 sh -c "cd qdra && alembic upgrade head"
+
 down: ## Stop all services
 	docker-compose down
 
