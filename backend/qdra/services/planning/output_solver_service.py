@@ -877,6 +877,13 @@ class OutputSolverService:
 
         scores["SourceProduction"] = source_production
 
+        # System: WasteProduced
+        scores["WasteProduced"] = float(sum(
+            max(0.0, n.produced_qty - n.consumed_qty)
+            for n in state.material_nodes.values()
+            if n.type == MaterialNodeType.OUTPUT
+        ))
+
         if score_rules:
             var_values: Dict[str, float] = dict(scores)
             for var_def in score_rules.user_variables:

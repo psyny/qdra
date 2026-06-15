@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Union
 from enum import Enum
 
 
-SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit", "SourceProduction"}
+SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit", "SourceProduction", "WasteProduced"}
 
 
 # ---------------------------------------------------------------------------
