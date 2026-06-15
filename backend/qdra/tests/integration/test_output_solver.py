@@ -456,7 +456,7 @@ def test_root_material_becomes_root_requirement(client):
         data,
         material_label_param=("identity", "name"),
         recipe_label_param=("identity", "name"),
-        simplify_level=0,
+        simplify_level=1,
     )
 
     assert data["success"] is True

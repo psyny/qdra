@@ -927,8 +927,166 @@ class OutputSolverService:
 
     @staticmethod
     def _simplify_graph_lv1(graph: dict) -> dict:
-        """Level 1: Not yet implemented - return graph as is."""
-        return graph
+        """Level 1: Collapse material nodes by cluster (connected material nodes of same material_id)."""
+        nodes = graph.get("nodes", [])
+        edges = graph.get("edges", [])
+
+        # Separate material and recipe nodes
+        material_nodes = []
+        recipe_nodes = []
+        node_id_to_material_id = {}
+
+        for node in nodes:
+            if node.get("kind") == "recipe_execution":
+                recipe_nodes.append(node)
+            else:
+                # Extract material_id from constraints
+                material_id = None
+                for c in node.get("material_constraints", []):
+                    if c.get("domain") == "identity" and c.get("key") == "material_id":
+                        material_id = c.get("value_string")
+                        break
+                if material_id:
+                    material_nodes.append(node)
+                    node_id_to_material_id[node["id"]] = material_id
+
+        # Build adjacency list for material nodes (which material nodes are connected to which)
+        material_id_to_node_ids = {}
+        for node in material_nodes:
+            material_id = node_id_to_material_id[node["id"]]
+            if material_id not in material_id_to_node_ids:
+                material_id_to_node_ids[material_id] = []
+            material_id_to_node_ids[material_id].append(node["id"])
+
+        # Build adjacency: which material node IDs are connected to which (only same material_id)
+        node_id_to_adjacent = {node_id: set() for node_id in node_id_to_material_id}
+        for edge in edges:
+            from_id = edge.get("from_node_id")
+            to_id = edge.get("to_node_id")
+            if from_id in node_id_to_material_id and to_id in node_id_to_material_id:
+                # Only add adjacency if both nodes have the same material_id
+                if node_id_to_material_id[from_id] == node_id_to_material_id[to_id]:
+                    node_id_to_adjacent[from_id].add(to_id)
+                    node_id_to_adjacent[to_id].add(from_id)
+
+        # Find clusters using BFS
+        visited = set()
+        clusters = []  # List of lists of node_ids
+
+        for node_id in node_id_to_material_id:
+            if node_id not in visited:
+                # Start BFS to find the cluster
+                cluster = []
+                queue = [node_id]
+                visited.add(node_id)
+                start_material_id = node_id_to_material_id[node_id]
+
+                while queue:
+                    current_id = queue.pop(0)
+                    cluster.append(current_id)
+
+                    # Add adjacent material nodes of the same material_id
+                    for adjacent_id in node_id_to_adjacent[current_id]:
+                        if adjacent_id not in visited and node_id_to_material_id[adjacent_id] == start_material_id:
+                            visited.add(adjacent_id)
+                            queue.append(adjacent_id)
+
+                clusters.append(cluster)
+
+        # Create collapsed material nodes for each cluster
+        collapsed_nodes = []
+        node_id_to_collapsed_id = {}
+        cluster_counter = 0
+
+        for cluster in clusters:
+            if len(cluster) == 1:
+                # No collapsing needed for single-node clusters
+                node_id_to_collapsed_id[cluster[0]] = cluster[0]
+                continue
+
+            # Merge tags from all nodes in cluster, add "collapsed"
+            merged_tags = set()
+            first_node = None
+            material_id = None
+
+            for node_id in cluster:
+                node = next(n for n in material_nodes if n["id"] == node_id)
+                if first_node is None:
+                    first_node = node
+                    material_id = node_id_to_material_id[node_id]
+                merged_tags.update(node.get("tags", []))
+            merged_tags.add("collapsed")
+
+            # Generate unique collapsed node id per cluster (not per material_id)
+            collapsed_id = f"CL{cluster_counter}_{material_id[:8]}"
+            cluster_counter += 1
+
+            # Create collapsed node
+            collapsed_node = {
+                "id": collapsed_id,
+                "kind": "material",
+                "type": first_node.get("type"),
+                "material_constraints": first_node.get("material_constraints"),
+                "produced_qty": 0,  # Will recalculate
+                "consumed_qty": 0,  # Will recalculate
+                "tags": list(merged_tags),
+            }
+            collapsed_nodes.append(collapsed_node)
+
+            # Map all cluster nodes to the collapsed ID
+            for node_id in cluster:
+                node_id_to_collapsed_id[node_id] = collapsed_id
+
+        # Add non-collapsed material nodes (single-node clusters)
+        for node in material_nodes:
+            if node["id"] not in node_id_to_collapsed_id or node_id_to_collapsed_id[node["id"]] == node["id"]:
+                # This node was not collapsed
+                collapsed_nodes.append(node)
+
+        # Build new edges (discard material-to-material edges within same cluster)
+        new_edges = []
+
+        for edge in edges:
+            from_id = edge.get("from_node_id")
+            to_id = edge.get("to_node_id")
+
+            # Map material node IDs to collapsed IDs
+            new_from_id = node_id_to_collapsed_id.get(from_id, from_id)
+            new_to_id = node_id_to_collapsed_id.get(to_id, to_id)
+
+            # Discard edges that map to the same collapsed node (material-to-material within cluster)
+            if new_from_id == new_to_id:
+                continue
+
+            new_edges.append({
+                "from_node_id": new_from_id,
+                "to_node_id": new_to_id,
+                "qty": edge.get("qty"),
+                "edge_type": edge.get("edge_type"),
+            })
+
+        # Recalculate produced/consumed for collapsed nodes
+        for collapsed_node in collapsed_nodes:
+            collapsed_id = collapsed_node["id"]
+            produced = 0
+            consumed = 0
+
+            for edge in new_edges:
+                if edge["to_node_id"] == collapsed_id:
+                    produced += edge.get("qty", 0)
+                if edge["from_node_id"] == collapsed_id:
+                    consumed += edge.get("qty", 0)
+
+            collapsed_node["produced_qty"] = produced
+            collapsed_node["consumed_qty"] = consumed
+
+        # Combine recipe nodes and (collapsed + non-collapsed) material nodes
+        simplified_nodes = recipe_nodes + collapsed_nodes
+
+        return {
+            "nodes": simplified_nodes,
+            "edges": new_edges,
+        }
 
     @staticmethod
     def _simplify_graph_lv2(graph: dict) -> dict:
