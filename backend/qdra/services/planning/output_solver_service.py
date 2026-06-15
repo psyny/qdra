@@ -885,10 +885,13 @@ class OutputSolverService:
                 label = simplified_node_id_to_label[n["id"]]
                 if n.get("kind") == "recipe_execution":
                     exec_count = n.get("execution_count", 1)
-                    print(f'  "{n["id"]}" [label="{label}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
+                    exec_str = f"{exec_count:.1f}" if exec_count != int(exec_count) else str(int(exec_count))
+                    print(f'  "{n["id"]}" [label="{label}\\n({exec_str})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
                 else:
                     prod = n.get("produced_qty", 0)
                     cons_qty = n.get("consumed_qty", 0)
+                    prod_str = f"{prod:.1f}" if prod != int(prod) else str(int(prod))
+                    cons_str = f"{cons_qty:.1f}" if cons_qty != int(cons_qty) else str(int(cons_qty))
                     tags = n.get("tags", [])
 
                     # Determine color based on tags
@@ -901,16 +904,17 @@ class OutputSolverService:
                     else:
                         color = "#ffd43b"  # yellow
 
-                    print(f'  "{n["id"]}" [label="{label}\\n{cons_qty}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
+                    print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
 
             # Print graphviz edges
             for e in simplified_edges:
                 qty = e.get("qty", 0)
+                qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
                 width = 1 + (qty / max_qty) * 3  # scale 1-4
                 width = min(max(width, 1), 4)
                 from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
                 to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
-                print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty}", penwidth={width:.1f}];')
+                print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
 
             print("}")
 

@@ -16,7 +16,8 @@ def create_comprehensive_test_dataset(client, project_id):
     - Recipe producing 2 materials used by different recipes (Processing -> intermediate_1/intermediate_3)
     - Recipe producing unused byproduct (Processing -> byproduct)
     - Mismatched rates for partial execution (PartialProducer/PartialConsumer)
-    - Chain of 4+ recipes (Extraction -> Processing -> Refining_A -> Assembly)
+    - Chain of 4+ recipes (Extraction -> Processing -> Refining_A -> Assembly_A -> Refining_C)
+    - Fractional production rates (Refining_A produces intermediate_2 at 1.5 rate)
     """
     
     # Create materials
@@ -34,6 +35,18 @@ def create_comprehensive_test_dataset(client, project_id):
     
     intermediate_3 = client.post(f"/projects/{project_id}/materials/bulk", json={
         "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_3"}]
+    }).json()
+    
+    intermediate_4 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_4"}]
+    }).json()
+    
+    intermediate_5 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_5"}]
+    }).json()
+    
+    intermediate_6 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_6"}]
     }).json()
     
     final_product = client.post(f"/projects/{project_id}/materials/bulk", json={
@@ -117,7 +130,8 @@ def create_comprehensive_test_dataset(client, project_id):
         },
     ).json()
     
-    # Recipe 3: Refining_A - consumes intermediate_1, produces intermediate_2
+    # Recipe 3: Refining_A - consumes intermediate_1, produces intermediate_2 at rate 1.5
+    # Covers: fractional production rate
     refining_a = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
@@ -138,7 +152,7 @@ def create_comprehensive_test_dataset(client, project_id):
                     "kind": "PRODUCES",
                     "options": [
                         {
-                            "quantity": 1,
+                            "quantity": 1.5,
                             "constraints": [
                                 {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_2["id"])}
                             ],
@@ -149,8 +163,8 @@ def create_comprehensive_test_dataset(client, project_id):
         },
     ).json()
     
-    # Recipe 4: Refining_B - consumes intermediate_1, produces intermediate_3
-    # Covers: second output of Processing used by different recipe
+    # Recipe 4: Refining_B - consumes intermediate_1, produces intermediate_3 AND intermediate_4
+    # Covers: 2 outputs used by different recipes
     refining_b = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
@@ -178,17 +192,39 @@ def create_comprehensive_test_dataset(client, project_id):
                         }
                     ],
                 },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                            ],
+                        }
+                    ],
+                },
             ],
         },
     ).json()
     
-    # Recipe 5: Assembly - consumes intermediate_2 + intermediate_3, produces final_product
-    # Chain depth: Extraction -> Processing -> Refining_A -> Assembly (4 deep)
-    assembly = client.post(
+    # Recipe 5: Assembly_A - consumes intermediate_4 + intermediate_2, produces intermediate_5
+    # Chain depth: Extraction -> Processing -> Refining_A -> Assembly_A -> Refining_C (5 deep)
+    assembly_a = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly"}],
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_A"}],
             "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                            ],
+                        }
+                    ],
+                },
                 {
                     "kind": "CONSUMES",
                     "options": [
@@ -201,12 +237,76 @@ def create_comprehensive_test_dataset(client, project_id):
                     ],
                 },
                 {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_5["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 6: Refining_C - consumes intermediate_3, produces intermediate_6
+    refining_c = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C"}],
+            "slots": [
+                {
                     "kind": "CONSUMES",
                     "options": [
                         {
                             "quantity": 1,
                             "constraints": [
                                 {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 7: Assembly_B - consumes intermediate_6 + intermediate_5, produces final_product
+    assembly_b = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_B"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_5["id"])}
                             ],
                         }
                     ],
@@ -226,7 +326,7 @@ def create_comprehensive_test_dataset(client, project_id):
         },
     ).json()
     
-    # Recipe 6: PartialProducer - produces partial_test_producer at rate 10
+    # Recipe 8: PartialProducer - produces partial_test_producer at rate 10
     partial_producer = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
@@ -247,7 +347,7 @@ def create_comprehensive_test_dataset(client, project_id):
         },
     ).json()
     
-    # Recipe 7: PartialConsumer - consumes partial_test_producer at rate 3, produces partial_test_consumer
+    # Recipe 9: PartialConsumer - consumes partial_test_producer at rate 3, produces partial_test_consumer
     # Mismatched rates (10 vs 3) for partial execution testing
     partial_consumer = client.post(
         f"/projects/{project_id}/recipes/bulk",
@@ -286,6 +386,9 @@ def create_comprehensive_test_dataset(client, project_id):
             "intermediate_1": intermediate_1,
             "intermediate_2": intermediate_2,
             "intermediate_3": intermediate_3,
+            "intermediate_4": intermediate_4,
+            "intermediate_5": intermediate_5,
+            "intermediate_6": intermediate_6,
             "final_product": final_product,
             "byproduct": byproduct,
             "partial_test_producer": partial_test_producer,
@@ -296,7 +399,9 @@ def create_comprehensive_test_dataset(client, project_id):
             "processing": processing,
             "refining_a": refining_a,
             "refining_b": refining_b,
-            "assembly": assembly,
+            "assembly_a": assembly_a,
+            "refining_c": refining_c,
+            "assembly_b": assembly_b,
             "partial_producer": partial_producer,
             "partial_consumer": partial_consumer,
         },
