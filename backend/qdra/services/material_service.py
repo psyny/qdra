@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from models.parameter import Parameter
 from repositories.material_repository import MaterialRepository
 from repositories.parameter_repository import ParameterRepository
 from repositories.project_repository import ProjectRepository
+from repositories.image_asset_repository import ImageAssetRepository
 
 
 class MaterialService:
@@ -16,6 +17,7 @@ class MaterialService:
         self.material_repository = MaterialRepository(db)
         self.parameter_repository = ParameterRepository(db)
         self.project_repository = ProjectRepository(db)
+        self.image_asset_repository = ImageAssetRepository(db)
 
     def create_material(self, project_id: uuid.UUID) -> Material:
         project = self.project_repository.get_by_id(project_id)
@@ -23,17 +25,63 @@ class MaterialService:
             raise ValueError(f"Project with id '{project_id}' not found")
         return self.material_repository.create(project_id)
 
-    def get_material(self, material_id: uuid.UUID) -> Material:
+    def get_material(self, material_id: uuid.UUID) -> Dict[str, Any]:
         material = self.material_repository.get_by_id(material_id)
         if not material:
             raise ValueError(f"Material with id '{material_id}' not found")
-        return material
+        
+        # Get primary image
+        image = self.image_asset_repository.get_primary_image(
+            material.project_id, "material", material.id
+        )
+        
+        result = {
+            "id": material.id,
+            "project_id": material.project_id,
+            "image": None,
+        }
+        
+        if image:
+            result["image"] = {
+                "id": image.id,
+                "url": f"/projects/{material.project_id}/images/{image.id}",
+                "mime_type": image.mime_type,
+                "alt_text": image.alt_text,
+            }
+        
+        return result
 
-    def list_materials(self, project_id: uuid.UUID) -> List[Material]:
+    def list_materials(self, project_id: uuid.UUID) -> List[Dict[str, Any]]:
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project with id '{project_id}' not found")
-        return self.material_repository.list_by_project(project_id)
+        
+        materials = self.material_repository.list_by_project(project_id)
+        result = []
+        
+        for material in materials:
+            # Get primary image
+            image = self.image_asset_repository.get_primary_image(
+                material.project_id, "material", material.id
+            )
+            
+            material_data = {
+                "id": material.id,
+                "project_id": material.project_id,
+                "image": None,
+            }
+            
+            if image:
+                material_data["image"] = {
+                    "id": image.id,
+                    "url": f"/projects/{material.project_id}/images/{image.id}",
+                    "mime_type": image.mime_type,
+                    "alt_text": image.alt_text,
+                }
+            
+            result.append(material_data)
+        
+        return result
 
     def add_parameter(
         self,

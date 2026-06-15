@@ -61,10 +61,18 @@ class RecipeParameterResponse(BaseModel):
     value_boolean: Optional[bool]
 
 
+class ImageMetadata(BaseModel):
+    id: uuid.UUID
+    url: str
+    mime_type: str
+    alt_text: Optional[str] = None
+
+
 class RecipeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_id: uuid.UUID
+    image: Optional[ImageMetadata] = None
 
 
 class SlotCreate(BaseModel):
@@ -189,7 +197,7 @@ def create_recipe_bulk(project_id: uuid.UUID, recipe_data: RecipeBulkCreate, db:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/projects/{project_id}/recipes", response_model=list[RecipeResponse])
+@router.get("/projects/{project_id}/recipes")
 def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
     service = RecipeService(db)
     try:
@@ -198,7 +206,7 @@ def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/recipes/{recipe_id}", response_model=RecipeResponse)
+@router.get("/recipes/{recipe_id}")
 def get_recipe(recipe_id: uuid.UUID, db: Session = Depends(get_db)):
     service = RecipeService(db)
     try:

@@ -11,10 +11,18 @@ from services.material_service import MaterialService
 router = APIRouter()
 
 
+class ImageMetadata(BaseModel):
+    id: uuid.UUID
+    url: str
+    mime_type: str
+    alt_text: Optional[str] = None
+
+
 class MaterialResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_id: uuid.UUID
+    image: Optional[ImageMetadata] = None
 
 
 class ParameterCreate(BaseModel):
@@ -71,7 +79,7 @@ def create_material_bulk(project_id: uuid.UUID, material_data: MaterialBulkCreat
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/projects/{project_id}/materials", response_model=list[MaterialResponse])
+@router.get("/projects/{project_id}/materials")
 def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
     service = MaterialService(db)
     try:
@@ -80,7 +88,7 @@ def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/materials/{material_id}", response_model=MaterialResponse)
+@router.get("/materials/{material_id}")
 def get_material(material_id: uuid.UUID, db: Session = Depends(get_db)):
     service = MaterialService(db)
     try:

@@ -1,0 +1,201 @@
+import uuid
+import imghdr
+from typing import Optional, Tuple
+from PIL import Image
+import io
+
+from sqlalchemy.orm import Session
+
+from repositories.image_asset_repository import ImageAssetRepository
+from repositories.material_repository import MaterialRepository
+from repositories.recipe_repository import RecipeRepository
+from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
+from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
+from infrastructure.storage.image_storage_provider import ImageStorageProvider
+from infrastructure.config.settings import settings
+
+
+class ImageService:
+    def __init__(self, db: Session):
+        self.db = db
+        self.image_asset_repo = ImageAssetRepository(db)
+        self.material_repo = MaterialRepository(db)
+        self.recipe_repo = RecipeRepository(db)
+        self.storage_provider = self._get_storage_provider()
+    
+    def _get_storage_provider(self) -> ImageStorageProvider:
+        """Get the configured storage provider."""
+        if settings.image_storage_backend == "local":
+            return LocalImageStorageProvider(settings.local_storage_root)
+        elif settings.image_storage_backend == "s3":
+            return S3ImageStorageProvider(
+                bucket=settings.s3_bucket,
+                region=settings.s3_region,
+                endpoint_url=settings.s3_endpoint_url or None,
+                access_key_id=settings.s3_access_key_id or None,
+                secret_access_key=settings.s3_secret_access_key or None,
+                public_base_url=settings.s3_public_base_url or None,
+            )
+        else:
+            raise ValueError(f"Unknown storage backend: {settings.image_storage_backend}")
+    
+    def _validate_image(self, content: bytes, filename: str) -> Tuple[str, str]:
+        """Validate image type and size. Returns (mime_type, extension)."""
+        # Check file size
+        max_size = settings.max_image_size_mb * 1024 * 1024
+        if len(content) > max_size:
+            raise ValueError(f"Image size exceeds {settings.max_image_size_mb}MB limit")
+        
+        # Detect actual image type from content
+        image_type = imghdr.what(None, h=content)
+        if image_type not in ["png", "jpeg", "webp"]:
+            raise ValueError(f"Unsupported image type: {image_type}")
+        
+        # Map to MIME type
+        mime_type_map = {
+            "png": "image/png",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+        }
+        mime_type = mime_type_map[image_type]
+        
+        # Check if MIME type is allowed
+        allowed_types = [t.strip() for t in settings.allowed_image_mime_types.split(",")]
+        if mime_type not in allowed_types:
+            raise ValueError(f"MIME type {mime_type} not allowed")
+        
+        return mime_type, f".{image_type}"
+    
+    def _get_image_dimensions(self, content: bytes) -> Tuple[int, int]:
+        """Extract image dimensions."""
+        image = Image.open(io.BytesIO(content))
+        return image.size
+    
+    def _generate_storage_key(
+        self, project_id: uuid.UUID, owner_type: str, owner_id: uuid.UUID, image_asset_id: uuid.UUID, extension: str
+    ) -> str:
+        """Generate storage key for an image."""
+        if owner_type == "material":
+            return f"projects/{project_id}/materials/{owner_id}/images/{image_asset_id}{extension}"
+        elif owner_type == "recipe":
+            return f"projects/{project_id}/recipes/{owner_id}/images/{image_asset_id}{extension}"
+        else:
+            raise ValueError(f"Unknown owner type: {owner_type}")
+    
+    async def upload_material_image(
+        self,
+        project_id: uuid.UUID,
+        material_id: uuid.UUID,
+        content: bytes,
+        filename: str,
+        alt_text: Optional[str] = None,
+    ):
+        """Upload an image for a material."""
+        # Validate material exists
+        material = self.material_repo.get_by_id(material_id)
+        if not material or material.project_id != project_id:
+            raise ValueError("Material not found")
+        
+        # Validate image
+        mime_type, extension = self._validate_image(content, filename)
+        width, height = self._get_image_dimensions(content)
+        
+        # Create image asset record
+        image_asset_id = uuid.uuid4()
+        storage_key = self._generate_storage_key(project_id, "material", material_id, image_asset_id, extension)
+        
+        # Save to storage
+        await self.storage_provider.save(storage_key, content, mime_type)
+        
+        # Create database record
+        image_asset = self.image_asset_repo.create(
+            project_id=project_id,
+            owner_type="material",
+            owner_id=material_id,
+            storage_backend=settings.image_storage_backend,
+            storage_key=storage_key,
+            mime_type=mime_type,
+            original_filename=filename,
+            file_size_bytes=len(content),
+            width=width,
+            height=height,
+            alt_text=alt_text,
+            is_primary=True,
+        )
+        
+        return image_asset
+    
+    async def upload_recipe_image(
+        self,
+        project_id: uuid.UUID,
+        recipe_id: uuid.UUID,
+        content: bytes,
+        filename: str,
+        alt_text: Optional[str] = None,
+    ):
+        """Upload an image for a recipe."""
+        # Validate recipe exists
+        recipe = self.recipe_repo.get_by_id(recipe_id)
+        if not recipe or recipe.project_id != project_id:
+            raise ValueError("Recipe not found")
+        
+        # Validate image
+        mime_type, extension = self._validate_image(content, filename)
+        width, height = self._get_image_dimensions(content)
+        
+        # Create image asset record
+        image_asset_id = uuid.uuid4()
+        storage_key = self._generate_storage_key(project_id, "recipe", recipe_id, image_asset_id, extension)
+        
+        # Save to storage
+        await self.storage_provider.save(storage_key, content, mime_type)
+        
+        # Create database record
+        image_asset = self.image_asset_repo.create(
+            project_id=project_id,
+            owner_type="recipe",
+            owner_id=recipe_id,
+            storage_backend=settings.image_storage_backend,
+            storage_key=storage_key,
+            mime_type=mime_type,
+            original_filename=filename,
+            file_size_bytes=len(content),
+            width=width,
+            height=height,
+            alt_text=alt_text,
+            is_primary=True,
+        )
+        
+        return image_asset
+    
+    def get_material_image(self, project_id: uuid.UUID, material_id: uuid.UUID):
+        """Get the primary image for a material."""
+        return self.image_asset_repo.get_primary_image(project_id, "material", material_id)
+    
+    def get_recipe_image(self, project_id: uuid.UUID, recipe_id: uuid.UUID):
+        """Get the primary image for a recipe."""
+        return self.image_asset_repo.get_primary_image(project_id, "recipe", recipe_id)
+    
+    def get_image_by_id(self, image_asset_id: uuid.UUID):
+        """Get an image by its ID."""
+        return self.image_asset_repo.get_by_id(image_asset_id)
+    
+    async def delete_image(self, image_asset_id: uuid.UUID):
+        """Delete an image."""
+        image_asset = self.image_asset_repo.get_by_id(image_asset_id)
+        if not image_asset:
+            raise ValueError("Image not found")
+        
+        # Delete from storage
+        await self.storage_provider.delete(image_asset.storage_key)
+        
+        # Delete from database
+        self.image_asset_repo.delete(image_asset_id)
+    
+    async def get_image_stream(self, image_asset_id: uuid.UUID):
+        """Get a read stream for an image."""
+        image_asset = self.image_asset_repo.get_by_id(image_asset_id)
+        if not image_asset:
+            raise ValueError("Image not found")
+        
+        return await self.storage_provider.open_read_stream(image_asset.storage_key)

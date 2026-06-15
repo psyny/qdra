@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
 from repositories.recipe_parameter_repository import RecipeParameterRepository
+from repositories.image_asset_repository import ImageAssetRepository
 
 
 class RecipeService:
@@ -25,6 +26,7 @@ class RecipeService:
         self.constraint_repository = ParameterConstraintRepository(db)
         self.project_repository = ProjectRepository(db)
         self.recipe_parameter_repository = RecipeParameterRepository(db)
+        self.image_asset_repository = ImageAssetRepository(db)
 
     def create_recipe(self, project_id: uuid.UUID) -> Recipe:
         project = self.project_repository.get_by_id(project_id)
@@ -32,17 +34,63 @@ class RecipeService:
             raise ValueError(f"Project with id '{project_id}' not found")
         return self.recipe_repository.create(project_id)
 
-    def get_recipe(self, recipe_id: uuid.UUID) -> Recipe:
+    def get_recipe(self, recipe_id: uuid.UUID) -> Dict[str, Any]:
         recipe = self.recipe_repository.get_by_id(recipe_id)
         if not recipe:
             raise ValueError(f"Recipe with id '{recipe_id}' not found")
-        return recipe
+        
+        # Get primary image
+        image = self.image_asset_repository.get_primary_image(
+            recipe.project_id, "recipe", recipe.id
+        )
+        
+        result = {
+            "id": recipe.id,
+            "project_id": recipe.project_id,
+            "image": None,
+        }
+        
+        if image:
+            result["image"] = {
+                "id": image.id,
+                "url": f"/projects/{recipe.project_id}/images/{image.id}",
+                "mime_type": image.mime_type,
+                "alt_text": image.alt_text,
+            }
+        
+        return result
 
-    def list_recipes(self, project_id: uuid.UUID) -> List[Recipe]:
+    def list_recipes(self, project_id: uuid.UUID) -> List[Dict[str, Any]]:
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project with id '{project_id}' not found")
-        return self.recipe_repository.list_by_project(project_id)
+        
+        recipes = self.recipe_repository.list_by_project(project_id)
+        result = []
+        
+        for recipe in recipes:
+            # Get primary image
+            image = self.image_asset_repository.get_primary_image(
+                recipe.project_id, "recipe", recipe.id
+            )
+            
+            recipe_data = {
+                "id": recipe.id,
+                "project_id": recipe.project_id,
+                "image": None,
+            }
+            
+            if image:
+                recipe_data["image"] = {
+                    "id": image.id,
+                    "url": f"/projects/{recipe.project_id}/images/{image.id}",
+                    "mime_type": image.mime_type,
+                    "alt_text": image.alt_text,
+                }
+            
+            result.append(recipe_data)
+        
+        return result
 
     def create_slot(self, recipe_id: uuid.UUID, kind: str) -> Slot:
         recipe = self.recipe_repository.get_by_id(recipe_id)

@@ -19,6 +19,12 @@ services:
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       REDIS_URL: redis://redis:6379/0
       GRAPH_JOB_QUEUE: graph_reasoning_jobs
+      QDRA_IMAGE_STORAGE_BACKEND: local
+      QDRA_LOCAL_STORAGE_ROOT: ./uploads
+      QDRA_MAX_IMAGE_SIZE_MB: 5
+      QDRA_ALLOWED_IMAGE_MIME_TYPES: image/png,image/jpeg,image/webp
+    volumes:
+      - qdra_uploads:/app/uploads
     depends_on:
       - postgres
       - redis
@@ -55,3 +61,4 @@ services:
 
 volumes:
   postgres_data:
+  qdra_uploads:
