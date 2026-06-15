@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from repositories.project_repository import ProjectRepository
+from repositories.project_template_repository import ProjectTemplateRepository
 from services.material_service import MaterialService
 from services.recipe_service import RecipeService
 from services.planning.output_planner_service import PlanningService
@@ -45,12 +46,14 @@ router = APIRouter()
 
 class ProjectCreate(BaseModel):
     name: str
+    project_template_id: Optional[uuid.UUID] = None
 
 
 class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     name: str
+    project_template_id: Optional[uuid.UUID]
 
 
 # Planning API Models
@@ -186,7 +189,7 @@ class RankingResultModel(BaseModel):
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
 def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
     repo = ProjectRepository(db)
-    project = repo.create(project_data.name)
+    project = repo.create(project_data.name, project_data.project_template_id)
     return project
 
 
@@ -200,6 +203,30 @@ def list_projects(db: Session = Depends(get_db)):
 def get_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
     repo = ProjectRepository(db)
     project = repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+class ProjectUpdateTemplate(BaseModel):
+    project_template_id: Optional[uuid.UUID] = None
+
+
+@router.patch("/projects/{project_id}/template", response_model=ProjectResponse)
+def update_project_template(
+    project_id: uuid.UUID,
+    data: ProjectUpdateTemplate,
+    db: Session = Depends(get_db),
+):
+    """Update a project's template. Can be set to null to use abstraction display."""
+    if data.project_template_id is not None:
+        template_repo = ProjectTemplateRepository(db)
+        template = template_repo.get_by_id(data.project_template_id)
+        if not template:
+            raise HTTPException(status_code=400, detail="Project template not found")
+
+    repo = ProjectRepository(db)
+    project = repo.update_template(project_id, data.project_template_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project

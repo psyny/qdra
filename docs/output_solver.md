@@ -237,9 +237,8 @@ Root nodes, byproduct nodes, and target nodes are derivable from the graph and d
 
 ---
 
-## Optimization (Future Work — Not Part of Core Algorithm)
-
-When `optimization_level > 0`, the solver runs additional passes over each emitted plan to reduce waste.
+## Optimization
+When `optimization_level > 0`, the solver runs additional passes over each emitted plan.
 
 ### Optimization Level 1
 
