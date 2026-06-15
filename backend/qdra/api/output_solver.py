@@ -241,6 +241,7 @@ def solve_output(
                     "kind": n.kind,
                     "recipe_id": str(n.recipe_id),
                     "execution_count": n.execution_count,
+                    "tags": n.tags,
                 })
             else:
                 nodes.append({

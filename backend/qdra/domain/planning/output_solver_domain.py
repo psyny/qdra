@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Union
 from enum import Enum
 
 
-SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit"}
+SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit", "SourceProduction"}
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +67,7 @@ class RecipeExecNode:
     id: str
     recipe_id: uuid.UUID
     execution_count: int = 1
+    tags: List[str] = field(default_factory=list)
     kind: str = "recipe_execution"
 
 

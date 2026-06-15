@@ -168,6 +168,7 @@ def test_root_material_becomes_root_requirement(client):
     score = plan["score"]
     assert "RecipeExecution" in score
     assert "MaterialSplit" in score
+    assert "SourceProduction" in score
     assert "TotalPower" in score
     assert "PowerEfficiency" in score
 

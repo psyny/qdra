@@ -141,6 +141,53 @@ class OutputSolverService:
         entities = self._collect_entities(plans, request.project_id)
         return SolverResponse(success=True, plans=plans, entities=entities)
 
+    def _tag_state_nodes(self, state: "_State") -> None:
+        """Tag material and recipe nodes in the state based on graph topology."""
+        # Build adjacency maps
+        outgoing: Dict[str, List[str]] = {}
+        incoming: Dict[str, List[str]] = {}
+
+        for e in state.material_edges:
+            if e.from_node_id not in outgoing:
+                outgoing[e.from_node_id] = []
+            outgoing[e.from_node_id].append(e.to_node_id)
+
+            if e.to_node_id not in incoming:
+                incoming[e.to_node_id] = []
+            incoming[e.to_node_id].append(e.from_node_id)
+
+        for e in state.recipe_edges:
+            if e.from_node_id not in outgoing:
+                outgoing[e.from_node_id] = []
+            outgoing[e.from_node_id].append(e.to_node_id)
+
+            if e.to_node_id not in incoming:
+                incoming[e.to_node_id] = []
+            incoming[e.to_node_id].append(e.from_node_id)
+
+        # Tag material nodes
+        for node in state.material_nodes.values():
+            tags: Set[str] = set()
+
+            if node.produced_qty > node.consumed_qty:
+                tags.add("excess")
+
+            if node.id not in outgoing or not outgoing[node.id]:
+                tags.add("leaf")
+
+            if node.id not in incoming or not incoming[node.id]:
+                tags.add("root")
+
+            node.tags = list(tags)
+
+        # Tag recipe nodes as root if they have no incoming edges
+        for rn in state.recipe_nodes.values():
+            tags: Set[str] = set()
+            if rn.id not in incoming or not incoming[rn.id]:
+                tags.add("root")
+
+            rn.tags = list(tags)
+
     def _tag_nodes(self, plan: SolvedPlan) -> None:
         """Tag material nodes based on graph topology and quantities."""
         # Build adjacency maps
@@ -178,6 +225,17 @@ class OutputSolverService:
             if node.id not in outgoing or not outgoing[node.id]:
                 tags.add("leaf")
 
+            if node.id not in incoming or not incoming[node.id]:
+                tags.add("root")
+
+            node.tags = list(tags)
+
+        # Tag recipe nodes as root if they have no incoming edges
+        for node in plan.graph_nodes:
+            if not isinstance(node, RecipeExecNode):
+                continue
+
+            tags: Set[str] = set()
             if node.id not in incoming or not incoming[node.id]:
                 tags.add("root")
 
@@ -314,6 +372,9 @@ class OutputSolverService:
             return
         seen_fps.add(fp)
 
+        # Tag state nodes before computing scores
+        self._tag_state_nodes(state)
+
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
         score = self._compute_score(state, score_rules, recipe_params)
 
@@ -381,6 +442,26 @@ class OutputSolverService:
         scores["MaterialSplit"] = (
             len(state.material_nodes) / n_mat_edges if n_mat_edges > 0 else 0.0
         )
+
+        # System: SourceProduction
+        # Sum consumed_qty of material root nodes
+        source_production = 0.0
+        for node in state.material_nodes.values():
+            if "root" in node.tags:
+                source_production += node.consumed_qty
+
+        # For recipe root nodes, add consumed_qty of their output material nodes
+        for rn in state.recipe_nodes.values():
+            if "root" in rn.tags:
+                # Find output edges from this recipe
+                for re in state.recipe_edges:
+                    if re.from_node_id == rn.id:
+                        # Find the material node at the end of this edge
+                        mat_node = state.material_nodes.get(re.to_node_id)
+                        if mat_node:
+                            source_production += mat_node.consumed_qty
+
+        scores["SourceProduction"] = source_production
 
         if score_rules:
             var_values: Dict[str, float] = dict(scores)
@@ -610,7 +691,8 @@ class OutputSolverService:
             for n in nodes:
                 label = node_id_to_label[n["id"]]
                 if n.get("kind") == "recipe_execution":
-                    print(f"  {label}: recipe exec={n.get('execution_count')}")
+                    tags = n.get("tags", [])
+                    print(f"  {label}: recipe exec={n.get('execution_count')} tags={tags}")
                 else:
                     node_type = n.get("type", "?")
                     prod = n.get("produced_qty", 0)
