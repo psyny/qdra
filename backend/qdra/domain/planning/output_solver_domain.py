@@ -121,6 +121,18 @@ class SearchParameters:
 
 
 @dataclass
+class DiscardedPlansStats:
+    loops: int = 0
+    max_recursion_depth: int = 0
+    max_recipe_depth: int = 0
+    forbidden_recipes: int = 0
+    forbidden_materials: int = 0
+    do_not_expand_materials: int = 0
+    max_solutions_returned: int = 0
+    no_producers_found: int = 0
+
+
+@dataclass
 class UserVariableDef:
     name: str
     parameter_domain: str
@@ -179,3 +191,4 @@ class SolverResponse:
     success: bool
     plans: List[SolvedPlan] = field(default_factory=list)
     entities: Entities = field(default_factory=Entities)
+    discarded_plans_stats: DiscardedPlansStats = field(default_factory=DiscardedPlansStats)

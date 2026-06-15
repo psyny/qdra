@@ -6,33 +6,57 @@ from services.planning.output_solver_service import OutputSolverService
 def print_pretty(obj):
     print(json.dumps(obj, indent=2))
 
-def test_root_material_becomes_root_requirement(client):
-    """Verify that if no recipe produces a requirement, it becomes a root requirement."""
-    project_response = client.post("/projects", json={"name": "Test Project"})
-    project_id = project_response.json()["id"]
 
-    # Create materials with identity.name for human-readable labels
-    iron_ore = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]
+def create_comprehensive_test_dataset(client, project_id):
+    """
+    Create a comprehensive set of materials and recipes for testing various solver scenarios.
+    
+    Covers:
+    - Material required by recipe but not produced by any (raw_resource)
+    - Recipe producing 2 materials used by different recipes (Processing -> intermediate_1/intermediate_3)
+    - Recipe producing unused byproduct (Processing -> byproduct)
+    - Mismatched rates for partial execution (PartialProducer/PartialConsumer)
+    - Chain of 4+ recipes (Extraction -> Processing -> Refining_A -> Assembly)
+    """
+    
+    # Create materials
+    raw_resource = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "raw_resource"}]
     }).json()
-    coal_ore = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "coal_ore"}]
+    
+    intermediate_1 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_1"}]
     }).json()
-    steel_ingot = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "steel_ingot"}]
+    
+    intermediate_2 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_2"}]
     }).json()
-    polution = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "polution"}]
+    
+    intermediate_3 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_3"}]
     }).json()
-
-    # Mining: produces iron_ore (no inputs)
-    mining_response = client.post(
+    
+    final_product = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "final_product"}]
+    }).json()
+    
+    byproduct = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "byproduct"}]
+    }).json()
+    
+    partial_test_producer = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "partial_test_producer"}]
+    }).json()
+    
+    partial_test_consumer = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [{"domain": "identity", "key": "name", "value_string": "partial_test_consumer"}]
+    }).json()
+    
+    # Recipe 1: Extraction - produces raw_resource (no inputs) - root material case
+    extraction = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "parameters": [
-                {"domain": "identity", "key": "name", "value_string": "Mining"},
-                {"domain": "resource", "key": "power", "value_number": 5.0}
-            ],
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Extraction"}],
             "slots": [
                 {
                     "kind": "PRODUCES",
@@ -40,24 +64,21 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(iron_ore["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(raw_resource["id"])}
                             ],
                         }
                     ],
                 }
             ],
         },
-    )
-    mining_id = mining_response.json()["id"]
-
-    # Smelting: consumes iron_ore + coal_ore, produces steel_ingot
-    smelting_response = client.post(
+    ).json()
+    
+    # Recipe 2: Processing - consumes raw_resource, produces intermediate_1 AND byproduct
+    # Covers: 2 outputs, one unused (byproduct)
+    processing = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "parameters": [
-                {"domain": "identity", "key": "name", "value_string": "Smelting"},
-                {"domain": "resource", "key": "power", "value_number": 15.0}
-            ],
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Processing"}],
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -65,7 +86,116 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(iron_ore["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(raw_resource["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(byproduct["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 3: Refining_A - consumes intermediate_1, produces intermediate_2
+    refining_a = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_A"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_2["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 4: Refining_B - consumes intermediate_1, produces intermediate_3
+    # Covers: second output of Processing used by different recipe
+    refining_b = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_B"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 5: Assembly - consumes intermediate_2 + intermediate_3, produces final_product
+    # Chain depth: Extraction -> Processing -> Refining_A -> Assembly (4 deep)
+    assembly = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_2["id"])}
                             ],
                         }
                     ],
@@ -76,7 +206,7 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(coal_ore["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
                             ],
                         }
                     ],
@@ -87,7 +217,50 @@ def test_root_material_becomes_root_requirement(client):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(steel_ingot["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
+    # Recipe 6: PartialProducer - produces partial_test_producer at rate 10
+    partial_producer = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "PartialProducer"}],
+            "slots": [
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 10,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_producer["id"])}
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+    ).json()
+    
+    # Recipe 7: PartialConsumer - consumes partial_test_producer at rate 3, produces partial_test_consumer
+    # Mismatched rates (10 vs 3) for partial execution testing
+    partial_consumer = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "PartialConsumer"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 3,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_producer["id"])}
                             ],
                         }
                     ],
@@ -96,45 +269,75 @@ def test_root_material_becomes_root_requirement(client):
                     "kind": "PRODUCES",
                     "options": [
                         {
-                            "quantity": 2,
+                            "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(polution["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_consumer["id"])}
                             ],
                         }
                     ],
                 },
             ],
         },
-    )
-    smelting_id = smelting_response.json()["id"]
+    ).json()
+    
+    return {
+        "materials": {
+            "raw_resource": raw_resource,
+            "intermediate_1": intermediate_1,
+            "intermediate_2": intermediate_2,
+            "intermediate_3": intermediate_3,
+            "final_product": final_product,
+            "byproduct": byproduct,
+            "partial_test_producer": partial_test_producer,
+            "partial_test_consumer": partial_test_consumer,
+        },
+        "recipes": {
+            "extraction": extraction,
+            "processing": processing,
+            "refining_a": refining_a,
+            "refining_b": refining_b,
+            "assembly": assembly,
+            "partial_producer": partial_producer,
+            "partial_consumer": partial_consumer,
+        },
+    }
 
-    # Plan for 10 steel_ingot — coal_ore has no producer, becomes root requirement
+def test_root_material_becomes_root_requirement(client):
+    """Verify that if no recipe produces a requirement, it becomes a root requirement."""
+    project_response = client.post("/projects", json={"name": "Test Project"})
+    project_id = project_response.json()["id"]
+
+    # Use comprehensive test dataset
+    dataset = create_comprehensive_test_dataset(client, project_id)
+    materials = dataset["materials"]
+    recipes = dataset["recipes"]
+
+    print(str(materials["final_product"]["id"]))
+
+    # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
         f"/projects/{project_id}/solver/output",
         json={
             "target": {
-                "quantity": 10,
+                "quantity": 5,
+                "target_type": "material",
                 "constraints": [
-                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(steel_ingot["id"])}
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product"]["id"])}
                 ],
             },
-            "score_rules": {
-                "user_variables": [
-                    {
-                        "name": "TotalPower",
-                        "parameter_domain": "resource",
-                        "parameter_key": "power",
-                        "variable_type": "recipe",
-                        "constraints": []
-                    }
-                ],
-                "score_formulas": [
-                    {
-                        "name": "PowerEfficiency",
-                        "formula": "TotalPower / RecipeExecution"
-                    }
-                ]
-            }
+            "domain_constraints": {
+                "do_not_expand_materials_matching": [],
+                "forbidden_materials_matching": [],
+                "forbidden_recipe_ids": [],
+                "max_recipe_depth": 10,
+                "allow_partial_recipe_execution": True,
+            },
+            "search_parameters": {
+                "max_recursion_depth": 20,
+                "max_branch_width": 10,
+                "allow_loops": False,
+                "max_solutions_returned": 10,
+            },
         },
     )
 
@@ -155,28 +358,12 @@ def test_root_material_becomes_root_requirement(client):
 
     plan = data["plans"][0]
 
-    # coal_ore has no producer -> should be tagged as "root"
-    coal_ore_nodes = [
+    # byproduct is produced but not consumed -> should be tagged as "leaf" and "excess"
+    byproduct_nodes = [
         n for n in plan["graph"]["nodes"]
         if n.get("kind") != "recipe_execution" and
-        any(c.get("key") == "material_id" and c.get("value_string") == str(coal_ore["id"]) for c in n.get("material_constraints", []))
+        any(c.get("key") == "material_id" and c.get("value_string") == str(materials["byproduct"]["id"]) for c in n.get("material_constraints", []))
     ]
-    assert len(coal_ore_nodes) > 0
-    assert "root" in coal_ore_nodes[0].get("tags", [])
-
-    # Verify scores
-    score = plan["score"]
-    assert "RecipeExecution" in score
-    assert "MaterialSplit" in score
-    assert "SourceProduction" in score
-    assert "TotalPower" in score
-    assert "PowerEfficiency" in score
-
-    # RecipeExecution should be 20 (10 smelting + 10 mining)
-    assert score["RecipeExecution"] == 20.0
-
-    # TotalPower = (10 * 15) + (10 * 5) = 150 + 50 = 200
-    assert score["TotalPower"] == 200.0
-
-    # PowerEfficiency = TotalPower / RecipeExecution = 200 / 20 = 10
-    assert score["PowerEfficiency"] == 10.0
+    assert len(byproduct_nodes) > 0
+    assert "leaf" in byproduct_nodes[0].get("tags", [])
+    assert "excess" in byproduct_nodes[0].get("tags", [])

@@ -21,7 +21,7 @@ from domain.planning.output_solver_domain import (
     MaterialNodeType, RecipeEdgeType, ConstraintSpec, ConstraintRule,
     SolvedPlan, SolverRequest, SolverResponse,
     UserVariableDef, ScoreFormulaDef, ScoreRules, SYSTEM_VARIABLE_NAMES,
-    Entities, EntityData,
+    Entities, EntityData, DiscardedPlansStats,
 )
 
 
@@ -109,29 +109,29 @@ class OutputSolverService:
         recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
-        if request.score_rules and any(
+        # Load recipe params if needed for score rules OR recipe target matching
+        if request.target.target_type == "recipe" or (request.score_rules and any(
             v.variable_type == "recipe" for v in request.score_rules.user_variables
-        ):
+        )):
             recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         # Initialize state based on target type (material or recipe)
         if request.target.target_type == "recipe":
-            # Load recipe params for target matching
-            recipe_params = self._load_recipe_params([r.id for r in recipes])
             initial = self._initialize_recipe_target(request, recipe_structures, recipe_params)
         else:
             initial = self._initialize_material_target(request)
 
         plans: List[SolvedPlan] = []
         seen_fps: Set[str] = set()
-        self._explore(initial, recipe_structures, request, plans, seen_fps, frozenset(), recipe_params)
+        discarded_stats = DiscardedPlansStats()
+        self._explore(initial, recipe_structures, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats)
 
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
             self._tag_nodes(plan)
 
         entities = self._collect_entities(plans, request.project_id)
-        return SolverResponse(success=True, plans=plans, entities=entities)
+        return SolverResponse(success=True, plans=plans, entities=entities, discarded_plans_stats=discarded_stats)
 
     def _tag_state_nodes(self, state: "_State") -> None:
         """Tag material and recipe nodes in the state based on graph topology."""
@@ -233,8 +233,9 @@ class OutputSolverService:
 
             node.tags = list(tags)
 
-    def _explore(self, state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params):
+    def _explore(self, state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats):
         if len(plans) >= request.search_parameters.max_solutions_returned:
+            discarded_stats.max_solutions_returned += 1
             return
 
         current_id = None
@@ -252,25 +253,32 @@ class OutputSolverService:
         current = state.material_nodes[current_id]
         sig = _sig(current.material_constraints)
 
-        if not request.search_parameters.allow_loops and sig in ancestor_sigs:
+        # Loop detection: only prevent if the same NODE is in the current path, not just same signature
+        # This allows diamond dependencies (same material needed by different branches)
+        if not request.search_parameters.allow_loops and current_id in ancestor_sigs:
+            discarded_stats.loops += 1
             return
         if state.recipe_depth >= request.domain_constraints.max_recipe_depth:
+            discarded_stats.max_recipe_depth += 1
             return
         if state.recipe_depth >= request.search_parameters.max_recursion_depth:
+            discarded_stats.max_recursion_depth += 1
             return
 
         surplus_id = self._find_surplus(state, current)
         if surplus_id is not None:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
-            self._explore(branch, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
+            self._explore(branch, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.do_not_expand_materials_matching):
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
+            discarded_stats.do_not_expand_materials += 1
+            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.forbidden_materials_matching):
+            discarded_stats.forbidden_materials += 1
             return
 
         producers = self._find_producers(
@@ -279,19 +287,21 @@ class OutputSolverService:
         )
 
         if not producers:
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params)
+            discarded_stats.no_producers_found += 1
+            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         producers = producers[: request.search_parameters.max_branch_width]
-        new_sigs = ancestor_sigs | {sig}
+        new_ancestors = ancestor_sigs | {current_id}
 
         for recipe_id, produces_option in producers:
             if len(plans) >= request.search_parameters.max_solutions_returned:
+                discarded_stats.max_solutions_returned += 1
                 return
             branch = state.clone()
             self._apply_recipe(branch, current_id, recipe_id, produces_option, recipe_structures, request)
             branch.recipe_depth += 1
-            self._explore(branch, recipe_structures, request, plans, seen_fps, new_sigs, recipe_params)
+            self._explore(branch, recipe_structures, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats)
 
     def _apply_recipe(self, state, need_id, recipe_id, produces_option, recipe_structures, request):
         need = state.material_nodes[need_id]

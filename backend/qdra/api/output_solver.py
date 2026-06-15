@@ -35,7 +35,8 @@ class ConstraintSpecModel(BaseModel):
 
 class TargetSpecModel(BaseModel):
     quantity: float
-    constraints: List[ConstraintSpecModel]
+    target_type: str = "material"  # "material" or "recipe"
+    constraints: List[ConstraintSpecModel] = []
 
 
 class ConstraintRuleModel(BaseModel):
@@ -47,6 +48,7 @@ class DomainConstraintsModel(BaseModel):
     forbidden_materials_matching: List[ConstraintRuleModel] = []
     forbidden_recipe_ids: List[uuid.UUID] = []
     max_recipe_depth: int = 10
+    allow_partial_recipe_execution: bool = False
 
 
 class SearchParametersModel(BaseModel):
@@ -107,7 +109,7 @@ class RecipeExecNodeModel(BaseModel):
     id: str
     kind: str
     recipe_id: uuid.UUID
-    execution_count: int
+    execution_count: float
 
 
 class EdgeModel(BaseModel):
@@ -140,10 +142,22 @@ class SolvedPlanModel(BaseModel):
     score: Dict[str, float]
 
 
+class DiscardedPlansStatsModel(BaseModel):
+    loops: int = 0
+    max_recursion_depth: int = 0
+    max_recipe_depth: int = 0
+    forbidden_recipes: int = 0
+    forbidden_materials: int = 0
+    do_not_expand_materials: int = 0
+    max_solutions_returned: int = 0
+    no_producers_found: int = 0
+
+
 class SolverResponseModel(BaseModel):
     success: bool
     plans: List[SolvedPlanModel] = []
     entities: EntitiesModel = EntitiesModel()
+    discarded_plans_stats: DiscardedPlansStatsModel = DiscardedPlansStatsModel()
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +184,7 @@ def solve_output(
 
     target = TargetSpec(
         quantity=request_data.target.quantity,
+        target_type=request_data.target.target_type,
         constraints=[to_spec(c) for c in request_data.target.constraints],
     )
     dc = request_data.domain_constraints
@@ -178,6 +193,7 @@ def solve_output(
         forbidden_materials_matching=[to_rule(r) for r in dc.forbidden_materials_matching],
         forbidden_recipe_ids=dc.forbidden_recipe_ids,
         max_recipe_depth=dc.max_recipe_depth,
+        allow_partial_recipe_execution=dc.allow_partial_recipe_execution,
     )
     sp = request_data.search_parameters
     search_parameters = SearchParameters(
@@ -299,4 +315,18 @@ def solve_output(
         },
     )
 
-    return SolverResponseModel(success=result.success, plans=plans, entities=entities_model)
+    return SolverResponseModel(
+        success=result.success,
+        plans=plans,
+        entities=entities_model,
+        discarded_plans_stats=DiscardedPlansStatsModel(
+            loops=result.discarded_plans_stats.loops,
+            max_recursion_depth=result.discarded_plans_stats.max_recursion_depth,
+            max_recipe_depth=result.discarded_plans_stats.max_recipe_depth,
+            forbidden_recipes=result.discarded_plans_stats.forbidden_recipes,
+            forbidden_materials=result.discarded_plans_stats.forbidden_materials,
+            do_not_expand_materials=result.discarded_plans_stats.do_not_expand_materials,
+            max_solutions_returned=result.discarded_plans_stats.max_solutions_returned,
+            no_producers_found=result.discarded_plans_stats.no_producers_found,
+        ),
+    )
