@@ -252,10 +252,41 @@ def create_comprehensive_test_dataset(client, project_id):
     ).json()
     
     # Recipe 6: Refining_C - consumes intermediate_3, produces intermediate_6
-    refining_c = client.post(
+    refining_c1 = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
-            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C"}],
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C1"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+
+    refining_c2 = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C2"}],
             "slots": [
                 {
                     "kind": "CONSUMES",
@@ -281,7 +312,7 @@ def create_comprehensive_test_dataset(client, project_id):
                 },
             ],
         },
-    ).json()
+    ).json()    
     
     # Recipe 7: Assembly_B - consumes intermediate_6 + intermediate_5, produces final_product
     assembly_b = client.post(
@@ -400,15 +431,15 @@ def create_comprehensive_test_dataset(client, project_id):
             "refining_a": refining_a,
             "refining_b": refining_b,
             "assembly_a": assembly_a,
-            "refining_c": refining_c,
+            "refining_c1": refining_c1,
+            "refining_c2": refining_c2,
             "assembly_b": assembly_b,
             "partial_producer": partial_producer,
             "partial_consumer": partial_consumer,
         },
     }
 
-def test_root_material_becomes_root_requirement(client):
-    """Verify that if no recipe produces a requirement, it becomes a root requirement."""
+def test_final_product_unrestricted(client):
     project_response = client.post("/projects", json={"name": "Test Project"})
     project_id = project_response.json()["id"]
 
@@ -451,7 +482,6 @@ def test_root_material_becomes_root_requirement(client):
 
     print_pretty(data)
 
-    print("----------------------------")
     OutputSolverService.print_plan_graph(
         data,
         material_label_param=("identity", "name"),
@@ -460,16 +490,48 @@ def test_root_material_becomes_root_requirement(client):
     )
 
     assert data["success"] is True
-    assert len(data["plans"]) == 1
+    assert len(data["plans"]) == 2
 
-    plan = data["plans"][0]
+def test_final_product_recipe_restricted(client):
+    project_response = client.post("/projects", json={"name": "Test Project"})
+    project_id = project_response.json()["id"]
 
-    # byproduct is produced but not consumed -> should be tagged as "leaf" and "excess"
-    byproduct_nodes = [
-        n for n in plan["graph"]["nodes"]
-        if n.get("kind") != "recipe_execution" and
-        any(c.get("key") == "material_id" and c.get("value_string") == str(materials["byproduct"]["id"]) for c in n.get("material_constraints", []))
-    ]
-    assert len(byproduct_nodes) > 0
-    assert "leaf" in byproduct_nodes[0].get("tags", [])
-    assert "excess" in byproduct_nodes[0].get("tags", [])
+    # Use comprehensive test dataset
+    dataset = create_comprehensive_test_dataset(client, project_id)
+    materials = dataset["materials"]
+    recipes = dataset["recipes"]
+
+    print(str(materials["final_product"]["id"]))
+
+    # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
+    plan_response = client.post(
+        f"/projects/{project_id}/solver/output",
+        json={
+            "target": {
+                "quantity": 5,
+                "target_type": "material",
+                "constraints": [
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product"]["id"])}
+                ],
+            },
+            "domain_constraints": {
+                "do_not_expand_materials_matching": [],
+                "forbidden_materials_matching": [],
+                "forbidden_recipe_ids": [str(recipes["refining_c2"]["id"])],
+                "max_recipe_depth": 100,
+                "allow_partial_recipe_execution": True,
+            },
+            "search_parameters": {
+                "max_recursion_depth": 20,
+                "max_branch_width": 10,
+                "allow_loops": False,
+                "max_solutions_returned": 10,
+            },
+        },
+    )
+
+    assert plan_response.status_code == 200
+    data = plan_response.json()
+
+    assert data["success"] is True
+    assert len(data["plans"]) == 1    
