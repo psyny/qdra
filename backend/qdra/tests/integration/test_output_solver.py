@@ -466,14 +466,14 @@ def test_final_product_unrestricted(client):
                 "forbidden_materials_matching": [],
                 "forbidden_recipe_matching": [],
                 "max_recipe_depth": 100,
-                "allow_partial_recipe_execution": False,
+                "allow_partial_recipe_execution": True,
             },
             "search_parameters": {
                 "max_recursion_depth": 20,
                 "max_branch_width": 10,
                 "allow_loops": False,
                 "max_solutions_returned": 10,
-                "optimization_level": 2,
+                "optimization_level": 1,
             },
         },
     )
@@ -533,7 +533,7 @@ def test_final_product_recipe_restricted(client):
                 "max_branch_width": 10,
                 "allow_loops": False,
                 "max_solutions_returned": 10,
-                "optimization_level": 0,
+                "optimization_level": 1,
             },
         },
     )
