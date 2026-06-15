@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProject } from '../api/projects';
 import { Project } from '../types/project';
-import { WorkspaceLayout } from '../components/WorkspaceLayout';
+import { WorkspaceLayout } from './WorkspaceLayout';
 
-export function ProjectHomePage() {
+type ProjectWorkspaceWrapperProps = {
+  children: (project: Project) => React.ReactNode;
+};
+
+export function ProjectWorkspaceWrapper({ children }: ProjectWorkspaceWrapperProps) {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,13 +64,7 @@ export function ProjectHomePage() {
 
   return (
     <WorkspaceLayout projectId={project.id} projectName={project.name}>
-      <h2 className="card-title">Project Home</h2>
-      <p className="card-description">
-        Welcome to {project.name}.
-      </p>
-      <p className="card-description">
-        Use the navigation menu to access project resources.
-      </p>
+      {children(project)}
     </WorkspaceLayout>
   );
 }
