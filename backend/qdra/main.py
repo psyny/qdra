@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.health import router as health_router
 from api.projects import router as projects_router
@@ -9,6 +10,14 @@ from api.images import router as images_router
 from api.project_templates import router as project_templates_router
 
 app = FastAPI(title="Qdra")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router)
 app.include_router(projects_router)

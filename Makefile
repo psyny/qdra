@@ -13,6 +13,9 @@ help: ## Show this help message
 
 up: ## Start all services
 	docker-compose up -d
+	@echo ""
+	@echo "Services started. Click here to access the frontend: http://localhost:3000"
+	@echo ""
 
 down: ## Stop all services
 	docker-compose down

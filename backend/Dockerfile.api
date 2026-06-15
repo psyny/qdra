@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -e .
 
 COPY qdra ./qdra
 
+ENV PYTHONPATH=/app/qdra
 ENV APP_ENV=development
 ENV DATABASE_URL=postgresql://qdra:qdra@postgres:5432/qdra
 ENV REDIS_URL=redis://redis:6379/0
