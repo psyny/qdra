@@ -99,7 +99,8 @@ class RecipeEdge:
 @dataclass
 class TargetSpec:
     quantity: float
-    constraints: List[ConstraintSpec]
+    target_type: str = "material"  # "material" or "recipe"
+    constraints: List[ConstraintSpec] = field(default_factory=list)
 
 
 @dataclass
