@@ -715,19 +715,62 @@ class OutputSolverService:
             for name, value in score.items():
                 print(f"  {name}: {value}")
 
+            # Simplify graph for graphviz output
+            simplified_graph = OutputSolverService.simplify_graph(graph)
+            simplified_nodes = simplified_graph["nodes"]
+            simplified_edges = simplified_graph["edges"]
+
+            # Rebuild label mapping for simplified nodes
+            simplified_node_id_to_label = {}
+            for n in simplified_nodes:
+                nid = n["id"]
+                if n.get("kind") == "recipe_execution":
+                    label = str(n.get("recipe_id", nid))[:8]
+                    if recipe_label_param:
+                        domain, key = recipe_label_param
+                        recipe_id = n.get("recipe_id")
+                        if recipe_id and "recipes" in entities:
+                            recipe_data = entities["recipes"].get(str(recipe_id))
+                            if recipe_data and "parameters" in recipe_data:
+                                for p in recipe_data["parameters"]:
+                                    if p.get("domain") == domain and p.get("key") == key:
+                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                        if val is not None:
+                                            label = str(val)
+                                            break
+                    simplified_node_id_to_label[nid] = label
+                else:
+                    # For collapsed material nodes, use entities to get label
+                    label = nid
+                    if material_label_param:
+                        domain, key = material_label_param
+                        for c in n.get("material_constraints", []):
+                            if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
+                                material_id = c.get("value_string")
+                                if material_id and "materials" in entities:
+                                    mat_data = entities["materials"].get(material_id)
+                                    if mat_data and "parameters" in mat_data:
+                                        for p in mat_data["parameters"]:
+                                            if p.get("domain") == domain and p.get("key") == key:
+                                                val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                                if val is not None:
+                                                    label = str(val)
+                                                    break
+                    simplified_node_id_to_label[nid] = label
+
             # Print graphviz dot code
-            print(f"\n// Graphviz for Plan {i}")
+            print(f"\n// Graphviz for Plan {i} (simplified)")
             print("digraph {")
             print("  rankdir=LR;")
 
             # Calculate max edge qty for width scaling
-            max_qty = max((e.get("qty", 0) for e in edges), default=1)
+            max_qty = max((e.get("qty", 0) for e in simplified_edges), default=1)
             if max_qty == 0:
                 max_qty = 1
 
             # Print graphviz nodes
-            for n in nodes:
-                label = node_id_to_label[n["id"]]
+            for n in simplified_nodes:
+                label = simplified_node_id_to_label[n["id"]]
                 if n.get("kind") == "recipe_execution":
                     exec_count = n.get("execution_count", 1)
                     print(f'  "{n["id"]}" [label="{label}\\n({exec_count})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
@@ -749,14 +792,126 @@ class OutputSolverService:
                     print(f'  "{n["id"]}" [label="{label}\\n{cons_qty}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
 
             # Print graphviz edges
-            for e in edges:
+            for e in simplified_edges:
                 qty = e.get("qty", 0)
                 width = 1 + (qty / max_qty) * 3  # scale 1-4
                 width = min(max(width, 1), 4)
-                from_label = node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
-                to_label = node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
+                from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
+                to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
                 print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty}", penwidth={width:.1f}];')
 
             print("}")
 
         print("=" * 60 + "\n")
+
+    @staticmethod
+    def simplify_graph(graph: dict) -> dict:
+        """Simplify graph by collapsing material nodes of the same type (material_id)."""
+        nodes = graph.get("nodes", [])
+        edges = graph.get("edges", [])
+
+        # Group material nodes by material_id
+        material_id_to_nodes = {}
+        recipe_nodes = []
+        node_id_to_material_id = {}
+
+        for node in nodes:
+            if node.get("kind") == "recipe_execution":
+                recipe_nodes.append(node)
+            else:
+                # Extract material_id from constraints
+                material_id = None
+                for c in node.get("material_constraints", []):
+                    if c.get("domain") == "identity" and c.get("key") == "material_id":
+                        material_id = c.get("value_string")
+                        break
+                if material_id:
+                    if material_id not in material_id_to_nodes:
+                        material_id_to_nodes[material_id] = []
+                    material_id_to_nodes[material_id].append(node)
+                    node_id_to_material_id[node["id"]] = material_id
+
+        # Create collapsed material nodes
+        collapsed_nodes = []
+        material_id_to_collapsed_id = {}
+
+        for material_id, mat_nodes in material_id_to_nodes.items():
+            # Merge tags from all nodes, add "collapsed"
+            merged_tags = set()
+            for n in mat_nodes:
+                merged_tags.update(n.get("tags", []))
+            merged_tags.add("collapsed")
+
+            # Generate collapsed node id
+            collapsed_id = f"C_{material_id[:8]}"
+            material_id_to_collapsed_id[material_id] = collapsed_id
+
+            # Create collapsed node with first node's constraints
+            first_node = mat_nodes[0]
+            collapsed_node = {
+                "id": collapsed_id,
+                "kind": "material",
+                "type": first_node.get("type"),
+                "material_constraints": first_node.get("material_constraints"),
+                "produced_qty": 0,  # Will recalculate
+                "consumed_qty": 0,  # Will recalculate
+                "tags": list(merged_tags),
+            }
+            collapsed_nodes.append(collapsed_node)
+
+        # Build new edges (discard material-to-material edges)
+        new_edges = []
+
+        for edge in edges:
+            from_id = edge.get("from_node_id")
+            to_id = edge.get("to_node_id")
+
+            # Check if from/to is a material node
+            from_is_material = from_id in node_id_to_material_id
+            to_is_material = to_id in node_id_to_material_id
+
+            # Discard material-to-material edges
+            if from_is_material and to_is_material:
+                continue
+
+            # Map material node IDs to collapsed IDs
+            new_from_id = from_id
+            new_to_id = to_id
+
+            if from_is_material:
+                material_id = node_id_to_material_id[from_id]
+                new_from_id = material_id_to_collapsed_id[material_id]
+
+            if to_is_material:
+                material_id = node_id_to_material_id[to_id]
+                new_to_id = material_id_to_collapsed_id[material_id]
+
+            new_edges.append({
+                "from_node_id": new_from_id,
+                "to_node_id": new_to_id,
+                "qty": edge.get("qty"),
+                "edge_type": edge.get("edge_type"),
+            })
+
+        # Recalculate produced/consumed for collapsed nodes
+        for collapsed_node in collapsed_nodes:
+            collapsed_id = collapsed_node["id"]
+            produced = 0
+            consumed = 0
+
+            for edge in new_edges:
+                if edge["to_node_id"] == collapsed_id:
+                    produced += edge.get("qty", 0)
+                if edge["from_node_id"] == collapsed_id:
+                    consumed += edge.get("qty", 0)
+
+            collapsed_node["produced_qty"] = produced
+            collapsed_node["consumed_qty"] = consumed
+
+        # Combine recipe nodes and collapsed material nodes
+        simplified_nodes = recipe_nodes + collapsed_nodes
+
+        return {
+            "nodes": simplified_nodes,
+            "edges": new_edges,
+        }
