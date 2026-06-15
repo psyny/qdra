@@ -21,6 +21,7 @@ Represents a single occurrence of a material at a specific point in the plan. Be
 | `produced_qty` | How much of this material has been produced at this node |
 | `consumed_qty` | How much of this material has been consumed at this node |
 | `type` | See types below |
+| `rank` | Integer. Position in the production chain relative to the target. See **Node Rank** section. |
 
 **Node types:**
 
@@ -42,6 +43,22 @@ Represents one use of a recipe in the plan. If the same recipe definition is sel
 | `id` | Unique node identifier |
 | `recipe_id` | Reference to the recipe definition |
 | `execution_count` | Number of times this recipe runs. Calculated as `ceil(need_qty / recipe_output_qty_per_execution)` |
+| `rank` | Integer. Inherited from the need node the recipe was created to satisfy. |
+
+---
+
+### Node Rank
+
+Every node (both material and recipe execution) carries an integer `rank` assigned **at creation time**. It represents the node's distance from the target in the production chain.
+
+| Node | Rank Assignment |
+|---|---|
+| Material node of type `"t"` | `0` |
+| Recipe execution node R created to satisfy need node N | `rank(N)` |
+| Material node of type `"o"` produced by R | `rank(R)` |
+| Material node of type `"i"` or `"r"` created for R | `rank(R) + 1` |
+
+**Consistency property**: A material edge always connects two nodes of equal rank. The `"o"` source and its `"i"` (or `"t"`) destination share the same rank, because `rank(o) = rank(R) = rank(need)` and `rank(i/t) = rank(need)`.
 
 ---
 
@@ -101,7 +118,7 @@ Tags are derived from graph structure, not set during the algorithm.
 
 ### Initialization
 
-Create one material node of type `"t"` per target, with `consumed_qty = target_quantity` and `produced_qty = 0`. Add all of them to the **needs queue**.
+Create one material node of type `"t"` per target, with `consumed_qty = target_quantity`, `produced_qty = 0`, and `rank = 0`. Add all of them to the **needs queue**.
 
 ### Main Loop
 
@@ -125,19 +142,19 @@ Find all recipes that produce a material matching the need's constraints. Each c
 For each candidate recipe:
 
 1. Calculate `execution_count = ceil(need.consumed_qty / recipe_output_qty_per_execution)`.
-2. Create a recipe execution node R.
+2. Create a recipe execution node R with `rank = rank(need_node)`.
 3. For each `PRODUCES` slot of the recipe:
-   - Create a material node of type `"o"` with `produced_qty = slot_qty * execution_count`.
+   - Create a material node of type `"o"` with `produced_qty = slot_qty * execution_count` and `rank = rank(R)`.
    - Add a recipe edge `R --[p]--> output_node`.
    - Create a material edge `output_node --> need_node` with qty = need quantity.
    - Update `output_node.consumed_qty += qty` and `need_node.produced_qty += qty`.
    - If the recipe produces more than needed (due to ceiling), the output node has a surplus — it may satisfy future needs via Rule #0.
 4. For each `CONSUMES` slot of the recipe:
-   - Create a material node of type `"i"` with `consumed_qty = slot_qty * execution_count`.
+   - Create a material node of type `"i"` with `consumed_qty = slot_qty * execution_count` and `rank = rank(R) + 1`.
    - Add a recipe edge `input_node --[c]--> R`.
    - Add this node to the needs queue.
 5. For each `REQUIRES` slot of the recipe:
-   - Create a material node of type `"r"` with `consumed_qty = slot_qty * execution_count`.
+   - Create a material node of type `"r"` with `consumed_qty = slot_qty * execution_count` and `rank = rank(R) + 1`.
    - Add a recipe edge `requires_node --[r]--> R`.
    - Add this node to the needs queue.
 
@@ -224,4 +241,112 @@ Root nodes, byproduct nodes, and target nodes are derivable from the graph and d
 
 When `optimization_level > 0`, the solver runs additional passes over each emitted plan to reduce waste.
 
-**Optimization Level 1:** Attempts to reduce recipe executions by reusing byproducts. Goes through all material nodes excluding type `"o"`, finds compatible nodes with surplus (`produced_qty > consumed_qty`), and redistributes that surplus to reduce the `consumed_qty` of input nodes — starting from the smallest `consumed_qty` first. Each optimized plan is a new plan added to the output pool alongside the original level-0 plan.
+### Optimization Level 1
+
+When Source Selection Rule #0 is solved in the original run, the solver might not have had all the outputs of the whole plan (because it was still being built). Now, after the basic plan is set, we retry each material node requirement to see if an existing surplus output can replace its current source(s) — reducing recipe execution counts where possible.
+
+**Goal**: For each demand node, replace all of its current source edges with a single surplus `"o"` node, then cascade the freed-up capacity backward through the recipe graph.
+
+#### Iteration Order
+
+Collect all material nodes of type `"i"` and `"t"`. Sort them by:
+
+1. `rank` ascending — process nodes closer to the target first (rank 0 before rank max)
+2. `consumed_qty` ascending within the same rank — smaller needs are easier to fit into available surplus
+
+#### Source Selection Rule #1
+
+For each **Node A** in the sorted list:
+
+1. **Snapshot** `initial_consumed_qty = NodeA.consumed_qty` before any modification.
+2. **Find Node C** — a material node of type `"o"` satisfying all of:
+   - Same `material_constraints_key` as Node A
+   - `surplus = produced_qty − consumed_qty >= initial_consumed_qty`
+   - Not already a direct source of Node A (no existing material edge C → A)
+3. If no Node C qualifies, skip Node A.
+4. If multiple candidates exist, **pick the one with the minimum surplus** (tightest fit).
+5. **Remove all existing incoming material edges** of Node A (each edge B_i → A with qty Q_i):
+   - `B_i.consumed_qty -= Q_i`
+   - `NodeA.produced_qty -= Q_i`
+   - If `B_i.consumed_qty == 0`: trigger **Cascade Reduction** of B_i (see below).
+6. **Add new material edge** C → A with `qty = initial_consumed_qty`:
+   - `NodeC.consumed_qty += initial_consumed_qty`
+   - `NodeA.produced_qty += initial_consumed_qty`
+
+#### Cascade Reduction
+
+Triggered whenever a material node of type `"o"` (call it Node B) has its `consumed_qty` decreased. Handles both full removal (`consumed_qty == 0`) and partial reduction as a unified procedure.
+
+1. Let R be the recipe execution node that produced B (via recipe edge `R --[p]--> B`).
+2. If `B.consumed_qty == 0`: remove Node B from the graph and remove the recipe edge `R --[p]--> B`.
+3. **Recalculate R's required execution count** using the current (already-updated) `consumed_qty` of all remaining output nodes:
+   ```
+   new_exec_count = max over remaining outputs of R: ceil(output.consumed_qty / slot_qty)
+   ```
+   If no outputs remain: `new_exec_count = 0`.
+4. If `new_exec_count < R.execution_count`:
+   - Set `R.execution_count = new_exec_count`.
+   - For each remaining `"o"` output of R: `output.produced_qty = slot_qty * new_exec_count`.
+   - For each `"i"` input node I of R:
+     - `delta = old_consumed_qty − (slot_qty * new_exec_count)`
+     - `I.consumed_qty -= delta`
+     - For each material edge M → I: reduce the edge `qty` by `delta`; `M.consumed_qty -= delta`.
+     - Trigger **Cascade Reduction** of M (recursive).
+5. If `new_exec_count == 0`: remove R entirely along with all remaining recipe edges attached to it.
+
+### Optimization Level 2
+
+Extends Level 1 by allowing **multiple Node C candidates** to jointly satisfy Node A's consumption rather than requiring a single Node C to fully cover it. Runs on the base (Level 0) plan independently of Level 1, producing a separate optimized plan.
+
+**Goal**: Replace as much of Node A's current source demand as possible using surplus `"o"` nodes (potentially several), strip the freed Node B edges from smallest to largest, and cascade the execution count reduction backward.
+
+#### Iteration Order
+
+Same as Level 1: collect `"i"` and `"t"` nodes, sort by `rank` ascending then `consumed_qty` ascending.
+
+#### Source Selection Rule #2
+
+For each **Node A** in the sorted list:
+
+1. **Snapshot** `initial_consumed_qty = NodeA.consumed_qty` before any modification.
+2. **Find all Node C candidates** — material nodes of type `"o"` satisfying all of:
+   - Same `material_constraints_key` as Node A
+   - `surplus = produced_qty − consumed_qty > 0`
+   - Not already a direct source of Node A
+3. **Partition candidates into two groups**:
+   - **Group C1**: `surplus >= initial_consumed_qty` — a single node can fully cover Node A
+   - **Group C2**: `0 < surplus < initial_consumed_qty` — partial contributors
+4. **Select Node Cs and their contribution quantities**:
+   - If **C1 is not empty**: pick the single C1 node with **minimum surplus** (contribution = `initial_consumed_qty`). Done — no C2 needed.
+   - If **C1 is empty**: take nodes from **C2 in descending surplus order** (most to least), each contributing its full surplus, until `initial_consumed_qty` is covered or C2 is exhausted.
+5. If no candidates exist at all, skip Node A.
+6. Let `total_C_covered = sum of all selected Node C contributions`.
+
+#### Replacement Procedure
+
+**Step A — Add new source edges** (one per selected Node C_j with contribution qty Q_j):
+- Add material edge C_j → A with `qty = Q_j`.
+- `NodeC_j.consumed_qty += Q_j`
+- `NodeA.produced_qty += Q_j`
+
+**Step B — Remove or reduce existing Node B edges**, from smallest edge qty to largest, until `total_C_covered` is absorbed:
+- Sort all incoming material edges of Node A by `qty` ascending.
+- Let `remaining_to_remove = total_C_covered`.
+- For each edge B_i → A (smallest first):
+  - If `remaining_to_remove >= B_i.edge_qty` (full removal):
+    - Remove edge B_i → A entirely.
+    - `B_i.consumed_qty -= B_i.edge_qty`
+    - `NodeA.produced_qty -= B_i.edge_qty`
+    - `remaining_to_remove -= B_i.edge_qty`
+    - Trigger **Cascade Reduction** of B_i.
+    - If `remaining_to_remove == 0`: stop.
+  - Else (partial reduction of this edge):
+    - Reduce edge B_i → A `qty` by `remaining_to_remove`.
+    - `B_i.consumed_qty -= remaining_to_remove`
+    - `NodeA.produced_qty -= remaining_to_remove`
+    - Trigger **Cascade Reduction** of B_i.
+    - Stop.
+
+The **Cascade Reduction** procedure defined in Level 1 applies identically — the partial-reduction path handles Node Bs that still have consumers after being reduced.
+
+
