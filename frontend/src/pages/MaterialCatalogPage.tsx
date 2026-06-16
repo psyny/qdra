@@ -32,8 +32,8 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   }, [projectId]);
 
   const filteredMaterials = materials.filter(material => {
-    const name = material.parameters.find(p => p.domain === 'identity' && p.key === 'name')?.value;
-    const category = material.parameters.find(p => p.domain === 'identity' && p.key === 'category')?.value;
+    const name = material.parameters?.find(p => p.domain === 'identity' && p.key === 'name')?.value;
+    const category = material.parameters?.find(p => p.domain === 'identity' && p.key === 'category')?.value;
     const query = searchQuery.toLowerCase();
     
     if (typeof name === 'string' && name.toLowerCase().includes(query)) return true;

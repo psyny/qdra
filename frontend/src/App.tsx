@@ -3,6 +3,7 @@ import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 import { ProjectHomePage } from './pages/ProjectHomePage';
 import { ProjectWorkspaceWrapper } from './components/ProjectWorkspaceWrapper';
 import { MaterialCatalogPage } from './pages/MaterialCatalogPage';
+import { MaterialEditorPage } from './pages/MaterialEditorPage';
 import { RecipesPlaceholderPage } from './pages/RecipesPlaceholderPage';
 import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
@@ -20,6 +21,22 @@ function App() {
           element={
             <ProjectWorkspaceWrapper>
               {(project) => <MaterialCatalogPage projectId={project.id} />}
+            </ProjectWorkspaceWrapper>
+          }
+        />
+        <Route
+          path="/projects/:projectId/materials/new"
+          element={
+            <ProjectWorkspaceWrapper>
+              {(project) => <MaterialEditorPage projectId={project.id} />}
+            </ProjectWorkspaceWrapper>
+          }
+        />
+        <Route
+          path="/projects/:projectId/materials/:materialId/edit"
+          element={
+            <ProjectWorkspaceWrapper>
+              {(project) => <MaterialEditorPage projectId={project.id} />}
             </ProjectWorkspaceWrapper>
           }
         />
