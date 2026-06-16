@@ -1,6 +1,7 @@
 export type Project = {
   id: string;
   name: string;
+  project_template_id?: string | null;
   description?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -8,6 +9,7 @@ export type Project = {
 
 export type CreateProjectRequest = {
   name: string;
+  project_template_id: string;
   description?: string | null;
 };
 

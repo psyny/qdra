@@ -20,6 +20,10 @@ class ProjectTemplateCreate(BaseModel):
     description: Optional[str] = None
 
 
+class ProjectTemplateCloneRequest(BaseModel):
+    name: Optional[str] = None
+
+
 class ProjectTemplateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -178,6 +182,32 @@ def list_project_templates(db: Session = Depends(get_db)):
     """List all available project templates."""
     repo = ProjectTemplateRepository(db)
     return repo.list_all()
+
+
+@router.delete("/project-templates/{project_template_id}", status_code=204)
+def delete_project_template(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a project template. Fails if the template is used by any project."""
+    repo = ProjectTemplateRepository(db)
+    success = repo.delete(project_template_id)
+    if not success:
+        raise HTTPException(status_code=409, detail="Cannot delete template because it is used by one or more projects.")
+
+
+@router.post("/project-templates/{project_template_id}/clone", response_model=ProjectTemplateResponse)
+def clone_project_template(
+    project_template_id: uuid.UUID,
+    data: ProjectTemplateCloneRequest,
+    db: Session = Depends(get_db),
+):
+    """Clone a project template."""
+    repo = ProjectTemplateRepository(db)
+    cloned = repo.clone_template(project_template_id, data.name)
+    if not cloned:
+        raise HTTPException(status_code=404, detail="Project template not found")
+    return cloned
 
 
 @router.get("/project-templates/{project_template_id}", response_model=ProjectTemplateDetailResponse)

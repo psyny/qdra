@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HomePage } from './pages/HomePage';
 import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 import { ProjectHomePage } from './pages/ProjectHomePage';
 import { ProjectWorkspaceWrapper } from './components/ProjectWorkspaceWrapper';
@@ -6,6 +7,7 @@ import { MaterialCatalogPage } from './pages/MaterialCatalogPage';
 import { MaterialEditorPage } from './pages/MaterialEditorPage';
 import { RecipesPlaceholderPage } from './pages/RecipesPlaceholderPage';
 import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
+import { TemplateListPage } from './pages/TemplateListPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
 import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
 
@@ -13,8 +15,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/projects" replace />} />
+        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="/projects" element={<ProjectSelectionPage />} />
+        <Route path="/templates" element={<TemplateListPage />} />
         <Route path="/projects/:projectId" element={<ProjectHomePage />} />
         <Route
           path="/projects/:projectId/materials"

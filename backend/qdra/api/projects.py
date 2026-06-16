@@ -46,7 +46,7 @@ router = APIRouter()
 
 class ProjectCreate(BaseModel):
     name: str
-    project_template_id: Optional[uuid.UUID] = None
+    project_template_id: uuid.UUID  # Required as of template hub milestone
 
 
 class ProjectResponse(BaseModel):
@@ -188,6 +188,12 @@ class RankingResultModel(BaseModel):
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
 def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
+    # Validate that the template exists
+    template_repo = ProjectTemplateRepository(db)
+    template = template_repo.get_by_id(project_data.project_template_id)
+    if not template:
+        raise HTTPException(status_code=400, detail="Project template not found")
+
     repo = ProjectRepository(db)
     project = repo.create(project_data.name, project_data.project_template_id)
     return project

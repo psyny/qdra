@@ -1,18 +1,23 @@
 import { useState } from 'react';
+import { ProjectTemplate } from '../types/template';
 
 type ProjectFormProps = {
   initialName?: string;
   initialDescription?: string | null;
+  initialTemplateId?: string | null;
+  templates: ProjectTemplate[];
   submitLabel: string;
   isSubmitting?: boolean;
   errorMessage?: string | null;
-  onSubmit: (payload: { name: string; description?: string | null }) => void;
+  onSubmit: (payload: { name: string; project_template_id: string; description?: string | null }) => void;
   onCancel?: () => void;
 };
 
 export function ProjectForm({
   initialName = '',
   initialDescription = '',
+  initialTemplateId = null,
+  templates,
   submitLabel,
   isSubmitting = false,
   errorMessage = null,
@@ -21,17 +26,37 @@ export function ProjectForm({
 }: ProjectFormProps) {
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription || '');
+  const [templateId, setTemplateId] = useState(initialTemplateId || '');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
+    if (!name.trim() || !templateId) {
       return;
     }
-    onSubmit({ name: name.trim(), description: description.trim() || null });
+    onSubmit({ name: name.trim(), project_template_id: templateId, description: description.trim() || null });
   };
 
   return (
     <form onSubmit={handleSubmit}>
+      <div className="form-field">
+        <label htmlFor="template" className="form-label">
+          Project Template *
+        </label>
+        <select
+          id="template"
+          value={templateId}
+          onChange={(e) => setTemplateId(e.target.value)}
+          disabled={isSubmitting}
+          className="form-select"
+        >
+          <option value="">Select a template...</option>
+          {templates.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="form-field">
         <label htmlFor="name" className="form-label">
           Name *
@@ -64,7 +89,7 @@ export function ProjectForm({
       <div className="form-actions">
         <button
           type="submit"
-          disabled={isSubmitting || !name.trim()}
+          disabled={isSubmitting || !name.trim() || !templateId}
           className="button button--primary"
         >
           {isSubmitting ? 'Saving...' : submitLabel}

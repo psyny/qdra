@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProjects, createProject, updateProject } from '../api/projects';
+import { getTemplates } from '../api/templates';
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
+import { ProjectTemplate } from '../types/template';
 import { BackendStatus } from '../components/BackendStatus';
 import { ProjectForm } from '../components/ProjectForm';
 
 export function ProjectSelectionPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -27,8 +30,18 @@ export function ProjectSelectionPage() {
     }
   };
 
+  const loadTemplates = async () => {
+    try {
+      const data = await getTemplates();
+      setTemplates(data);
+    } catch (err) {
+      console.error('Could not load templates', err);
+    }
+  };
+
   useEffect(() => {
     loadProjects();
+    loadTemplates();
   }, []);
 
   const handleCreateProject = async (payload: CreateProjectRequest) => {
@@ -36,6 +49,20 @@ export function ProjectSelectionPage() {
     setFormError(null);
     try {
       const newProject = await createProject(payload);
+      setProjects([...projects, newProject]);
+      setShowCreateForm(false);
+    } catch (err) {
+      setFormError('Could not save project');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateProjectWithTemplate = async (payload: { name: string; project_template_id: string; description?: string | null }) => {
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      const newProject = await createProject(payload as CreateProjectRequest);
       setProjects([...projects, newProject]);
       setShowCreateForm(false);
     } catch (err) {
@@ -89,12 +116,14 @@ export function ProjectSelectionPage() {
             <ProjectForm
               initialName={editingProject?.name || ''}
               initialDescription={editingProject?.description || ''}
+              initialTemplateId={editingProject?.project_template_id || null}
+              templates={templates}
               submitLabel={showCreateForm ? 'Create' : 'Save'}
               isSubmitting={isSubmitting}
               errorMessage={formError}
               onSubmit={(payload) => {
                 if (showCreateForm) {
-                  handleCreateProject(payload);
+                  handleCreateProjectWithTemplate(payload);
                 } else if (editingProjectId) {
                   handleUpdateProject(editingProjectId, payload);
                 }

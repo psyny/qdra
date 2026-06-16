@@ -46,10 +46,107 @@ class ProjectTemplateRepository:
     def delete(self, template_id: uuid.UUID) -> bool:
         template = self.get_by_id(template_id)
         if template:
+            # Check if template is used by any projects
+            from models.project import Project
+            project_count = self.db.query(Project).filter(Project.project_template_id == template_id).count()
+            if project_count > 0:
+                return False  # Cannot delete, template is in use
             self.db.delete(template)
             self.db.commit()
             return True
         return False
+
+    def clone_template(self, template_id: uuid.UUID, name: Optional[str] = None) -> Optional[ProjectTemplate]:
+        source = self.get_by_id(template_id)
+        if not source:
+            return None
+
+        clone_name = name or f"{source.name} Copy"
+        clone = ProjectTemplate(
+            name=clone_name,
+            description=source.description,
+            is_builtin=False,
+        )
+        self.db.add(clone)
+        self.db.commit()
+        self.db.refresh(clone)
+
+        # Clone material types
+        for material_type in self.list_material_types(template_id):
+            self.create_material_type(
+                project_template_id=clone.id,
+                name=material_type.name,
+                description=material_type.description,
+                sort_order=material_type.sort_order,
+            )
+
+        # Clone recipe types
+        for recipe_type in self.list_recipe_types(template_id):
+            self.create_recipe_type(
+                project_template_id=clone.id,
+                name=recipe_type.name,
+                description=recipe_type.description,
+                sort_order=recipe_type.sort_order,
+            )
+
+        # Clone parameter definitions
+        for param_def in self.list_parameter_definitions(template_id):
+            self.create_parameter_definition(
+                project_template_id=clone.id,
+                owner_kind=param_def.owner_kind,
+                owner_type_id=self._map_owner_id(param_def.owner_kind, param_def.owner_type_id, template_id, clone.id),
+                domain=param_def.domain,
+                key=param_def.key,
+                value_type=param_def.value_type,
+                label=param_def.label,
+                description=param_def.description,
+                required=param_def.required,
+                sort_order=param_def.sort_order,
+                is_label=param_def.is_label,
+                is_unique=param_def.is_unique,
+                is_searchable=param_def.is_searchable,
+                is_hidden=param_def.is_hidden,
+                default_value=param_def.default_value,
+                validation=param_def.validation,
+            )
+
+        # Clone views
+        for view in self.list_views(template_id):
+            new_view = self.create_view(
+                project_template_id=clone.id,
+                view_name=view.view_name,
+                sort_order=view.sort_order,
+            )
+            for config in self.list_view_configs(view.id):
+                self.create_view_config(
+                    view_id=new_view.id,
+                    entity_type=config.entity_type,
+                    filter_params=config.filter_params,
+                    slots=config.slots,
+                    sort_order=config.sort_order,
+                )
+
+        return clone
+
+    def _map_owner_id(self, owner_kind: str, old_owner_id: uuid.UUID, old_template_id: uuid.UUID, new_template_id: uuid.UUID) -> uuid.UUID:
+        """Map an owner_type_id from the source template to the cloned template."""
+        if owner_kind == "material_type":
+            old_type = self.get_material_type_by_id(old_owner_id)
+            if old_type and old_type.project_template_id == old_template_id:
+                # Find the corresponding new material type by name
+                new_types = self.list_material_types(new_template_id)
+                for new_type in new_types:
+                    if new_type.name == old_type.name:
+                        return new_type.id
+        elif owner_kind == "recipe_type":
+            old_type = self.get_recipe_type_by_id(old_owner_id)
+            if old_type and old_type.project_template_id == old_template_id:
+                # Find the corresponding new recipe type by name
+                new_types = self.list_recipe_types(new_template_id)
+                for new_type in new_types:
+                    if new_type.name == old_type.name:
+                        return new_type.id
+        return old_owner_id  # Fallback, should not happen
 
     # ProjectTemplateMaterialType CRUD
 
