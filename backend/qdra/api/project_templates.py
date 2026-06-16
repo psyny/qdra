@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -75,6 +75,12 @@ class ParameterDefinitionCreate(BaseModel):
     description: Optional[str] = None
     required: bool = False
     sort_order: int = 0
+    is_label: bool = False
+    is_unique: bool = False
+    is_searchable: bool = False
+    is_hidden: bool = False
+    default_value: Optional[str] = None
+    validation: Optional[Dict[str, Any]] = None
 
 
 class ParameterDefinitionResponse(BaseModel):
@@ -90,6 +96,56 @@ class ParameterDefinitionResponse(BaseModel):
     description: Optional[str]
     required: bool
     sort_order: int
+    is_label: bool
+    is_unique: bool
+    is_searchable: bool
+    is_hidden: bool
+    default_value: Optional[str]
+    validation: Optional[Dict[str, Any]]
+    created_at: str
+    updated_at: str
+
+
+class ViewCreate(BaseModel):
+    view_name: str
+    sort_order: int = 0
+
+
+class ViewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    project_template_id: uuid.UUID
+    view_name: str
+    sort_order: int
+    created_at: str
+    updated_at: str
+
+
+class ViewConfigCreate(BaseModel):
+    entity_type: str  # "material" | "recipe"
+    filter_params: Optional[List[Dict[str, Any]]] = None  # [{domain, key, value}, ...] AND logic; null = fallback
+    slots: List[Dict[str, Any]]  # [{domain, key}, ...]
+    sort_order: int = 0
+
+
+class ViewConfigResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    view_id: uuid.UUID
+    entity_type: str
+    filter_params: Optional[List[Dict[str, Any]]]
+    slots: List[Dict[str, Any]]
+    sort_order: int
+    created_at: str
+    updated_at: str
+
+
+class ViewWithConfigsResponse(BaseModel):
+    id: uuid.UUID
+    project_template_id: uuid.UUID
+    view_name: str
+    sort_order: int
+    configs: List[ViewConfigResponse]
     created_at: str
     updated_at: str
 
@@ -99,6 +155,7 @@ class ProjectTemplateDetailResponse(BaseModel):
     material_types: List[MaterialTypeResponse]
     recipe_types: List[RecipeTypeResponse]
     parameter_definitions: List[ParameterDefinitionResponse]
+    views: List[ViewWithConfigsResponse]
 
 
 # ---------------------------------------------------------------------------
@@ -137,12 +194,26 @@ def get_project_template_detail(
     material_types = repo.list_material_types(project_template_id)
     recipe_types = repo.list_recipe_types(project_template_id)
     parameter_definitions = repo.list_parameter_definitions(project_template_id)
+    raw_views = repo.list_views(project_template_id)
+    views = [
+        ViewWithConfigsResponse(
+            id=v.id,
+            project_template_id=v.project_template_id,
+            view_name=v.view_name,
+            sort_order=v.sort_order,
+            configs=[ViewConfigResponse.model_validate(c) for c in repo.list_view_configs(v.id)],
+            created_at=str(v.created_at),
+            updated_at=str(v.updated_at),
+        )
+        for v in raw_views
+    ]
 
     return ProjectTemplateDetailResponse(
         template=template,
         material_types=material_types,
         recipe_types=recipe_types,
         parameter_definitions=parameter_definitions,
+        views=views,
     )
 
 
@@ -188,6 +259,105 @@ def create_recipe_type(
     return recipe_type
 
 
+@router.post("/project-templates/{project_template_id}/views", response_model=ViewResponse)
+def create_view(
+    project_template_id: uuid.UUID,
+    data: ViewCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a named view context within a project template."""
+    repo = ProjectTemplateRepository(db)
+    template = repo.get_by_id(project_template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Project template not found")
+
+    view = repo.create_view(
+        project_template_id=project_template_id,
+        view_name=data.view_name,
+        sort_order=data.sort_order,
+    )
+    return view
+
+
+@router.get("/project-templates/{project_template_id}/views", response_model=List[ViewWithConfigsResponse])
+def list_views(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """List all views for a project template, each with their configs."""
+    repo = ProjectTemplateRepository(db)
+    template = repo.get_by_id(project_template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Project template not found")
+
+    raw_views = repo.list_views(project_template_id)
+    return [
+        ViewWithConfigsResponse(
+            id=v.id,
+            project_template_id=v.project_template_id,
+            view_name=v.view_name,
+            sort_order=v.sort_order,
+            configs=[ViewConfigResponse.model_validate(c) for c in repo.list_view_configs(v.id)],
+            created_at=str(v.created_at),
+            updated_at=str(v.updated_at),
+        )
+        for v in raw_views
+    ]
+
+
+@router.delete("/project-templates/{project_template_id}/views/{view_id}", status_code=204)
+def delete_view(
+    project_template_id: uuid.UUID,
+    view_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a view and all its configs (cascades)."""
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_view(view_id):
+        raise HTTPException(status_code=404, detail="View not found")
+
+
+@router.post("/project-templates/{project_template_id}/views/{view_id}/configs", response_model=ViewConfigResponse)
+def create_view_config(
+    project_template_id: uuid.UUID,
+    view_id: uuid.UUID,
+    data: ViewConfigCreate,
+    db: Session = Depends(get_db),
+):
+    """Add an entity display config to a view."""
+    repo = ProjectTemplateRepository(db)
+    view = repo.get_view_by_id(view_id)
+    if not view:
+        raise HTTPException(status_code=404, detail="View not found")
+    if view.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="View not found")
+
+    if data.entity_type not in ("material", "recipe"):
+        raise HTTPException(status_code=400, detail="entity_type must be 'material' or 'recipe'")
+
+    config = repo.create_view_config(
+        view_id=view_id,
+        entity_type=data.entity_type,
+        filter_params=data.filter_params,
+        slots=data.slots,
+        sort_order=data.sort_order,
+    )
+    return config
+
+
+@router.delete("/project-templates/{project_template_id}/views/{view_id}/configs/{config_id}", status_code=204)
+def delete_view_config(
+    project_template_id: uuid.UUID,
+    view_id: uuid.UUID,
+    config_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete a single view config."""
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_view_config(config_id):
+        raise HTTPException(status_code=404, detail="View config not found")
+
+
 @router.post("/project-templates/{project_template_id}/parameter-definitions", response_model=ParameterDefinitionResponse)
 def create_parameter_definition(
     project_template_id: uuid.UUID,
@@ -217,5 +387,11 @@ def create_parameter_definition(
         description=data.description,
         required=data.required,
         sort_order=data.sort_order,
+        is_label=data.is_label,
+        is_unique=data.is_unique,
+        is_searchable=data.is_searchable,
+        is_hidden=data.is_hidden,
+        default_value=data.default_value,
+        validation=data.validation,
     )
     return param_def

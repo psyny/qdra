@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,8 @@ from models.project_template import (
     ProjectTemplateMaterialType,
     ProjectTemplateRecipeType,
     ProjectTemplateParameterDefinition,
+    ProjectTemplateView,
+    ProjectTemplateViewConfig,
 )
 
 
@@ -141,6 +143,12 @@ class ProjectTemplateRepository:
         description: Optional[str] = None,
         required: bool = False,
         sort_order: int = 0,
+        is_label: bool = False,
+        is_unique: bool = False,
+        is_searchable: bool = False,
+        is_hidden: bool = False,
+        default_value: Optional[str] = None,
+        validation: Optional[Dict[str, Any]] = None,
     ) -> ProjectTemplateParameterDefinition:
         param_def = ProjectTemplateParameterDefinition(
             project_template_id=project_template_id,
@@ -153,6 +161,12 @@ class ProjectTemplateRepository:
             description=description,
             required=required,
             sort_order=sort_order,
+            is_label=is_label,
+            is_unique=is_unique,
+            is_searchable=is_searchable,
+            is_hidden=is_hidden,
+            default_value=default_value,
+            validation=validation,
         )
         self.db.add(param_def)
         self.db.commit()
@@ -188,6 +202,84 @@ class ProjectTemplateRepository:
         param_def = self.get_parameter_definition_by_id(param_def_id)
         if param_def:
             self.db.delete(param_def)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateView CRUD
+
+    def create_view(
+        self,
+        project_template_id: uuid.UUID,
+        view_name: str,
+        sort_order: int = 0,
+    ) -> ProjectTemplateView:
+        view = ProjectTemplateView(
+            project_template_id=project_template_id,
+            view_name=view_name,
+            sort_order=sort_order,
+        )
+        self.db.add(view)
+        self.db.commit()
+        self.db.refresh(view)
+        return view
+
+    def get_view_by_id(self, view_id: uuid.UUID) -> Optional[ProjectTemplateView]:
+        return self.db.query(ProjectTemplateView).filter(ProjectTemplateView.id == view_id).first()
+
+    def list_views(self, project_template_id: uuid.UUID) -> List[ProjectTemplateView]:
+        return (
+            self.db.query(ProjectTemplateView)
+            .filter(ProjectTemplateView.project_template_id == project_template_id)
+            .order_by(ProjectTemplateView.sort_order)
+            .all()
+        )
+
+    def delete_view(self, view_id: uuid.UUID) -> bool:
+        view = self.get_view_by_id(view_id)
+        if view:
+            self.db.delete(view)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateViewConfig CRUD
+
+    def create_view_config(
+        self,
+        view_id: uuid.UUID,
+        entity_type: str,
+        slots: List[Dict[str, Any]],
+        filter_params: Optional[List[Dict[str, Any]]] = None,
+        sort_order: int = 0,
+    ) -> ProjectTemplateViewConfig:
+        config = ProjectTemplateViewConfig(
+            view_id=view_id,
+            entity_type=entity_type,
+            filter_params=filter_params,
+            slots=slots,
+            sort_order=sort_order,
+        )
+        self.db.add(config)
+        self.db.commit()
+        self.db.refresh(config)
+        return config
+
+    def get_view_config_by_id(self, config_id: uuid.UUID) -> Optional[ProjectTemplateViewConfig]:
+        return self.db.query(ProjectTemplateViewConfig).filter(ProjectTemplateViewConfig.id == config_id).first()
+
+    def list_view_configs(self, view_id: uuid.UUID) -> List[ProjectTemplateViewConfig]:
+        return (
+            self.db.query(ProjectTemplateViewConfig)
+            .filter(ProjectTemplateViewConfig.view_id == view_id)
+            .order_by(ProjectTemplateViewConfig.sort_order)
+            .all()
+        )
+
+    def delete_view_config(self, config_id: uuid.UUID) -> bool:
+        config = self.get_view_config_by_id(config_id)
+        if config:
+            self.db.delete(config)
             self.db.commit()
             return True
         return False
