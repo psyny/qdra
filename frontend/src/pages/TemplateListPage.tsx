@@ -82,6 +82,11 @@ export function TemplateListPage() {
 
   return (
     <div className="page">
+      <div className="workspace-header">
+        <div className="workspace-header__breadcrumb">
+          <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link>
+        </div>
+      </div>
       <div className="page-header">
         <h1 className="page-title">Project Templates</h1>
         <p className="page-description">Define schemas and display configurations for your projects</p>
@@ -99,7 +104,7 @@ export function TemplateListPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
-          <button onClick={handleCreateTemplate} className="button button--primary">
+          <button onClick={handleCreateTemplate} className="button button--primary page-actions__create">
             Create Template
           </button>
         </div>

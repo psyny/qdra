@@ -58,4 +58,26 @@ docker-compose up --build
 
 ## Development
 
-Frontend TypeScript errors are expected until `npm install` is run in the frontend directory.
+### Frontend local development
+
+Run:
+
+```bash
+docker compose up frontend
+```
+
+Then open:
+
+```
+http://localhost:3000
+```
+
+Frontend source changes under `frontend/src/` should hot reload automatically.
+
+Rebuild the frontend image only when dependencies or Docker configuration change:
+
+```bash
+docker compose build frontend
+```
+
+Note: Frontend TypeScript errors in the IDE are expected until `npm install` is run in the frontend directory.

@@ -12,6 +12,7 @@ export function ProjectSelectionPage() {
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,10 +89,23 @@ export function ProjectSelectionPage() {
 
   const editingProject = editingProjectId ? projects.find((p) => p.id === editingProjectId) : null;
 
+  const filteredProjects = projects.filter((project) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      project.name.toLowerCase().includes(query) ||
+      (project.description && project.description.toLowerCase().includes(query))
+    );
+  });
+
   return (
     <div className="page">
+      <div className="workspace-header">
+        <div className="workspace-header__breadcrumb">
+          <Link to="/home">Home</Link> &gt; <Link to="/projects">Projects</Link>
+        </div>
+      </div>
       <div className="page-header">
-        <h1 className="page-title">Qdra</h1>
+        <h1 className="page-title">Projects</h1>
         <p className="page-description">Create, edit, and open Qdra workspaces.</p>
         <div className="mt-4">
           <BackendStatus />
@@ -99,14 +113,23 @@ export function ProjectSelectionPage() {
       </div>
 
       <div className="mt-8">
-        {!showCreateForm && !editingProjectId && (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="button button--primary"
-          >
-            + New Project
-          </button>
-        )}
+        <div className="page-actions">
+          <input
+            type="text"
+            placeholder="Search projects..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+          {!showCreateForm && !editingProjectId && (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="button button--primary page-actions__create"
+            >
+              + New Project
+            </button>
+          )}
+        </div>
 
         {(showCreateForm || editingProjectId) && (
           <div className="card form-card mt-6">
@@ -155,10 +178,10 @@ export function ProjectSelectionPage() {
             </button>
           </div>
         )}
-        {!loading && !error && projects.length === 0 && (
+        {!loading && !error && filteredProjects.length === 0 && (
           <div className="card state-message">
-            <p className="state-message__text">No projects yet.</p>
-            <p className="state-message__subtext">Create your first project to start using Qdra.</p>
+            <p className="state-message__text">No projects found.</p>
+            <p className="state-message__subtext">Try adjusting your search or create a new project.</p>
             <button
               onClick={() => setShowCreateForm(true)}
               className="button button--primary"
@@ -167,9 +190,9 @@ export function ProjectSelectionPage() {
             </button>
           </div>
         )}
-        {!loading && !error && projects.length > 0 && (
+        {!loading && !error && filteredProjects.length > 0 && (
           <div className="project-grid">
-            {projects.map((project) => (
+            {filteredProjects.map((project) => (
               <div key={project.id} className="card project-card">
                 {editingProjectId === project.id ? null : (
                   <>
