@@ -4,6 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from models.image_asset import ImageAsset
+from models.entity import Entity
 
 
 class ImageAssetRepository:
@@ -12,11 +13,10 @@ class ImageAssetRepository:
 
     def create(
         self,
-        project_id: uuid.UUID,
+        entity_id: uuid.UUID,
         storage_backend: str,
         storage_key: str,
         mime_type: str,
-        entity_id: Optional[uuid.UUID] = None,
         original_filename: Optional[str] = None,
         file_size_bytes: Optional[int] = None,
         width: Optional[int] = None,
@@ -25,7 +25,6 @@ class ImageAssetRepository:
         is_primary: bool = True,
     ) -> ImageAsset:
         image_asset = ImageAsset(
-            project_id=project_id,
             entity_id=entity_id,
             storage_backend=storage_backend,
             storage_key=storage_key,
@@ -46,12 +45,11 @@ class ImageAssetRepository:
         return self.db.query(ImageAsset).filter(ImageAsset.id == image_asset_id).first()
 
     def get_primary_image(
-        self, project_id: uuid.UUID, entity_id: uuid.UUID
+        self, entity_id: uuid.UUID
     ) -> Optional[ImageAsset]:
         return (
             self.db.query(ImageAsset)
             .filter(
-                ImageAsset.project_id == project_id,
                 ImageAsset.entity_id == entity_id,
                 ImageAsset.is_primary == True,
             )
@@ -59,12 +57,11 @@ class ImageAssetRepository:
         )
 
     def list_by_entity(
-        self, project_id: uuid.UUID, entity_id: uuid.UUID
+        self, entity_id: uuid.UUID
     ) -> List[ImageAsset]:
         return (
             self.db.query(ImageAsset)
             .filter(
-                ImageAsset.project_id == project_id,
                 ImageAsset.entity_id == entity_id,
             )
             .all()
@@ -85,7 +82,6 @@ class ImageAssetRepository:
 
         # Unset primary for all images of the same entity
         self.db.query(ImageAsset).filter(
-            ImageAsset.project_id == image_asset.project_id,
             ImageAsset.entity_id == image_asset.entity_id,
         ).update({"is_primary": False})
 

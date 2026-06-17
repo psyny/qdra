@@ -23,7 +23,7 @@ class ProjectRepository:
     def list_all(self) -> List[Project]:
         return self.db.query(Project).all()
 
-    def update_template(self, project_id: uuid.UUID, project_template_id: Optional[uuid.UUID]) -> Optional[Project]:
+    def update_template(self, project_id: uuid.UUID, project_template_id: uuid.UUID) -> Optional[Project]:
         project = self.get_by_id(project_id)
         if project:
             project.project_template_id = project_template_id

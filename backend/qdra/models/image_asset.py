@@ -15,10 +15,7 @@ class ImageAsset(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
-    )
-    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    entity_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=True,

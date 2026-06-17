@@ -51,7 +51,7 @@ class ProjectResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     name: str
-    project_template_id: Optional[uuid.UUID]
+    project_template_id: uuid.UUID
 
 
 # Planning API Models
@@ -213,7 +213,7 @@ def get_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
 
 
 class ProjectUpdateTemplate(BaseModel):
-    project_template_id: Optional[uuid.UUID] = None
+    project_template_id: uuid.UUID
 
 
 @router.patch("/projects/{project_id}/template", response_model=ProjectResponse)
@@ -222,12 +222,11 @@ def update_project_template(
     data: ProjectUpdateTemplate,
     db: Session = Depends(get_db),
 ):
-    """Update a project's template. Can be set to null to use abstraction display."""
-    if data.project_template_id is not None:
-        template_repo = ProjectTemplateRepository(db)
-        template = template_repo.get_by_id(data.project_template_id)
-        if not template:
-            raise HTTPException(status_code=400, detail="Project template not found")
+    """Update a project's template."""
+    template_repo = ProjectTemplateRepository(db)
+    template = template_repo.get_by_id(data.project_template_id)
+    if not template:
+        raise HTTPException(status_code=400, detail="Project template not found")
 
     repo = ProjectRepository(db)
     project = repo.update_template(project_id, data.project_template_id)

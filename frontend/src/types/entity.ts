@@ -29,7 +29,6 @@ export type Entity = {
 
 export type CreateEntityRequest = {
   entity_type_id: string;
-  kind: string;
   parameters?: Array<{
     domain: string;
     key: string;

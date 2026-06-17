@@ -26,7 +26,6 @@ class ParameterValueModel(BaseModel):
 
 class CreateEntityRequest(BaseModel):
     entity_type_id: uuid.UUID
-    kind: str
     parameters: Optional[List[ParameterValueModel]] = None
 
 
@@ -75,7 +74,6 @@ def create_entity(
         entity = service.create_entity(
             project_id=project_id,
             entity_type_id=request.entity_type_id,
-            kind=request.kind,
         )
         if request.parameters:
             for param in request.parameters:
@@ -105,7 +103,6 @@ def bulk_create_entities(
             entity = service.create_entity(
                 project_id=project_id,
                 entity_type_id=item.entity_type_id,
-                kind=item.kind,
             )
             if item.parameters:
                 for param in item.parameters:

@@ -83,7 +83,7 @@ def create_material(
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
-        entity = service.create_entity(project_id=project_id, entity_type_id=et_id, kind="material")
+        entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
         if data.parameters:
             for p in data.parameters:
                 service.add_parameter(
@@ -108,7 +108,7 @@ def create_material_bulk(
         if material_data.materials and len(material_data.materials) == 1:
             mat = material_data.materials[0]
         et_id = _resolve_entity_type_id(project_id, mat.entity_type_id, db)
-        entity = service.create_entity(project_id=project_id, entity_type_id=et_id, kind="material")
+        entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
         for p in (mat.parameters or []):
             service.add_parameter(
                 entity_id=entity.id, domain=p.domain, key=p.key,

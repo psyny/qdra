@@ -185,7 +185,7 @@ def create_recipe(
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
-        entity = service.create_entity(project_id=project_id, entity_type_id=et_id, kind="recipe")
+        entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
         return service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -203,7 +203,7 @@ def create_recipe_bulk(
     constraint_repo = ParameterConstraintRepository(db)
     try:
         et_id = _resolve_entity_type_id(project_id, recipe_data.entity_type_id, db)
-        entity = service.create_entity(project_id=project_id, entity_type_id=et_id, kind="recipe")
+        entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
 
         for p in recipe_data.parameters:
             service.add_parameter(

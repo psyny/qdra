@@ -4,6 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from models.entity import Entity
+from models.project_template import ProjectTemplateEntityType
 
 
 class EntityRepository:
@@ -14,12 +15,10 @@ class EntityRepository:
         self,
         project_id: uuid.UUID,
         entity_type_id: uuid.UUID,
-        kind: str,
     ) -> Entity:
         entity = Entity(
             project_id=project_id,
             entity_type_id=entity_type_id,
-            kind=kind,
         )
         self.db.add(entity)
         self.db.commit()
@@ -34,7 +33,7 @@ class EntityRepository:
     ) -> List[Entity]:
         q = self.db.query(Entity).filter(Entity.project_id == project_id)
         if kind is not None:
-            q = q.filter(Entity.kind == kind)
+            q = q.join(ProjectTemplateEntityType).filter(ProjectTemplateEntityType.kind == kind)
         return q.all()
 
     def list_by_entity_type(self, entity_type_id: uuid.UUID) -> List[Entity]:

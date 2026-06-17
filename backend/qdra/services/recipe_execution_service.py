@@ -146,7 +146,6 @@ class RecipeExecutionService:
                 entity = self.entity_repo.create(
                     project_id=recipe.project_id,
                     entity_type_id=entity_type_id,
-                    kind="material",
                 )
 
                 for constraint in constraints:

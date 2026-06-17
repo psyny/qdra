@@ -70,12 +70,10 @@ class ImageService:
         return image.size
     
     def _generate_storage_key(
-        self, project_id: uuid.UUID, entity_id: Optional[uuid.UUID], image_asset_id: uuid.UUID, extension: str
+        self, project_id: uuid.UUID, entity_id: uuid.UUID, image_asset_id: uuid.UUID, extension: str
     ) -> str:
         """Generate storage key for an image."""
-        if entity_id:
-            return f"projects/{project_id}/entities/{entity_id}/images/{image_asset_id}{extension}"
-        return f"projects/{project_id}/images/{image_asset_id}{extension}"
+        return f"projects/{project_id}/entities/{entity_id}/images/{image_asset_id}{extension}"
     
     async def upload_entity_image(
         self,
@@ -99,7 +97,6 @@ class ImageService:
         await self.storage_provider.save(storage_key, content, mime_type)
 
         image_asset = self.image_asset_repo.create(
-            project_id=project_id,
             entity_id=entity_id,
             storage_backend=settings.image_storage_backend,
             storage_key=storage_key,
@@ -114,9 +111,9 @@ class ImageService:
 
         return image_asset
 
-    def get_entity_image(self, project_id: uuid.UUID, entity_id: uuid.UUID):
+    def get_entity_image(self, entity_id: uuid.UUID):
         """Get the primary image for an entity."""
-        return self.image_asset_repo.get_primary_image(project_id, entity_id)
+        return self.image_asset_repo.get_primary_image(entity_id)
     
     def get_image_by_id(self, image_asset_id: uuid.UUID):
         """Get an image by its ID."""

@@ -25,7 +25,6 @@ class EntityService:
         self,
         project_id: uuid.UUID,
         entity_type_id: uuid.UUID,
-        kind: str,
     ) -> Entity:
         project = self.project_repository.get_by_id(project_id)
         if not project:
@@ -35,15 +34,9 @@ class EntityService:
         if not entity_type:
             raise ValueError(f"EntityType '{entity_type_id}' not found")
 
-        if entity_type.kind != kind:
-            raise ValueError(
-                f"EntityType kind '{entity_type.kind}' does not match requested kind '{kind}'"
-            )
-
         return self.entity_repository.create(
             project_id=project_id,
             entity_type_id=entity_type_id,
-            kind=kind,
         )
 
     def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
@@ -51,15 +44,16 @@ class EntityService:
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
 
-        image = self.image_asset_repository.get_primary_image(
-            entity.project_id, entity.id
-        )
+        entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+        kind = entity_type.kind if entity_type else "unknown"
+
+        image = self.image_asset_repository.get_primary_image(entity.id)
 
         result: Dict[str, Any] = {
             "id": entity.id,
             "project_id": entity.project_id,
             "entity_type_id": entity.entity_type_id,
-            "kind": entity.kind,
+            "kind": kind,
             "created_at": entity.created_at,
             "updated_at": entity.updated_at,
             "image": None,
@@ -88,14 +82,15 @@ class EntityService:
         result = []
 
         for entity in entities:
-            image = self.image_asset_repository.get_primary_image(
-                entity.project_id, entity.id
-            )
+            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+            entity_kind = entity_type.kind if entity_type else "unknown"
+
+            image = self.image_asset_repository.get_primary_image(entity.id)
             entity_data: Dict[str, Any] = {
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
-                "kind": entity.kind,
+                "kind": entity_kind,
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
                 "image": None,

@@ -14,7 +14,6 @@ router = APIRouter()
 class ImageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    project_id: uuid.UUID
     entity_id: Optional[uuid.UUID]
     storage_backend: str
     storage_key: str
@@ -27,7 +26,6 @@ class ImageResponse(BaseModel):
 def _make_response(image_asset, project_id: uuid.UUID) -> ImageResponse:
     return ImageResponse(
         id=image_asset.id,
-        project_id=image_asset.project_id,
         entity_id=image_asset.entity_id,
         storage_backend=image_asset.storage_backend,
         storage_key=image_asset.storage_key,
@@ -104,7 +102,7 @@ async def upload_recipe_image(
 @router.get("/projects/{project_id}/entities/{entity_id}/image", response_model=ImageResponse)
 def get_entity_image(project_id: uuid.UUID, entity_id: uuid.UUID, db: Session = Depends(get_db)):
     service = ImageService(db)
-    image_asset = service.get_entity_image(project_id, entity_id)
+    image_asset = service.get_entity_image(entity_id)
     if not image_asset:
         raise HTTPException(status_code=404, detail="Image not found")
     return _make_response(image_asset, project_id)
@@ -113,7 +111,7 @@ def get_entity_image(project_id: uuid.UUID, entity_id: uuid.UUID, db: Session = 
 @router.get("/projects/{project_id}/materials/{entity_id}/image", response_model=ImageResponse)
 def get_material_image(project_id: uuid.UUID, entity_id: uuid.UUID, db: Session = Depends(get_db)):
     service = ImageService(db)
-    image_asset = service.get_entity_image(project_id, entity_id)
+    image_asset = service.get_entity_image(entity_id)
     if not image_asset:
         raise HTTPException(status_code=404, detail="Image not found")
     return _make_response(image_asset, project_id)
@@ -122,7 +120,7 @@ def get_material_image(project_id: uuid.UUID, entity_id: uuid.UUID, db: Session 
 @router.get("/projects/{project_id}/recipes/{entity_id}/image", response_model=ImageResponse)
 def get_recipe_image(project_id: uuid.UUID, entity_id: uuid.UUID, db: Session = Depends(get_db)):
     service = ImageService(db)
-    image_asset = service.get_entity_image(project_id, entity_id)
+    image_asset = service.get_entity_image(entity_id)
     if not image_asset:
         raise HTTPException(status_code=404, detail="Image not found")
     return _make_response(image_asset, project_id)
@@ -135,7 +133,11 @@ async def stream_image(project_id: uuid.UUID, image_asset_id: uuid.UUID, db: Ses
     service = ImageService(db)
     try:
         image_asset = service.get_image_by_id(image_asset_id)
-        if not image_asset or image_asset.project_id != project_id:
+        if not image_asset:
+            raise HTTPException(status_code=404, detail="Image not found")
+        # Derive project_id from entity
+        entity = service.entity_repo.get_by_id(image_asset.entity_id)
+        if not entity or entity.project_id != project_id:
             raise HTTPException(status_code=404, detail="Image not found")
         
         stream = await service.get_image_stream(image_asset_id)
@@ -153,7 +155,11 @@ async def delete_image(project_id: uuid.UUID, image_asset_id: uuid.UUID, db: Ses
     service = ImageService(db)
     try:
         image_asset = service.get_image_by_id(image_asset_id)
-        if not image_asset or image_asset.project_id != project_id:
+        if not image_asset:
+            raise HTTPException(status_code=404, detail="Image not found")
+        # Derive project_id from entity
+        entity = service.entity_repo.get_by_id(image_asset.entity_id)
+        if not entity or entity.project_id != project_id:
             raise HTTPException(status_code=404, detail="Image not found")
         
         await service.delete_image(image_asset_id)
