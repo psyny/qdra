@@ -7,8 +7,7 @@ import io
 from sqlalchemy.orm import Session
 
 from repositories.image_asset_repository import ImageAssetRepository
-from repositories.material_repository import MaterialRepository
-from repositories.recipe_repository import RecipeRepository
+from repositories.entity_repository import EntityRepository
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
@@ -19,8 +18,7 @@ class ImageService:
     def __init__(self, db: Session):
         self.db = db
         self.image_asset_repo = ImageAssetRepository(db)
-        self.material_repo = MaterialRepository(db)
-        self.recipe_repo = RecipeRepository(db)
+        self.entity_repo = EntityRepository(db)
         self.storage_provider = self._get_storage_provider()
     
     def _get_storage_provider(self) -> ImageStorageProvider:
@@ -72,46 +70,37 @@ class ImageService:
         return image.size
     
     def _generate_storage_key(
-        self, project_id: uuid.UUID, owner_type: str, owner_id: uuid.UUID, image_asset_id: uuid.UUID, extension: str
+        self, project_id: uuid.UUID, entity_id: Optional[uuid.UUID], image_asset_id: uuid.UUID, extension: str
     ) -> str:
         """Generate storage key for an image."""
-        if owner_type == "material":
-            return f"projects/{project_id}/materials/{owner_id}/images/{image_asset_id}{extension}"
-        elif owner_type == "recipe":
-            return f"projects/{project_id}/recipes/{owner_id}/images/{image_asset_id}{extension}"
-        else:
-            raise ValueError(f"Unknown owner type: {owner_type}")
+        if entity_id:
+            return f"projects/{project_id}/entities/{entity_id}/images/{image_asset_id}{extension}"
+        return f"projects/{project_id}/images/{image_asset_id}{extension}"
     
-    async def upload_material_image(
+    async def upload_entity_image(
         self,
         project_id: uuid.UUID,
-        material_id: uuid.UUID,
+        entity_id: uuid.UUID,
         content: bytes,
         filename: str,
         alt_text: Optional[str] = None,
     ):
-        """Upload an image for a material."""
-        # Validate material exists
-        material = self.material_repo.get_by_id(material_id)
-        if not material or material.project_id != project_id:
-            raise ValueError("Material not found")
-        
-        # Validate image
+        """Upload an image for an entity."""
+        entity = self.entity_repo.get_by_id(entity_id)
+        if not entity or entity.project_id != project_id:
+            raise ValueError("Entity not found")
+
         mime_type, extension = self._validate_image(content, filename)
         width, height = self._get_image_dimensions(content)
-        
-        # Create image asset record
+
         image_asset_id = uuid.uuid4()
-        storage_key = self._generate_storage_key(project_id, "material", material_id, image_asset_id, extension)
-        
-        # Save to storage
+        storage_key = self._generate_storage_key(project_id, entity_id, image_asset_id, extension)
+
         await self.storage_provider.save(storage_key, content, mime_type)
-        
-        # Create database record
+
         image_asset = self.image_asset_repo.create(
             project_id=project_id,
-            owner_type="material",
-            owner_id=material_id,
+            entity_id=entity_id,
             storage_backend=settings.image_storage_backend,
             storage_key=storage_key,
             mime_type=mime_type,
@@ -122,59 +111,12 @@ class ImageService:
             alt_text=alt_text,
             is_primary=True,
         )
-        
+
         return image_asset
-    
-    async def upload_recipe_image(
-        self,
-        project_id: uuid.UUID,
-        recipe_id: uuid.UUID,
-        content: bytes,
-        filename: str,
-        alt_text: Optional[str] = None,
-    ):
-        """Upload an image for a recipe."""
-        # Validate recipe exists
-        recipe = self.recipe_repo.get_by_id(recipe_id)
-        if not recipe or recipe.project_id != project_id:
-            raise ValueError("Recipe not found")
-        
-        # Validate image
-        mime_type, extension = self._validate_image(content, filename)
-        width, height = self._get_image_dimensions(content)
-        
-        # Create image asset record
-        image_asset_id = uuid.uuid4()
-        storage_key = self._generate_storage_key(project_id, "recipe", recipe_id, image_asset_id, extension)
-        
-        # Save to storage
-        await self.storage_provider.save(storage_key, content, mime_type)
-        
-        # Create database record
-        image_asset = self.image_asset_repo.create(
-            project_id=project_id,
-            owner_type="recipe",
-            owner_id=recipe_id,
-            storage_backend=settings.image_storage_backend,
-            storage_key=storage_key,
-            mime_type=mime_type,
-            original_filename=filename,
-            file_size_bytes=len(content),
-            width=width,
-            height=height,
-            alt_text=alt_text,
-            is_primary=True,
-        )
-        
-        return image_asset
-    
-    def get_material_image(self, project_id: uuid.UUID, material_id: uuid.UUID):
-        """Get the primary image for a material."""
-        return self.image_asset_repo.get_primary_image(project_id, "material", material_id)
-    
-    def get_recipe_image(self, project_id: uuid.UUID, recipe_id: uuid.UUID):
-        """Get the primary image for a recipe."""
-        return self.image_asset_repo.get_primary_image(project_id, "recipe", recipe_id)
+
+    def get_entity_image(self, project_id: uuid.UUID, entity_id: uuid.UUID):
+        """Get the primary image for an entity."""
+        return self.image_asset_repo.get_primary_image(project_id, entity_id)
     
     def get_image_by_id(self, image_asset_id: uuid.UUID):
         """Get an image by its ID."""

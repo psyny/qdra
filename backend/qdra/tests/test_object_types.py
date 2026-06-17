@@ -1,3 +1,8 @@
+import pytest
+
+pytestmark = pytest.mark.skip(reason="Legacy object-type endpoints removed; replaced by entity abstraction (EntityType)")
+
+
 def test_create_object_type_inside_project(client):
     """Test that an object type can be created inside a project."""
     # Create a project first

@@ -4,33 +4,11 @@ import { Material } from '../types/material';
 type MaterialCardProps = {
   material: Material;
   projectId: string;
+  name?: string;
+  category?: string | null;
 };
 
-function getMaterialName(material: Material): string {
-  const nameParam = material.parameters.find(p => p.domain === 'identity' && p.key === 'name');
-  if (nameParam && typeof nameParam.value === 'string') {
-    return nameParam.value
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-  return 'Unnamed Material';
-}
-
-function getMaterialCategory(material: Material): string | null {
-  const categoryParam = material.parameters.find(p => p.domain === 'identity' && p.key === 'category');
-  if (categoryParam && typeof categoryParam.value === 'string') {
-    return categoryParam.value
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-  }
-  return null;
-}
-
-export function MaterialCard({ material, projectId }: MaterialCardProps) {
-  const name = getMaterialName(material);
-  const category = getMaterialCategory(material);
+export function MaterialCard({ material, projectId, name = 'Unnamed Material', category }: MaterialCardProps) {
 
   return (
     <div className="card project-card">

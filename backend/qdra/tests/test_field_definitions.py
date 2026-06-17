@@ -1,3 +1,8 @@
+import pytest
+
+pytestmark = pytest.mark.skip(reason="Legacy field-definition endpoints removed; replaced by entity abstraction (ParameterDefinition)")
+
+
 def test_create_field_definition_for_object_type(client):
     """Test that a field definition can be created for an object type."""
     # Create a project

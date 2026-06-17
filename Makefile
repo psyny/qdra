@@ -36,15 +36,22 @@ logs-api: ## Show logs from backend-api
 logs-worker: ## Show logs from graph-worker
 	docker-compose logs -f graph-worker
 
-restart: ## Restart all services
-	docker-compose restart
+restart-soft: ## Soft restart (down, up, prepare)
+	$(MAKE) down
+	$(MAKE) up
+	$(MAKE) prepare
+
+restart-hard: ## Hard restart (down, rebuild, up, prepare)
+	$(MAKE) down
+	$(MAKE) rebuild
+	$(MAKE) up
+	$(MAKE) prepare
 
 clean: ## Stop and remove all containers, volumes, and networks
 	docker-compose down -v
 
-rebuild: ## Rebuild and restart all services
-	docker-compose down
-	docker-compose up --build -d
+rebuild: ## Rebuild all services
+	docker-compose build
 
 ps: ## Show running containers
 	docker-compose ps
@@ -53,9 +60,25 @@ db-reset: ## Drop and recreate main database
 	docker-compose up -d postgres
 	@echo "Waiting for Postgres to be ready..."
 	@sleep 3
-	docker exec qdra-postgres-1 psql -U qdra -c "DROP DATABASE IF EXISTS qdra;"
-	docker exec qdra-postgres-1 psql -U qdra -c "CREATE DATABASE qdra;"
+	docker exec qdra-postgres-1 psql -U qdra -d postgres -c "DROP DATABASE IF EXISTS qdra;"
+	docker exec qdra-postgres-1 psql -U qdra -d postgres -c "CREATE DATABASE qdra;"
 	@echo "Main database reset"
+
+db-reset-test: ## Drop and recreate test database
+	docker-compose up -d postgres
+	@echo "Waiting for Postgres to be ready..."
+	@sleep 3
+	docker exec qdra-postgres-1 psql -U qdra -d postgres -c "DROP DATABASE IF EXISTS qdra_test;"
+	docker exec qdra-postgres-1 psql -U qdra -d postgres -c "CREATE DATABASE qdra_test;"
+	@echo "Test database reset"
+
+db-reset-all: ## Drop and recreate both main and test databases
+	$(MAKE) db-reset
+	$(MAKE) db-reset-test
+
+db-check-structure: ## Check current database structure via API
+	@echo "Fetching database structure..."
+	@curl -s http://localhost:8000/api/schema | $(BE_PYTHON) -m json.tool
 
 # ============================================================================
 # Backend (Qdra) Commands

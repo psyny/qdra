@@ -31,15 +31,9 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     loadMaterials();
   }, [projectId]);
 
-  const filteredMaterials = materials.filter(material => {
-    const name = material.parameters?.find(p => p.domain === 'identity' && p.key === 'name')?.value;
-    const category = material.parameters?.find(p => p.domain === 'identity' && p.key === 'category')?.value;
-    const query = searchQuery.toLowerCase();
-    
-    if (typeof name === 'string' && name.toLowerCase().includes(query)) return true;
-    if (typeof category === 'string' && category.toLowerCase().includes(query)) return true;
-    return false;
-  });
+  const filteredMaterials = searchQuery
+    ? materials.filter(m => m.id.toLowerCase().includes(searchQuery.toLowerCase()))
+    : materials;
 
   if (loading) {
     return (

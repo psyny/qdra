@@ -439,9 +439,8 @@ def create_comprehensive_test_dataset(client, project_id):
         },
     }
 
-def test_final_product_unrestricted(client):
-    project_response = client.post("/projects", json={"name": "Test Project"})
-    project_id = project_response.json()["id"]
+def test_final_product_unrestricted(client, project_ctx):
+    project_id = project_ctx["project_id"]
 
     # Use comprehensive test dataset
     dataset = create_comprehensive_test_dataset(client, project_id)
@@ -493,9 +492,8 @@ def test_final_product_unrestricted(client):
     assert data["success"] is True
     assert len(data["plans"]) == 2
 
-def test_final_product_recipe_restricted(client):
-    project_response = client.post("/projects", json={"name": "Test Project"})
-    project_id = project_response.json()["id"]
+def test_final_product_recipe_restricted(client, project_ctx):
+    project_id = project_ctx["project_id"]
 
     # Use comprehensive test dataset
     dataset = create_comprehensive_test_dataset(client, project_id)

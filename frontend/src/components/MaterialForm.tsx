@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { MaterialParameter, CreateMaterialRequest, UpdateMaterialRequest } from '../types/material';
 import { MaterialParameterEditor } from './MaterialParameterEditor';
+import { DraftParameter } from './ParameterRow';
 
 type MaterialFormProps = {
-  initialParameters?: MaterialParameter[];
+  initialParameters?: DraftParameter[];
   isSubmitting?: boolean;
   errorMessage?: string | null;
-  onSubmit: (parameters: MaterialParameter[]) => void;
+  onSubmit: (parameters: DraftParameter[]) => void;
   onCancel: () => void;
   submitLabel: string;
 };
@@ -21,7 +21,7 @@ export function MaterialForm({
 }: MaterialFormProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
-  const [parameters, setParameters] = useState<MaterialParameter[]>(initialParameters);
+  const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -35,7 +35,7 @@ export function MaterialForm({
     }
 
     // Build final parameters list
-    const finalParameters: MaterialParameter[] = [
+    const finalParameters: DraftParameter[] = [
       { domain: 'identity', key: 'name', value: name.trim(), value_type: 'string' },
     ];
 

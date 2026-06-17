@@ -8,6 +8,7 @@ import { MaterialEditorPage } from './pages/MaterialEditorPage';
 import { RecipesPlaceholderPage } from './pages/RecipesPlaceholderPage';
 import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
 import { TemplateListPage } from './pages/TemplateListPage';
+import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
 import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
 
@@ -19,6 +20,8 @@ function App() {
         <Route path="/home" element={<HomePage />} />
         <Route path="/projects" element={<ProjectSelectionPage />} />
         <Route path="/templates" element={<TemplateListPage />} />
+        <Route path="/templates/new" element={<TemplateEditorPage />} />
+        <Route path="/templates/:templateId/edit" element={<TemplateEditorPage />} />
         <Route path="/projects/:projectId" element={<ProjectHomePage />} />
         <Route
           path="/projects/:projectId/materials"

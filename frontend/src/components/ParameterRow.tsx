@@ -1,9 +1,16 @@
-import { MaterialParameter } from '../types/material';
+import React from 'react';
+
+export type DraftParameter = {
+  domain: string;
+  key: string;
+  value: string | number | boolean | null;
+  value_type: 'string' | 'number' | 'boolean' | 'null';
+};
 
 type ParameterRowProps = {
-  parameter: MaterialParameter;
+  parameter: DraftParameter;
   index: number;
-  onChange: (index: number, parameter: MaterialParameter) => void;
+  onChange: (index: number, parameter: DraftParameter) => void;
   onRemove: (index: number) => void;
 };
 

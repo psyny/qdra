@@ -1,13 +1,12 @@
-import { MaterialParameter } from '../types/material';
-import { ParameterRow } from './ParameterRow';
+import { ParameterRow, DraftParameter } from './ParameterRow';
 
 type MaterialParameterEditorProps = {
-  parameters: MaterialParameter[];
-  onChange: (parameters: MaterialParameter[]) => void;
+  parameters: DraftParameter[];
+  onChange: (parameters: DraftParameter[]) => void;
 };
 
 export function MaterialParameterEditor({ parameters, onChange }: MaterialParameterEditorProps) {
-  const handleParameterChange = (index: number, parameter: MaterialParameter) => {
+  const handleParameterChange = (index: number, parameter: DraftParameter) => {
     const newParameters = [...parameters];
     newParameters[index] = parameter;
     onChange(newParameters);
@@ -16,7 +15,7 @@ export function MaterialParameterEditor({ parameters, onChange }: MaterialParame
   const handleAddParameter = () => {
     onChange([
       ...parameters,
-      { domain: '', key: '', value: '', value_type: 'string' },
+      { domain: '', key: '', value: '', value_type: 'string' } as DraftParameter,
     ]);
   };
 

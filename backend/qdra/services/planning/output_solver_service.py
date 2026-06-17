@@ -7,10 +7,9 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from models.slot import SlotKind
-from models.material import Material
-from models.recipe import Recipe
-from repositories.recipe_repository import RecipeRepository
-from repositories.material_repository import MaterialRepository
+from models.entity import Entity
+from repositories.entity_repository import EntityRepository
+from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
@@ -87,8 +86,8 @@ def validate_formula(formula: str, variable_names: Set[str]) -> None:
 class OutputSolverService:
     def __init__(self, db: Session):
         self.db = db
-        self.recipe_repo = RecipeRepository(db)
-        self.material_repo = MaterialRepository(db)
+        self.entity_repo = EntityRepository(db)
+        self.entity_param_repo = EntityParameterRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
@@ -105,7 +104,7 @@ class OutputSolverService:
             for fdef in request.score_rules.score_formulas:
                 validate_formula(fdef.formula, all_names)
 
-        recipes = self.recipe_repo.list_by_project(request.project_id)
+        recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
         recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
@@ -982,42 +981,36 @@ class OutputSolverService:
         recipes: Dict[uuid.UUID, EntityData] = {}
 
         if material_ids:
-            db_materials = self.db.query(Material).filter(
-                Material.id.in_(material_ids), Material.project_id == project_id
-            ).all()
-            from repositories.parameter_repository import ParameterRepository
-            param_repo = ParameterRepository(self.db)
-            for m in db_materials:
-                params = param_repo.list_by_material(m.id)
-                materials[m.id] = EntityData(
-                    id=m.id, project_id=m.project_id, created_at=m.created_at,
-                    parameters=[self._to_spec(p) for p in params]
-                )
+            for mid in material_ids:
+                entity = self.entity_repo.get_by_id(mid)
+                if entity and entity.project_id == project_id:
+                    params = self.entity_param_repo.list_by_entity(mid)
+                    materials[mid] = EntityData(
+                        id=entity.id, project_id=entity.project_id,
+                        created_at=entity.created_at,
+                        parameters=[self._to_spec(p) for p in params]
+                    )
 
         if recipe_ids:
-            db_recipes = self.db.query(Recipe).filter(
-                Recipe.id.in_(recipe_ids), Recipe.project_id == project_id
-            ).all()
-            from repositories.recipe_parameter_repository import RecipeParameterRepository
-            recipe_param_repo = RecipeParameterRepository(self.db)
-            for r in db_recipes:
-                params = recipe_param_repo.list_by_recipe(r.id)
-                recipes[r.id] = EntityData(
-                    id=r.id, project_id=r.project_id, created_at=r.created_at,
-                    parameters=[self._to_spec(p) for p in params]
-                )
+            for rid in recipe_ids:
+                entity = self.entity_repo.get_by_id(rid)
+                if entity and entity.project_id == project_id:
+                    params = self.entity_param_repo.list_by_entity(rid)
+                    recipes[rid] = EntityData(
+                        id=entity.id, project_id=entity.project_id,
+                        created_at=entity.created_at,
+                        parameters=[self._to_spec(p) for p in params]
+                    )
 
         return Entities(materials=materials, recipes=recipes)
 
     def _load_recipe_params(
         self, recipe_ids: List[uuid.UUID]
     ) -> Dict[str, List[ConstraintSpec]]:
-        """Load recipe parameters as ConstraintSpec lists, keyed by str(recipe_id)."""
-        from repositories.recipe_parameter_repository import RecipeParameterRepository
-        param_repo = RecipeParameterRepository(self.db)
+        """Load recipe entity parameters as ConstraintSpec lists, keyed by str(recipe_id)."""
         result: Dict[str, List[ConstraintSpec]] = {}
         for rid in recipe_ids:
-            params = param_repo.list_by_recipe(rid)
+            params = self.entity_param_repo.list_by_entity(rid)
             result[str(rid)] = [
                 ConstraintSpec(
                     domain=p.domain, key=p.key, operator="=",
@@ -1030,7 +1023,7 @@ class OutputSolverService:
         return result
 
     def _load_recipe_structure(self, recipe_id: uuid.UUID) -> Dict:
-        slots = self.slot_repo.list_by_recipe(recipe_id)
+        slots = self.slot_repo.list_by_recipe_entity(recipe_id)
         structure = {"recipe_id": recipe_id, "slots": []}
         for slot in slots:
             options = self.option_repo.list_by_slot(slot.id)

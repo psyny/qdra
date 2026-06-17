@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { getTemplates, createTemplate, deleteTemplate, cloneTemplate } from '../api/templates';
-import { ProjectTemplate, CreateTemplateRequest, CloneTemplateRequest } from '../types/template';
+import { Link, useNavigate } from 'react-router-dom';
+import { getTemplates, deleteTemplate, cloneTemplate } from '../api/templates';
+import { ProjectTemplate, CloneTemplateRequest } from '../types/template';
 import { BackendStatus } from '../components/BackendStatus';
 
 export function TemplateListPage() {
+  const navigate = useNavigate();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -31,17 +32,8 @@ export function TemplateListPage() {
     loadTemplates();
   }, []);
 
-  const handleCreateTemplate = async () => {
-    const payload: CreateTemplateRequest = {
-      name: 'New Template',
-      description: '',
-    };
-    try {
-      await createTemplate(payload);
-      await loadTemplates();
-    } catch (err) {
-      setActionError('Could not create template');
-    }
+  const handleCreateTemplate = () => {
+    navigate('/templates/new');
   };
 
   const handleCloneTemplate = async (templateId: string) => {
@@ -49,8 +41,9 @@ export function TemplateListPage() {
     setActionError(null);
     try {
       const payload: CloneTemplateRequest = {};
-      await cloneTemplate(templateId, payload);
+      const cloned = await cloneTemplate(templateId, payload);
       await loadTemplates();
+      navigate(`/templates/${cloned.id}/edit`);
     } catch (err) {
       setActionError('Could not clone template');
     } finally {

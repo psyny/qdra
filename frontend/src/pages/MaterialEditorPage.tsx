@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getMaterial, createMaterial, updateMaterial } from '../api/materials';
-import { Material, MaterialParameter } from '../types/material';
+import { getMaterial, createMaterial, addMaterialParameter } from '../api/materials';
+import { Material } from '../types/material';
 import { MaterialForm } from '../components/MaterialForm';
+import { DraftParameter } from '../components/ParameterRow';
 
 type MaterialEditorPageProps = {
   projectId: string;
@@ -37,15 +38,23 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
     }
   };
 
-  const handleSubmit = async (parameters: MaterialParameter[]) => {
+  const draftToApiParam = (p: DraftParameter) => {
+    if (p.value_type === 'string') return { domain: p.domain, key: p.key, value_string: String(p.value ?? '') };
+    if (p.value_type === 'number') return { domain: p.domain, key: p.key, value_number: Number(p.value ?? 0) };
+    if (p.value_type === 'boolean') return { domain: p.domain, key: p.key, value_boolean: Boolean(p.value) };
+    return { domain: p.domain, key: p.key, value_string: null };
+  };
+
+  const handleSubmit = async (parameters: DraftParameter[]) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      if (materialId) {
-        await updateMaterial(projectId, materialId, { parameters });
-      } else {
-        await createMaterial(projectId, { parameters });
+      if (!materialId) {
+        const entity = await createMaterial(projectId, {});
+        for (const p of parameters) {
+          await addMaterialParameter(projectId, entity.id, draftToApiParam(p));
+        }
       }
       navigate(`/projects/${projectId}/materials`);
     } catch (err) {
@@ -83,7 +92,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         {materialId ? 'Edit Material' : 'New Material'}
       </h2>
       <MaterialForm
-        initialParameters={material?.parameters || []}
+        initialParameters={[]}
         isSubmitting={isSubmitting}
         errorMessage={error}
         onSubmit={handleSubmit}

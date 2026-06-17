@@ -1,11 +1,11 @@
 from typing import Any
-from models.parameter import Parameter
+from models.entity_parameter import EntityParameter
 from models.parameter_constraint import ParameterConstraint, Operator
 
 
 class ConstraintMatcher:
     @staticmethod
-    def matches(parameter: Parameter, constraint: ParameterConstraint) -> bool:
+    def matches(parameter: EntityParameter, constraint: ParameterConstraint) -> bool:
         """Check if a parameter matches a constraint."""
         # Get parameter value
         param_value = ConstraintMatcher._get_parameter_value(parameter)
@@ -70,7 +70,7 @@ class ConstraintMatcher:
         return False
 
     @staticmethod
-    def _get_parameter_value(parameter: Parameter) -> Any:
+    def _get_parameter_value(parameter: EntityParameter) -> Any:
         """Extract the value from a parameter (exactly one should be set)."""
         if parameter.value_string is not None:
             return parameter.value_string

@@ -10,8 +10,8 @@ class OptionRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, slot_id: uuid.UUID, quantity: float) -> Option:
-        option = Option(slot_id=slot_id, quantity=quantity)
+    def create(self, slot_id: uuid.UUID, quantity: float, sort_order: int = 0) -> Option:
+        option = Option(slot_id=slot_id, quantity=quantity, sort_order=sort_order)
         self.db.add(option)
         self.db.commit()
         self.db.refresh(option)

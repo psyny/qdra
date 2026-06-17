@@ -8,8 +8,6 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
-from services.material_service import MaterialService
-from services.recipe_service import RecipeService
 from services.planning.output_planner_service import PlanningService
 
 from domain.planning.output_planner import (

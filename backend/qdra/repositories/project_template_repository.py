@@ -5,8 +5,7 @@ from sqlalchemy.orm import Session
 
 from models.project_template import (
     ProjectTemplate,
-    ProjectTemplateMaterialType,
-    ProjectTemplateRecipeType,
+    ProjectTemplateEntityType,
     ProjectTemplateParameterDefinition,
     ProjectTemplateView,
     ProjectTemplateViewConfig,
@@ -19,20 +18,38 @@ class ProjectTemplateRepository:
 
     # ProjectTemplate CRUD
 
-    def create(self, name: str, description: Optional[str] = None, is_builtin: bool = False) -> ProjectTemplate:
-        template = ProjectTemplate(name=name, description=description, is_builtin=is_builtin)
+    def create(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        is_builtin: bool = False,
+    ) -> ProjectTemplate:
+        template = ProjectTemplate(
+            name=name,
+            description=description,
+            is_builtin=is_builtin,
+        )
         self.db.add(template)
         self.db.commit()
         self.db.refresh(template)
         return template
 
     def get_by_id(self, template_id: uuid.UUID) -> Optional[ProjectTemplate]:
-        return self.db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
+        return (
+            self.db.query(ProjectTemplate)
+            .filter(ProjectTemplate.id == template_id)
+            .first()
+        )
 
     def list_all(self) -> List[ProjectTemplate]:
         return self.db.query(ProjectTemplate).all()
 
-    def update(self, template_id: uuid.UUID, name: Optional[str] = None, description: Optional[str] = None) -> Optional[ProjectTemplate]:
+    def update(
+        self,
+        template_id: uuid.UUID,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> Optional[ProjectTemplate]:
         template = self.get_by_id(template_id)
         if template:
             if name is not None:
@@ -46,17 +63,22 @@ class ProjectTemplateRepository:
     def delete(self, template_id: uuid.UUID) -> bool:
         template = self.get_by_id(template_id)
         if template:
-            # Check if template is used by any projects
             from models.project import Project
-            project_count = self.db.query(Project).filter(Project.project_template_id == template_id).count()
+            project_count = (
+                self.db.query(Project)
+                .filter(Project.project_template_id == template_id)
+                .count()
+            )
             if project_count > 0:
-                return False  # Cannot delete, template is in use
+                return False
             self.db.delete(template)
             self.db.commit()
             return True
         return False
 
-    def clone_template(self, template_id: uuid.UUID, name: Optional[str] = None) -> Optional[ProjectTemplate]:
+    def clone_template(
+        self, template_id: uuid.UUID, name: Optional[str] = None
+    ) -> Optional[ProjectTemplate]:
         source = self.get_by_id(template_id)
         if not source:
             return None
@@ -71,30 +93,26 @@ class ProjectTemplateRepository:
         self.db.commit()
         self.db.refresh(clone)
 
-        # Clone material types
-        for material_type in self.list_material_types(template_id):
-            self.create_material_type(
-                project_template_id=clone.id,
-                name=material_type.name,
-                description=material_type.description,
-                sort_order=material_type.sort_order,
-            )
+        # id mapping from old entity_type_id -> new entity_type_id
+        entity_type_id_map: Dict[uuid.UUID, uuid.UUID] = {}
 
-        # Clone recipe types
-        for recipe_type in self.list_recipe_types(template_id):
-            self.create_recipe_type(
+        for et in self.list_entity_types(template_id):
+            new_et = self.create_entity_type(
                 project_template_id=clone.id,
-                name=recipe_type.name,
-                description=recipe_type.description,
-                sort_order=recipe_type.sort_order,
+                kind=et.kind,
+                name=et.name,
+                description=et.description,
+                sort_order=et.sort_order,
             )
+            entity_type_id_map[et.id] = new_et.id
 
-        # Clone parameter definitions
         for param_def in self.list_parameter_definitions(template_id):
+            new_entity_type_id = entity_type_id_map.get(
+                param_def.entity_type_id, param_def.entity_type_id
+            )
             self.create_parameter_definition(
                 project_template_id=clone.id,
-                owner_kind=param_def.owner_kind,
-                owner_type_id=self._map_owner_id(param_def.owner_kind, param_def.owner_type_id, template_id, clone.id),
+                entity_type_id=new_entity_type_id,
                 domain=param_def.domain,
                 key=param_def.key,
                 value_type=param_def.value_type,
@@ -110,7 +128,6 @@ class ProjectTemplateRepository:
                 validation=param_def.validation,
             )
 
-        # Clone views
         for view in self.list_views(template_id):
             new_view = self.create_view(
                 project_template_id=clone.id,
@@ -118,9 +135,15 @@ class ProjectTemplateRepository:
                 sort_order=view.sort_order,
             )
             for config in self.list_view_configs(view.id):
+                new_et_id = (
+                    entity_type_id_map.get(config.entity_type_id)
+                    if config.entity_type_id
+                    else None
+                )
                 self.create_view_config(
                     view_id=new_view.id,
-                    entity_type=config.entity_type,
+                    entity_kind=config.entity_kind,
+                    entity_type_id=new_et_id,
                     filter_params=config.filter_params,
                     slots=config.slots,
                     sort_order=config.sort_order,
@@ -128,100 +151,73 @@ class ProjectTemplateRepository:
 
         return clone
 
-    def _map_owner_id(self, owner_kind: str, old_owner_id: uuid.UUID, old_template_id: uuid.UUID, new_template_id: uuid.UUID) -> uuid.UUID:
-        """Map an owner_type_id from the source template to the cloned template."""
-        if owner_kind == "material_type":
-            old_type = self.get_material_type_by_id(old_owner_id)
-            if old_type and old_type.project_template_id == old_template_id:
-                # Find the corresponding new material type by name
-                new_types = self.list_material_types(new_template_id)
-                for new_type in new_types:
-                    if new_type.name == old_type.name:
-                        return new_type.id
-        elif owner_kind == "recipe_type":
-            old_type = self.get_recipe_type_by_id(old_owner_id)
-            if old_type and old_type.project_template_id == old_template_id:
-                # Find the corresponding new recipe type by name
-                new_types = self.list_recipe_types(new_template_id)
-                for new_type in new_types:
-                    if new_type.name == old_type.name:
-                        return new_type.id
-        return old_owner_id  # Fallback, should not happen
+    # ProjectTemplateEntityType CRUD
 
-    # ProjectTemplateMaterialType CRUD
-
-    def create_material_type(
+    def create_entity_type(
         self,
         project_template_id: uuid.UUID,
+        kind: str,
         name: str,
         description: Optional[str] = None,
         sort_order: int = 0,
-    ) -> ProjectTemplateMaterialType:
-        material_type = ProjectTemplateMaterialType(
+    ) -> ProjectTemplateEntityType:
+        entity_type = ProjectTemplateEntityType(
             project_template_id=project_template_id,
+            kind=kind,
             name=name,
             description=description,
             sort_order=sort_order,
         )
-        self.db.add(material_type)
+        self.db.add(entity_type)
         self.db.commit()
-        self.db.refresh(material_type)
-        return material_type
+        self.db.refresh(entity_type)
+        return entity_type
 
-    def get_material_type_by_id(self, material_type_id: uuid.UUID) -> Optional[ProjectTemplateMaterialType]:
-        return self.db.query(ProjectTemplateMaterialType).filter(ProjectTemplateMaterialType.id == material_type_id).first()
-
-    def list_material_types(self, project_template_id: uuid.UUID) -> List[ProjectTemplateMaterialType]:
+    def get_entity_type_by_id(
+        self, entity_type_id: uuid.UUID
+    ) -> Optional[ProjectTemplateEntityType]:
         return (
-            self.db.query(ProjectTemplateMaterialType)
-            .filter(ProjectTemplateMaterialType.project_template_id == project_template_id)
-            .order_by(ProjectTemplateMaterialType.sort_order)
-            .all()
+            self.db.query(ProjectTemplateEntityType)
+            .filter(ProjectTemplateEntityType.id == entity_type_id)
+            .first()
         )
 
-    def delete_material_type(self, material_type_id: uuid.UUID) -> bool:
-        material_type = self.get_material_type_by_id(material_type_id)
-        if material_type:
-            self.db.delete(material_type)
+    def list_entity_types(
+        self, project_template_id: uuid.UUID, kind: Optional[str] = None
+    ) -> List[ProjectTemplateEntityType]:
+        q = (
+            self.db.query(ProjectTemplateEntityType)
+            .filter(
+                ProjectTemplateEntityType.project_template_id == project_template_id
+            )
+        )
+        if kind is not None:
+            q = q.filter(ProjectTemplateEntityType.kind == kind)
+        return q.order_by(ProjectTemplateEntityType.sort_order).all()
+
+    def update_entity_type(
+        self,
+        entity_type_id: uuid.UUID,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateEntityType]:
+        entity_type = self.get_entity_type_by_id(entity_type_id)
+        if entity_type:
+            if name is not None:
+                entity_type.name = name
+            if description is not None:
+                entity_type.description = description
+            if sort_order is not None:
+                entity_type.sort_order = sort_order
             self.db.commit()
-            return True
-        return False
+            self.db.refresh(entity_type)
+        return entity_type
 
-    # ProjectTemplateRecipeType CRUD
-
-    def create_recipe_type(
-        self,
-        project_template_id: uuid.UUID,
-        name: str,
-        description: Optional[str] = None,
-        sort_order: int = 0,
-    ) -> ProjectTemplateRecipeType:
-        recipe_type = ProjectTemplateRecipeType(
-            project_template_id=project_template_id,
-            name=name,
-            description=description,
-            sort_order=sort_order,
-        )
-        self.db.add(recipe_type)
-        self.db.commit()
-        self.db.refresh(recipe_type)
-        return recipe_type
-
-    def get_recipe_type_by_id(self, recipe_type_id: uuid.UUID) -> Optional[ProjectTemplateRecipeType]:
-        return self.db.query(ProjectTemplateRecipeType).filter(ProjectTemplateRecipeType.id == recipe_type_id).first()
-
-    def list_recipe_types(self, project_template_id: uuid.UUID) -> List[ProjectTemplateRecipeType]:
-        return (
-            self.db.query(ProjectTemplateRecipeType)
-            .filter(ProjectTemplateRecipeType.project_template_id == project_template_id)
-            .order_by(ProjectTemplateRecipeType.sort_order)
-            .all()
-        )
-
-    def delete_recipe_type(self, recipe_type_id: uuid.UUID) -> bool:
-        recipe_type = self.get_recipe_type_by_id(recipe_type_id)
-        if recipe_type:
-            self.db.delete(recipe_type)
+    def delete_entity_type(self, entity_type_id: uuid.UUID) -> bool:
+        entity_type = self.get_entity_type_by_id(entity_type_id)
+        if entity_type:
+            self.db.delete(entity_type)
             self.db.commit()
             return True
         return False
@@ -231,12 +227,11 @@ class ProjectTemplateRepository:
     def create_parameter_definition(
         self,
         project_template_id: uuid.UUID,
-        owner_kind: str,
-        owner_type_id: uuid.UUID,
+        entity_type_id: uuid.UUID,
         domain: str,
         key: str,
         value_type: str,
-        label: Optional[str] = None,
+        label: str = "",
         description: Optional[str] = None,
         required: bool = False,
         sort_order: int = 0,
@@ -249,8 +244,7 @@ class ProjectTemplateRepository:
     ) -> ProjectTemplateParameterDefinition:
         param_def = ProjectTemplateParameterDefinition(
             project_template_id=project_template_id,
-            owner_kind=owner_kind,
-            owner_type_id=owner_type_id,
+            entity_type_id=entity_type_id,
             domain=domain,
             key=key,
             value_type=value_type,
@@ -270,26 +264,35 @@ class ProjectTemplateRepository:
         self.db.refresh(param_def)
         return param_def
 
-    def get_parameter_definition_by_id(self, param_def_id: uuid.UUID) -> Optional[ProjectTemplateParameterDefinition]:
-        return self.db.query(ProjectTemplateParameterDefinition).filter(ProjectTemplateParameterDefinition.id == param_def_id).first()
-
-    def list_parameter_definitions(self, project_template_id: uuid.UUID) -> List[ProjectTemplateParameterDefinition]:
+    def get_parameter_definition_by_id(
+        self, param_def_id: uuid.UUID
+    ) -> Optional[ProjectTemplateParameterDefinition]:
         return (
             self.db.query(ProjectTemplateParameterDefinition)
-            .filter(ProjectTemplateParameterDefinition.project_template_id == project_template_id)
-            .order_by(ProjectTemplateParameterDefinition.sort_order)
-            .all()
+            .filter(ProjectTemplateParameterDefinition.id == param_def_id)
+            .first()
         )
 
-    def list_parameter_definitions_by_owner(
-        self, project_template_id: uuid.UUID, owner_kind: str, owner_type_id: uuid.UUID
+    def list_parameter_definitions(
+        self, project_template_id: uuid.UUID
     ) -> List[ProjectTemplateParameterDefinition]:
         return (
             self.db.query(ProjectTemplateParameterDefinition)
             .filter(
-                ProjectTemplateParameterDefinition.project_template_id == project_template_id,
-                ProjectTemplateParameterDefinition.owner_kind == owner_kind,
-                ProjectTemplateParameterDefinition.owner_type_id == owner_type_id,
+                ProjectTemplateParameterDefinition.project_template_id
+                == project_template_id
+            )
+            .order_by(ProjectTemplateParameterDefinition.sort_order)
+            .all()
+        )
+
+    def list_parameter_definitions_by_entity_type(
+        self, entity_type_id: uuid.UUID
+    ) -> List[ProjectTemplateParameterDefinition]:
+        return (
+            self.db.query(ProjectTemplateParameterDefinition)
+            .filter(
+                ProjectTemplateParameterDefinition.entity_type_id == entity_type_id
             )
             .order_by(ProjectTemplateParameterDefinition.sort_order)
             .all()
@@ -322,12 +325,20 @@ class ProjectTemplateRepository:
         return view
 
     def get_view_by_id(self, view_id: uuid.UUID) -> Optional[ProjectTemplateView]:
-        return self.db.query(ProjectTemplateView).filter(ProjectTemplateView.id == view_id).first()
-
-    def list_views(self, project_template_id: uuid.UUID) -> List[ProjectTemplateView]:
         return (
             self.db.query(ProjectTemplateView)
-            .filter(ProjectTemplateView.project_template_id == project_template_id)
+            .filter(ProjectTemplateView.id == view_id)
+            .first()
+        )
+
+    def list_views(
+        self, project_template_id: uuid.UUID
+    ) -> List[ProjectTemplateView]:
+        return (
+            self.db.query(ProjectTemplateView)
+            .filter(
+                ProjectTemplateView.project_template_id == project_template_id
+            )
             .order_by(ProjectTemplateView.sort_order)
             .all()
         )
@@ -345,14 +356,16 @@ class ProjectTemplateRepository:
     def create_view_config(
         self,
         view_id: uuid.UUID,
-        entity_type: str,
-        slots: List[Dict[str, Any]],
+        entity_kind: Optional[str] = None,
+        entity_type_id: Optional[uuid.UUID] = None,
+        slots: Optional[List[Dict[str, Any]]] = None,
         filter_params: Optional[List[Dict[str, Any]]] = None,
         sort_order: int = 0,
     ) -> ProjectTemplateViewConfig:
         config = ProjectTemplateViewConfig(
             view_id=view_id,
-            entity_type=entity_type,
+            entity_kind=entity_kind,
+            entity_type_id=entity_type_id,
             filter_params=filter_params,
             slots=slots,
             sort_order=sort_order,
@@ -362,10 +375,18 @@ class ProjectTemplateRepository:
         self.db.refresh(config)
         return config
 
-    def get_view_config_by_id(self, config_id: uuid.UUID) -> Optional[ProjectTemplateViewConfig]:
-        return self.db.query(ProjectTemplateViewConfig).filter(ProjectTemplateViewConfig.id == config_id).first()
+    def get_view_config_by_id(
+        self, config_id: uuid.UUID
+    ) -> Optional[ProjectTemplateViewConfig]:
+        return (
+            self.db.query(ProjectTemplateViewConfig)
+            .filter(ProjectTemplateViewConfig.id == config_id)
+            .first()
+        )
 
-    def list_view_configs(self, view_id: uuid.UUID) -> List[ProjectTemplateViewConfig]:
+    def list_view_configs(
+        self, view_id: uuid.UUID
+    ) -> List[ProjectTemplateViewConfig]:
         return (
             self.db.query(ProjectTemplateViewConfig)
             .filter(ProjectTemplateViewConfig.view_id == view_id)

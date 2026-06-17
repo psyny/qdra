@@ -10,7 +10,7 @@ class ProjectRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, name: str, project_template_id: Optional[uuid.UUID] = None) -> Project:
+    def create(self, name: str, project_template_id: uuid.UUID) -> Project:
         project = Project(name=name, project_template_id=project_template_id)
         self.db.add(project)
         self.db.commit()

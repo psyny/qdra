@@ -1,62 +1,39 @@
-def test_create_material(client):
+def test_create_material(client, project_ctx):
     """Test that a material can be created."""
-    # Create a project first
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-
-    # Create a material
-    response = client.post(f"/projects/{project_id}/materials")
+    project_id = project_ctx["project_id"]
+    response = client.post(f"/projects/{project_id}/materials", json={})
     assert response.status_code == 201
     data = response.json()
     assert "id" in data
     assert data["project_id"] == project_id
+    assert data["kind"] == "material"
 
 
-def test_list_materials(client):
+def test_list_materials(client, project_ctx):
     """Test that materials can be listed."""
-    # Create a project
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-
-    # Create materials
-    client.post(f"/projects/{project_id}/materials")
-    client.post(f"/projects/{project_id}/materials")
-
-    # List materials
+    project_id = project_ctx["project_id"]
+    client.post(f"/projects/{project_id}/materials", json={})
+    client.post(f"/projects/{project_id}/materials", json={})
     response = client.get(f"/projects/{project_id}/materials")
     assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 2
+    assert len(response.json()) == 2
 
 
-def test_get_material(client):
+def test_get_material(client, project_ctx):
     """Test that a material can be retrieved."""
-    # Create a project
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-
-    # Create a material
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Get material
-    response = client.get(f"/materials/{material_id}")
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
+    response = client.get(f"/projects/{project_id}/materials/{material_id}")
     assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == material_id
+    assert response.json()["id"] == material_id
 
 
-def test_add_string_parameter(client):
+def test_add_string_parameter(client, project_ctx):
     """Test that a string parameter can be added to a material."""
-    # Create a project and material
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Add string parameter
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
     response = client.post(
-        f"/materials/{material_id}/parameters",
+        f"/projects/{project_id}/materials/{material_id}/parameters",
         json={"domain": "identity", "key": "name", "value_string": "iron_ore"},
     )
     assert response.status_code == 201
@@ -68,17 +45,12 @@ def test_add_string_parameter(client):
     assert data["value_boolean"] is None
 
 
-def test_add_number_parameter(client):
+def test_add_number_parameter(client, project_ctx):
     """Test that a number parameter can be added to a material."""
-    # Create a project and material
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Add number parameter
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
     response = client.post(
-        f"/materials/{material_id}/parameters",
+        f"/projects/{project_id}/materials/{material_id}/parameters",
         json={"domain": "stat", "key": "quality", "value_number": 78.5},
     )
     assert response.status_code == 201
@@ -90,17 +62,12 @@ def test_add_number_parameter(client):
     assert data["value_boolean"] is None
 
 
-def test_add_boolean_parameter(client):
+def test_add_boolean_parameter(client, project_ctx):
     """Test that a boolean parameter can be added to a material."""
-    # Create a project and material
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Add boolean parameter
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
     response = client.post(
-        f"/materials/{material_id}/parameters",
+        f"/projects/{project_id}/materials/{material_id}/parameters",
         json={"domain": "classification", "key": "metal", "value_boolean": True},
     )
     assert response.status_code == 201
@@ -112,44 +79,27 @@ def test_add_boolean_parameter(client):
     assert data["value_number"] is None
 
 
-def test_reject_multiple_value_columns(client):
+def test_reject_multiple_value_columns(client, project_ctx):
     """Test that multiple value columns are rejected."""
-    # Create a project and material
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Try to add parameter with multiple values
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
     response = client.post(
-        f"/materials/{material_id}/parameters",
-        json={
-            "domain": "test",
-            "key": "test",
-            "value_string": "test",
-            "value_number": 123,
-        },
+        f"/projects/{project_id}/materials/{material_id}/parameters",
+        json={"domain": "test", "key": "test", "value_string": "test", "value_number": 123},
     )
     assert response.status_code == 400
     assert "Exactly one value" in response.json()["detail"]
 
 
-def test_delete_parameter(client):
+def test_delete_parameter(client, project_ctx):
     """Test that a parameter can be deleted."""
-    # Create a project and material
-    project_response = client.post("/projects", json={"name": "Factory Test"})
-    project_id = project_response.json()["id"]
-    material_response = client.post(f"/projects/{project_id}/materials")
-    material_id = material_response.json()["id"]
-
-    # Add parameter
-    param_response = client.post(
-        f"/materials/{material_id}/parameters",
+    project_id = project_ctx["project_id"]
+    material_id = client.post(f"/projects/{project_id}/materials", json={}).json()["id"]
+    param_id = client.post(
+        f"/projects/{project_id}/materials/{material_id}/parameters",
         json={"domain": "identity", "key": "name", "value_string": "iron_ore"},
+    ).json()["id"]
+    response = client.delete(
+        f"/projects/{project_id}/materials/{material_id}/parameters/{param_id}"
     )
-    param_id = param_response.json()["id"]
-
-    # Delete parameter
-    response = client.delete(f"/parameters/{param_id}")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Parameter deleted"}
+    assert response.status_code == 204

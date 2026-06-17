@@ -2,46 +2,41 @@ import uuid
 from typing import List, Set, Optional
 from sqlalchemy.orm import Session
 
-from models.material import Material
-from models.recipe import Recipe
+from models.entity import Entity
 from models.slot import Slot, SlotKind
 from models.option import Option
-from models.parameter import Parameter
+from models.entity_parameter import EntityParameter
 from models.parameter_constraint import ParameterConstraint
 
-from repositories.material_repository import MaterialRepository
-from repositories.recipe_repository import RecipeRepository
+from repositories.entity_repository import EntityRepository
 from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
-from repositories.parameter_repository import ParameterRepository
+from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 
 from services.constraint_matcher import ConstraintMatcher
 
-from domain.state import State
 from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
 
 
 class RecipeEvaluationService:
     def __init__(self, db: Session):
         self.db = db
-        self.material_repo = MaterialRepository(db)
-        self.recipe_repo = RecipeRepository(db)
+        self.entity_repo = EntityRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
-        self.parameter_repo = ParameterRepository(db)
+        self.entity_parameter_repo = EntityParameterRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
 
     def evaluate_recipe(
         self, recipe_id: uuid.UUID, material_ids: List[uuid.UUID]
     ) -> RecipeMatchResult:
         """
-        Evaluate if a recipe can execute given a set of materials.
-        
+        Evaluate if a recipe entity can execute given a set of material entity IDs.
+
         Returns a RecipeMatchResult with success status and allocations.
         """
-        # Load recipe
-        recipe = self.recipe_repo.get_by_id(recipe_id)
+        recipe = self.entity_repo.get_by_id(recipe_id)
         if not recipe:
             return RecipeMatchResult(
                 success=False,
@@ -50,17 +45,19 @@ class RecipeEvaluationService:
                 allocations=[]
             )
 
-        # Load materials with their parameters
+        # Load material entities with their parameters
         materials = []
         material_params_map = {}
         for material_id in material_ids:
-            material = self.material_repo.get_by_id(material_id)
+            material = self.entity_repo.get_by_id(material_id)
             if material:
                 materials.append(material)
-                material_params_map[material_id] = self.parameter_repo.list_by_material(material_id)
+                material_params_map[material_id] = (
+                    self.entity_parameter_repo.list_by_entity(material_id)
+                )
 
         # Load recipe structure
-        slots = self.slot_repo.list_by_recipe(recipe_id)
+        slots = self.slot_repo.list_by_recipe_entity(recipe_id)
         
         # Track allocated materials
         allocated_materials: Set[uuid.UUID] = set()
@@ -118,7 +115,7 @@ class RecipeEvaluationService:
     def _evaluate_slot(
         self,
         slot: Slot,
-        materials: List[Material],
+        materials: List[Entity],
         material_params_map: dict,
         allocated_materials: Set[uuid.UUID]
     ) -> SlotMatchResult:
@@ -160,7 +157,7 @@ class RecipeEvaluationService:
     def _find_matching_materials(
         self,
         option: Option,
-        materials: List[Material],
+        materials: List[Entity],
         material_params_map: dict,
         allocated_materials: Set[uuid.UUID]
     ) -> List[uuid.UUID]:
@@ -188,7 +185,7 @@ class RecipeEvaluationService:
 
     def _material_matches_constraints(
         self,
-        material: Material,
+        material: Entity,
         constraints: List[ParameterConstraint],
         material_params_map: dict
     ) -> bool:

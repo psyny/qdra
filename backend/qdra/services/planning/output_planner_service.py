@@ -5,17 +5,17 @@ from typing import List, Set, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
-from models.recipe import Recipe
+from models.entity import Entity
 from models.slot import Slot, SlotKind
 from models.option import Option
 from models.parameter_constraint import ParameterConstraint
 
-from repositories.recipe_repository import RecipeRepository
+from repositories.entity_repository import EntityRepository
 from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
-from repositories.recipe_parameter_repository import RecipeParameterRepository
+from repositories.entity_parameter_repository import EntityParameterRepository
 
 from domain.planning.output_planner import (
     PlanningRequest,
@@ -65,12 +65,12 @@ class PlanningState:
 class PlanningService:
     def __init__(self, db: Session):
         self.db = db
-        self.recipe_repo = RecipeRepository(db)
+        self.entity_repo = EntityRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
         self.project_repo = ProjectRepository(db)
-        self.recipe_param_repo = RecipeParameterRepository(db)
+        self.entity_param_repo = EntityParameterRepository(db)
         self.summary_service = PlanSummaryService()
         self.ranking_service = PlanRankingService()
         self.memoization_cache = PlannerMemoizationCache()
@@ -84,8 +84,8 @@ class PlanningService:
         if not project:
             return PlanningResponse(success=False, plans=[])
         
-        # Get all recipes in project
-        recipes = self.recipe_repo.list_by_project(request.project_id)
+        # Get all recipe entities in project
+        recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
         
         # Pre-load recipe structures for efficiency
         recipe_structures = {}
@@ -95,7 +95,7 @@ class PlanningService:
         # Load recipe params if needed for forbidden_recipe_matching
         recipe_params = {}
         if request.domain_constraints.forbidden_recipe_matching:
-            recipe_params = self._load_recipe_params([r.id for r in recipes])
+            recipe_params = self._load_entity_params([r.id for r in recipes])
         
         # Find candidate plans
         plans = []
@@ -162,7 +162,7 @@ class PlanningService:
     
     def _load_recipe_structure(self, recipe_id: uuid.UUID) -> Dict:
         """Load complete recipe structure."""
-        slots = self.slot_repo.list_by_recipe(recipe_id)
+        slots = self.slot_repo.list_by_recipe_entity(recipe_id)
         structure = {
             "recipe_id": recipe_id,
             "slots": []
@@ -426,11 +426,32 @@ class PlanningService:
         
         return root_reqs
     
+    def _load_entity_params(
+        self, entity_ids: List[uuid.UUID]
+    ) -> Dict[uuid.UUID, List[ParameterConstraintSpec]]:
+        """Load entity parameters as ParameterConstraintSpec for forbidden_recipe_matching."""
+        result: Dict[uuid.UUID, List[ParameterConstraintSpec]] = {}
+        for eid in entity_ids:
+            params = self.entity_param_repo.list_by_entity(eid)
+            result[eid] = [
+                ParameterConstraintSpec(
+                    domain=p.domain,
+                    key=p.key,
+                    operator="=",
+                    value_string=p.value_string,
+                    value_number=p.value_number,
+                    value_boolean=p.value_boolean,
+                )
+                for p in params
+            ]
+        return result
+
     def _find_producer_recipes(
         self,
         constraints: List[ParameterConstraintSpec],
         recipe_structures: Dict[uuid.UUID, Dict],
-        forbidden_recipe_ids: List[uuid.UUID]
+        forbidden_recipe_ids: List[uuid.UUID],
+        recipe_params: Optional[Dict[uuid.UUID, List[ParameterConstraintSpec]]] = None,
     ) -> List[Tuple[uuid.UUID, Dict]]:
         """Find recipes that can produce materials matching constraints."""
         producers = []
