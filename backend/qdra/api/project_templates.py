@@ -52,22 +52,10 @@ class EntityTypeUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     sort_order: Optional[int] = None
-
-
-class EntityTypeResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    project_template_id: uuid.UUID
-    kind: str
-    name: str
-    description: Optional[str]
-    sort_order: int
-    created_at: datetime
-    updated_at: datetime
+    # kind is immutable - not included in update
 
 
 class ParameterDefinitionCreate(BaseModel):
-    entity_type_id: uuid.UUID
     domain: str
     key: str
     value_type: str
@@ -103,6 +91,51 @@ class ParameterDefinitionResponse(BaseModel):
     validation: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
+
+
+class ParameterDefinitionUpdate(BaseModel):
+    domain: Optional[str] = None
+    key: Optional[str] = None
+    value_type: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    required: Optional[bool] = None
+    sort_order: Optional[int] = None
+    is_label: Optional[bool] = None
+    is_unique: Optional[bool] = None
+    is_searchable: Optional[bool] = None
+    is_hidden: Optional[bool] = None
+    default_value: Optional[str] = None
+    validation: Optional[Dict[str, Any]] = None
+
+
+class EntityTypeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    project_template_id: uuid.UUID
+    kind: str
+    name: str
+    description: Optional[str]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    parameter_definitions: List[ParameterDefinitionResponse] = []
+
+
+class ParameterDefinitionUpdate(BaseModel):
+    domain: Optional[str] = None
+    key: Optional[str] = None
+    value_type: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    required: Optional[bool] = None
+    sort_order: Optional[int] = None
+    is_label: Optional[bool] = None
+    is_unique: Optional[bool] = None
+    is_searchable: Optional[bool] = None
+    is_hidden: Optional[bool] = None
+    default_value: Optional[str] = None
+    validation: Optional[Dict[str, Any]] = None
 
 
 class ViewCreate(BaseModel):
@@ -257,13 +290,19 @@ def create_entity_type(
     repo = ProjectTemplateRepository(db)
     if not repo.get_by_id(project_template_id):
         raise HTTPException(status_code=404, detail="Project template not found")
-    return repo.create_entity_type(
+    if data.kind not in ("material", "recipe"):
+        raise HTTPException(status_code=400, detail="kind must be one of: material, recipe")
+    entity_type = repo.create_entity_type(
         project_template_id=project_template_id,
         kind=data.kind,
         name=data.name,
         description=data.description,
         sort_order=data.sort_order,
     )
+    # Return with empty parameter definitions
+    et_response = EntityTypeResponse.model_validate(entity_type)
+    et_response.parameter_definitions = []
+    return et_response
 
 
 @router.get("/project-templates/{project_template_id}/entity-types", response_model=List[EntityTypeResponse])
@@ -275,7 +314,85 @@ def list_entity_types(
     repo = ProjectTemplateRepository(db)
     if not repo.get_by_id(project_template_id):
         raise HTTPException(status_code=404, detail="Project template not found")
-    return repo.list_entity_types(project_template_id, kind=kind)
+    entity_types = repo.list_entity_types(project_template_id, kind=kind)
+    # Attach parameter definitions to each entity type
+    result = []
+    for et in entity_types:
+        param_defs = repo.list_parameter_definitions_by_entity_type(et.id)
+        et_response = EntityTypeResponse.model_validate(et)
+        et_response.parameter_definitions = [ParameterDefinitionResponse.model_validate(pd) for pd in param_defs]
+        result.append(et_response)
+    return result
+
+
+@router.get(
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}",
+    response_model=EntityTypeResponse,
+)
+def get_entity_type(
+    project_template_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    et = repo.get_entity_type_by_id(entity_type_id)
+    if not et or et.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    param_defs = repo.list_parameter_definitions_by_entity_type(entity_type_id)
+    et_response = EntityTypeResponse.model_validate(et)
+    et_response.parameter_definitions = [ParameterDefinitionResponse.model_validate(pd) for pd in param_defs]
+    return et_response
+
+
+@router.post(
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}/clone",
+    response_model=EntityTypeResponse,
+)
+def clone_entity_type(
+    project_template_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    source = repo.get_entity_type_by_id(entity_type_id)
+    if not source or source.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    
+    # Clone with "Copy" suffix
+    clone_name = f"{source.name} Copy"
+    cloned = repo.create_entity_type(
+        project_template_id=project_template_id,
+        kind=source.kind,
+        name=clone_name,
+        description=source.description,
+        sort_order=source.sort_order,
+    )
+    
+    # Clone parameter definitions
+    for param_def in repo.list_parameter_definitions_by_entity_type(entity_type_id):
+        repo.create_parameter_definition(
+            project_template_id=project_template_id,
+            entity_type_id=cloned.id,
+            domain=param_def.domain,
+            key=param_def.key,
+            value_type=param_def.value_type,
+            label=param_def.label,
+            description=param_def.description,
+            required=param_def.required,
+            sort_order=param_def.sort_order,
+            is_label=param_def.is_label,
+            is_unique=param_def.is_unique,
+            is_searchable=param_def.is_searchable,
+            is_hidden=param_def.is_hidden,
+            default_value=param_def.default_value,
+            validation=param_def.validation,
+        )
+    
+    # Return with parameter definitions
+    param_defs = repo.list_parameter_definitions_by_entity_type(cloned.id)
+    cloned_response = EntityTypeResponse.model_validate(cloned)
+    cloned_response.parameter_definitions = [ParameterDefinitionResponse.model_validate(pd) for pd in param_defs]
+    return cloned_response
 
 
 @router.put(
@@ -297,7 +414,11 @@ def update_entity_type(
     )
     if not et:
         raise HTTPException(status_code=404, detail="Entity type not found")
-    return et
+    # Return with parameter definitions
+    param_defs = repo.list_parameter_definitions_by_entity_type(entity_type_id)
+    et_response = EntityTypeResponse.model_validate(et)
+    et_response.parameter_definitions = [ParameterDefinitionResponse.model_validate(pd) for pd in param_defs]
+    return et_response
 
 
 @router.delete(
@@ -310,6 +431,12 @@ def delete_entity_type(
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
+    # Check if entity type is used by runtime entities
+    if repo.is_entity_type_used_by_entities(entity_type_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete entity type: it is used by existing entities."
+        )
     if not repo.delete_entity_type(entity_type_id):
         raise HTTPException(status_code=404, detail="Entity type not found")
 
@@ -317,22 +444,25 @@ def delete_entity_type(
 # Parameter definitions
 
 @router.post(
-    "/project-templates/{project_template_id}/parameter-definitions",
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}/parameter-definitions",
     response_model=ParameterDefinitionResponse,
 )
 def create_parameter_definition(
     project_template_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
     data: ParameterDefinitionCreate,
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
     if not repo.get_by_id(project_template_id):
         raise HTTPException(status_code=404, detail="Project template not found")
-    if data.value_type not in ("string", "integer", "float", "boolean"):
-        raise HTTPException(status_code=400, detail="value_type must be one of: string, integer, float, boolean")
+    if not repo.get_entity_type_by_id(entity_type_id):
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    if data.value_type not in ("string", "number", "boolean"):
+        raise HTTPException(status_code=400, detail="value_type must be one of: string, number, boolean")
     return repo.create_parameter_definition(
         project_template_id=project_template_id,
-        entity_type_id=data.entity_type_id,
+        entity_type_id=entity_type_id,
         domain=data.domain,
         key=data.key,
         value_type=data.value_type,
@@ -349,17 +479,72 @@ def create_parameter_definition(
     )
 
 
+@router.get(
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}/parameter-definitions",
+    response_model=List[ParameterDefinitionResponse],
+)
+def list_parameter_definitions_by_entity_type(
+    project_template_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    if not repo.get_entity_type_by_id(entity_type_id):
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    return repo.list_parameter_definitions_by_entity_type(entity_type_id)
+
+
+@router.patch(
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}/parameter-definitions/{definition_id}",
+    response_model=ParameterDefinitionResponse,
+)
+def update_parameter_definition(
+    project_template_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    definition_id: uuid.UUID,
+    data: ParameterDefinitionUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    param_def = repo.update_parameter_definition(
+        definition_id=definition_id,
+        domain=data.domain,
+        key=data.key,
+        value_type=data.value_type,
+        label=data.label,
+        description=data.description,
+        required=data.required,
+        sort_order=data.sort_order,
+        is_label=data.is_label,
+        is_unique=data.is_unique,
+        is_searchable=data.is_searchable,
+        is_hidden=data.is_hidden,
+        default_value=data.default_value,
+        validation=data.validation,
+    )
+    if not param_def:
+        raise HTTPException(status_code=404, detail="Parameter definition not found")
+    return param_def
+
+
 @router.delete(
-    "/project-templates/{project_template_id}/parameter-definitions/{param_def_id}",
+    "/project-templates/{project_template_id}/entity-types/{entity_type_id}/parameter-definitions/{definition_id}",
     status_code=204,
 )
 def delete_parameter_definition(
     project_template_id: uuid.UUID,
-    param_def_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    definition_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
-    if not repo.delete_parameter_definition(param_def_id):
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    if not repo.delete_parameter_definition(definition_id):
         raise HTTPException(status_code=404, detail="Parameter definition not found")
 
 

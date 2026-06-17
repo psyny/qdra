@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getTemplate, createTemplate, updateTemplate } from '../api/templates';
 import { ProjectTemplateDraft, ProjectTemplateDetail } from '../types/template';
+import { EntityTypeEditor } from '../components/EntityTypeEditor';
 
 export function TemplateEditorPage() {
   const { templateId } = useParams<{ templateId?: string }>();
@@ -141,10 +142,7 @@ export function TemplateEditorPage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: '24px' }}>
-        <h2 className="card-title">Entity Types</h2>
-        <p className="card-description">Define entity types (materials, recipes, etc.) and their parameter definitions. (Coming soon)</p>
-      </div>
+      {templateId && <EntityTypeEditor templateId={templateId} />}
 
       <div className="card" style={{ marginTop: '24px' }}>
         <h2 className="card-title">Entity Views</h2>

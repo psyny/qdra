@@ -80,6 +80,12 @@ export async function cloneTemplate(templateId: string, payload: CloneTemplateRe
   return response.json();
 }
 
+export async function getEntityType(templateId: string, entityTypeId: string): Promise<EntityType> {
+  const response = await fetch(`${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}`);
+  if (!response.ok) throw new Error('Failed to fetch entity type');
+  return response.json();
+}
+
 export async function listEntityTypes(templateId: string, kind?: string): Promise<EntityType[]> {
   const url = kind
     ? `${API_URL}/project-templates/${templateId}/entity-types?kind=${kind}`
@@ -110,7 +116,7 @@ export async function updateEntityType(
   const response = await fetch(
     `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     },
@@ -124,25 +130,38 @@ export async function deleteEntityType(templateId: string, entityTypeId: string)
     `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}`,
     { method: 'DELETE' },
   );
-  if (!response.ok) throw new Error('Failed to delete entity type');
+  if (!response.ok) {
+    if (response.status === 409) {
+      throw new Error('Cannot delete entity type because it is used by existing entities.');
+    }
+    throw new Error('Failed to delete entity type');
+  }
+}
+
+export async function cloneEntityType(templateId: string, entityTypeId: string): Promise<EntityType> {
+  const response = await fetch(
+    `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}/clone`,
+    { method: 'POST' },
+  );
+  if (!response.ok) throw new Error('Failed to clone entity type');
+  return response.json();
 }
 
 export async function listParameterDefinitions(
   templateId: string,
-  entityTypeId?: string,
+  entityTypeId: string,
 ): Promise<ParameterDefinition[]> {
-  const url = entityTypeId
-    ? `${API_URL}/project-templates/${templateId}/parameter-definitions?entity_type_id=${entityTypeId}`
-    : `${API_URL}/project-templates/${templateId}/parameter-definitions`;
-  const response = await fetch(url);
+  const response = await fetch(
+    `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions`,
+  );
   if (!response.ok) throw new Error('Failed to fetch parameter definitions');
   return response.json();
 }
 
 export async function createParameterDefinition(
   templateId: string,
+  entityTypeId: string,
   payload: {
-    entity_type_id: string;
     domain: string;
     key: string;
     value_type: string;
@@ -159,7 +178,7 @@ export async function createParameterDefinition(
   },
 ): Promise<ParameterDefinition> {
   const response = await fetch(
-    `${API_URL}/project-templates/${templateId}/parameter-definitions`,
+    `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -170,12 +189,45 @@ export async function createParameterDefinition(
   return response.json();
 }
 
+export async function updateParameterDefinition(
+  templateId: string,
+  entityTypeId: string,
+  definitionId: string,
+  payload: {
+    domain?: string;
+    key?: string;
+    value_type?: string;
+    label?: string;
+    description?: string | null;
+    required?: boolean;
+    sort_order?: number;
+    is_label?: boolean;
+    is_unique?: boolean;
+    is_searchable?: boolean;
+    is_hidden?: boolean;
+    default_value?: string | null;
+    validation?: Record<string, unknown> | null;
+  },
+): Promise<ParameterDefinition> {
+  const response = await fetch(
+    `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions/${definitionId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  );
+  if (!response.ok) throw new Error('Failed to update parameter definition');
+  return response.json();
+}
+
 export async function deleteParameterDefinition(
   templateId: string,
-  paramDefId: string,
+  entityTypeId: string,
+  definitionId: string,
 ): Promise<void> {
   const response = await fetch(
-    `${API_URL}/project-templates/${templateId}/parameter-definitions/${paramDefId}`,
+    `${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions/${definitionId}`,
     { method: 'DELETE' },
   );
   if (!response.ok) throw new Error('Failed to delete parameter definition');

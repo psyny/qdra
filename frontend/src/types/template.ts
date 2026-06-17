@@ -31,6 +31,7 @@ export type EntityType = {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  parameter_definitions: ParameterDefinition[];
 };
 
 export type ParameterDefinition = {

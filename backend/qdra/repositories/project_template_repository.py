@@ -222,6 +222,16 @@ class ProjectTemplateRepository:
             return True
         return False
 
+    def is_entity_type_used_by_entities(self, entity_type_id: uuid.UUID) -> bool:
+        """Check if an entity type is used by any runtime entities."""
+        from models.entity import Entity
+        count = (
+            self.db.query(Entity)
+            .filter(Entity.entity_type_id == entity_type_id)
+            .count()
+        )
+        return count > 0
+
     # ProjectTemplateParameterDefinition CRUD
 
     def create_parameter_definition(
@@ -305,6 +315,55 @@ class ProjectTemplateRepository:
             self.db.commit()
             return True
         return False
+
+    def update_parameter_definition(
+        self,
+        definition_id: uuid.UUID,
+        domain: Optional[str] = None,
+        key: Optional[str] = None,
+        value_type: Optional[str] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        required: Optional[bool] = None,
+        sort_order: Optional[int] = None,
+        is_label: Optional[bool] = None,
+        is_unique: Optional[bool] = None,
+        is_searchable: Optional[bool] = None,
+        is_hidden: Optional[bool] = None,
+        default_value: Optional[str] = None,
+        validation: Optional[Dict[str, Any]] = None,
+    ) -> Optional[ProjectTemplateParameterDefinition]:
+        param_def = self.get_parameter_definition_by_id(definition_id)
+        if param_def:
+            if domain is not None:
+                param_def.domain = domain
+            if key is not None:
+                param_def.key = key
+            if value_type is not None:
+                param_def.value_type = value_type
+            if label is not None:
+                param_def.label = label
+            if description is not None:
+                param_def.description = description
+            if required is not None:
+                param_def.required = required
+            if sort_order is not None:
+                param_def.sort_order = sort_order
+            if is_label is not None:
+                param_def.is_label = is_label
+            if is_unique is not None:
+                param_def.is_unique = is_unique
+            if is_searchable is not None:
+                param_def.is_searchable = is_searchable
+            if is_hidden is not None:
+                param_def.is_hidden = is_hidden
+            if default_value is not None:
+                param_def.default_value = default_value
+            if validation is not None:
+                param_def.validation = validation
+            self.db.commit()
+            self.db.refresh(param_def)
+        return param_def
 
     # ProjectTemplateView CRUD
 
