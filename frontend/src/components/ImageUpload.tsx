@@ -52,14 +52,16 @@ export function ImageUpload({
         setImageDimensions({ width: img.width, height: img.height });
         setEditingImage(e.target?.result as string);
         
-        // Calculate initial scale to fit the whole image in the editor
-        const maxDimension = Math.max(img.width, img.height);
-        const initialScale = editorSize / maxDimension;
+        // Calculate scale based on smallest dimension to fill the target square
+        const minDimension = Math.min(img.width, img.height);
+        const initialScale = targetSize / minDimension;
         setScale(initialScale);
         
-        // Center the image in the editor
+        // Center the image so the smallest dimension fills the target square
         const scaledWidth = img.width * initialScale;
         const scaledHeight = img.height * initialScale;
+        
+        // Position to center the image in the editor
         const initialX = (editorSize - scaledWidth) / 2;
         const initialY = (editorSize - scaledHeight) / 2;
         setPosition({ x: initialX, y: initialY });
