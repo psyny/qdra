@@ -62,7 +62,6 @@ export function SlotDefinitionsPage() {
   
   const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
   const [editingGroup, setEditingGroup] = useState<SlotGroup | null>(null);
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   
   const [groupForm, setGroupForm] = useState({
     kind: 'consumes',
@@ -502,13 +501,10 @@ export function SlotDefinitionsPage() {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => setExpandedGroup(expandedGroup === group.id ? null : group.id)} className="button button--secondary" style={{ fontSize: '12px' }}>
-                  {expandedGroup === group.id ? 'Collapse' : 'Expand'}
-                </button>
-                <button onClick={() => startEditGroup(group)} className="button button--secondary" style={{ fontSize: '12px' }}>
+                <button onClick={() => startEditGroup(group)} className="button button--secondary">
                   Edit
                 </button>
-                <button onClick={() => handleDeleteGroup(group.id)} className="button button--secondary" style={{ fontSize: '12px', color: '#c33' }}>
+                <button onClick={() => handleDeleteGroup(group.id)} className="button button--danger">
                   Delete
                 </button>
               </div>
@@ -556,12 +552,11 @@ export function SlotDefinitionsPage() {
               </div>
             )}
 
-            {expandedGroup === group.id && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid #ddd', paddingTop: '12px' }}>
+            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h4 style={{ margin: 0 }}>Default Constraints</h4>
-                    <button onClick={() => startCreateConstraint('group', group.id)} className="button button--primary" style={{ fontSize: '12px' }}>
+                    <button onClick={() => startCreateConstraint('group', group.id)} className="button button--primary">
                       Add Constraint
                     </button>
                   </div>
@@ -572,8 +567,8 @@ export function SlotDefinitionsPage() {
                       {group.constraints.map((constraint) => (
                         <li key={constraint.id} style={{ marginBottom: '4px' }}>
                           <span>{getConstraintDisplay(constraint)}</span>
-                          <button onClick={() => startEditConstraint(constraint)} style={{ marginLeft: '8px', fontSize: '11px' }}>Edit</button>
-                          <button onClick={() => handleDeleteConstraint(constraint.id)} style={{ marginLeft: '4px', fontSize: '11px', color: '#c33' }}>Delete</button>
+                          <button onClick={() => startEditConstraint(constraint)} className="button button--secondary" style={{ marginLeft: '8px' }}>Edit</button>
+                          <button onClick={() => handleDeleteConstraint(constraint.id)} className="button button--danger" style={{ marginLeft: '4px' }}>Delete</button>
                         </li>
                       ))}
                     </ul>
@@ -583,7 +578,7 @@ export function SlotDefinitionsPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <h4 style={{ margin: 0 }}>Slot Definitions</h4>
-                    <button onClick={() => { setShowDefinitionForm(true); setEditingDefinition(null); }} className="button button--primary" style={{ fontSize: '12px' }}>
+                    <button onClick={() => { setShowDefinitionForm(true); setEditingDefinition(null); }} className="button button--primary">
                       Add Slot Definition
                     </button>
                   </div>
@@ -600,8 +595,8 @@ export function SlotDefinitionsPage() {
                             </span>
                           </div>
                           <div style={{ display: 'flex', gap: '4px' }}>
-                            <button onClick={() => startEditDefinition(def)} style={{ fontSize: '11px' }}>Edit</button>
-                            <button onClick={() => handleDeleteDefinition(def.id)} style={{ fontSize: '11px', color: '#c33' }}>Delete</button>
+                            <button onClick={() => startEditDefinition(def)} className="button button--secondary">Edit</button>
+                            <button onClick={() => handleDeleteDefinition(def.id)} className="button button--danger">Delete</button>
                           </div>
                         </div>
                         {def.constraints.length > 0 && (
@@ -611,14 +606,14 @@ export function SlotDefinitionsPage() {
                               {def.constraints.map((constraint) => (
                                 <li key={constraint.id}>
                                   {getConstraintDisplay(constraint)}
-                                  <button onClick={() => startEditConstraint(constraint)} style={{ marginLeft: '8px', fontSize: '11px' }}>Edit</button>
-                                  <button onClick={() => handleDeleteConstraint(constraint.id)} style={{ marginLeft: '4px', fontSize: '11px', color: '#c33' }}>Delete</button>
+                                  <button onClick={() => startEditConstraint(constraint)} className="button button--secondary" style={{ marginLeft: '8px' }}>Edit</button>
+                                  <button onClick={() => handleDeleteConstraint(constraint.id)} className="button button--danger" style={{ marginLeft: '4px' }}>Delete</button>
                                 </li>
                               ))}
                             </ul>
                           </div>
                         )}
-                        <button onClick={() => startCreateConstraint('definition', def.id)} style={{ marginTop: '8px', fontSize: '11px' }}>
+                        <button onClick={() => startCreateConstraint('definition', def.id)} className="button button--primary" style={{ marginTop: '8px' }}>
                           Add Constraint
                         </button>
                       </div>
@@ -669,7 +664,6 @@ export function SlotDefinitionsPage() {
                   </div>
                 )}
               </div>
-            )}
           </div>
         );
       })}

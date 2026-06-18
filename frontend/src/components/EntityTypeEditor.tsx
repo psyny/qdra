@@ -385,7 +385,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
               {et.description && <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px' }}>{et.description}</p>}
               {et.kind === 'recipe' && (
                 <p style={{ margin: '8px 0 0 0', color: '#666', fontSize: '13px', fontStyle: 'italic' }}>
-                  Recipes can define runtime slots: consumes, requires, and produces. Slot editing happens when editing actual recipe entities, not here.
+                  
                 </p>
               )}
             </div>
