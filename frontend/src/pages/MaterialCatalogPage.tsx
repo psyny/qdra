@@ -85,10 +85,6 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     loadEntities();
   }, [projectId, selectedConfig]);
 
-  const filteredEntities = searchQuery
-    ? entities.filter((e: Entity) => e.id.toLowerCase().includes(searchQuery.toLowerCase()))
-    : entities;
-
   // Helper to resolve display slot value from entity parameters
   const getDisplaySlotValue = (entity: Entity, slotIndex: number): string => {
     const displaySlots = selectedConfig?.display_slots;
@@ -101,7 +97,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
       return '';
     }
 
-    const source = (slot as any).source;
+    const source = (slot as any).source || 'parameter'; // Default to 'parameter' if not specified
     const domain = (slot as any).domain;
     const key = (slot as any).key;
 
@@ -129,6 +125,35 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
 
     return '';
   };
+
+  // Helper to get display slot label from parameter definitions
+  const getDisplaySlotLabel = (slotIndex: number): string => {
+    const displaySlots = selectedConfig?.display_slots;
+    if (!displaySlots || !Array.isArray(displaySlots) || slotIndex >= displaySlots.length) {
+      return '';
+    }
+
+    const slot = displaySlots[slotIndex];
+    if (!slot || typeof slot !== 'object') {
+      return '';
+    }
+
+    const key = (slot as any).key;
+    return key || '';
+  };
+
+  const filteredEntities = searchQuery
+    ? entities.filter((e: Entity) => {
+        const slot0 = getDisplaySlotValue(e, 0);
+        const slot1 = getDisplaySlotValue(e, 1);
+        const searchLower = searchQuery.toLowerCase();
+        return (
+          slot0.toLowerCase().includes(searchLower) ||
+          slot1.toLowerCase().includes(searchLower) ||
+          e.id.toLowerCase().includes(searchLower)
+        );
+      })
+    : entities;
 
   const handleDeleteClick = (entity: Entity) => {
     setDeleteConfirmEntity(entity);
@@ -249,23 +274,43 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
       ) : (
         <div className="project-grid">
           {filteredEntities.map((entity: Entity) => (
-            <div key={entity.id} className="card project-card">
-              <h3 className="project-card__title">{getDisplaySlotValue(entity, 0) || entity.id}</h3>
-              <p className="project-card__description">{getDisplaySlotValue(entity, 1) || entity.kind}</p>
-              <div className="project-card__actions">
-                <Link
-                  to={`/projects/${projectId}/materials/${entity.id}/edit?configId=${selectedConfig?.id}`}
-                  className="button button--secondary"
-                >
-                  Edit
-                </Link>
-                <button
-                  onClick={() => handleDeleteClick(entity)}
-                  className="button button--danger"
-                >
-                  Delete
-                </button>
+            <div key={entity.id} className="card material-card">
+              <div className="material-catalog-card__info-region">
+                <div className="material-catalog-card__title-region">
+                  <h3 className="material-catalog-card__title">{getDisplaySlotValue(entity, 0) || '<title>'}</h3>
+                  <p className="material-catalog-card__subtitle">{getDisplaySlotValue(entity, 1) || '<subtitle>'}</p>
+                </div>
+                <div className="material-catalog-card__data-region">
+                  {[2, 3, 4].map((slotIndex) => {
+                    const label = getDisplaySlotLabel(slotIndex);
+                    const value = getDisplaySlotValue(entity, slotIndex);
+                    if (!label && !value) return null;
+                    return (
+                      <div key={slotIndex} className="material-catalog-card__data-row">
+                        <span className="material-catalog-card__data-label">{label || ''}:</span>
+                        <span className="material-catalog-card__data-value">{value || ''}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="material-catalog-card__actions">
+                  <Link
+                    to={`/projects/${projectId}/materials/${entity.id}/edit?configId=${selectedConfig?.id}`}
+                    className="button button--secondary"
+                    style={{ padding: '1px 4px', fontSize: '10px' }}
+                  >
+                    Edit
+                  </Link>
+                  <button
+                    onClick={() => handleDeleteClick(entity)}
+                    className="button button--danger"
+                    style={{ padding: '1px 4px', fontSize: '10px' }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
+              <div className="material-catalog-card__image-region" />
             </div>
           ))}
         </div>
