@@ -393,3 +393,71 @@
 .parameter-row__label {
   padding: 0 4px;
 }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  backdrop-filter: blur(8px);
+}
+
+.modal__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.modal__description {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.modal__input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--field-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-small);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.modal__input:focus {
+  outline: none;
+  border-color: var(--field-focus-border);
+}
+
+.modal__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

@@ -80,6 +80,28 @@ export async function cloneTemplate(templateId: string, payload: CloneTemplateRe
   return response.json();
 }
 
+export async function exportTemplate(templateId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/project-templates/${templateId}/export`);
+  if (!response.ok) {
+    throw new Error('Failed to export template');
+  }
+  return response.json();
+}
+
+export async function importTemplate(data: any): Promise<ProjectTemplate> {
+  const response = await fetch(`${API_URL}/project-templates/import`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ data }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to import template');
+  }
+  return response.json();
+}
+
 export async function getEntityType(templateId: string, entityTypeId: string): Promise<EntityType> {
   const response = await fetch(`${API_URL}/project-templates/${templateId}/entity-types/${entityTypeId}`);
   if (!response.ok) throw new Error('Failed to fetch entity type');

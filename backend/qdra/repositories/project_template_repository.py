@@ -75,6 +75,76 @@ class ProjectTemplateRepository:
             )
             if project_count > 0:
                 return False
+            
+            # Delete related records in order of dependencies
+            # Delete view configs
+            self.db.query(ProjectTemplateViewConfig).filter(
+                ProjectTemplateViewConfig.view_id.in_(
+                    self.db.query(ProjectTemplateView.id).filter(
+                        ProjectTemplateView.project_template_id == template_id
+                    )
+                )
+            ).delete(synchronize_session=False)
+            
+            # Delete views
+            self.db.query(ProjectTemplateView).filter(
+                ProjectTemplateView.project_template_id == template_id
+            ).delete(synchronize_session=False)
+            
+            # Delete slot constraints
+            self.db.query(ProjectTemplateSlotConstraint).filter(
+                ProjectTemplateSlotConstraint.slot_definition_id.in_(
+                    self.db.query(ProjectTemplateSlotDefinition.id).filter(
+                        ProjectTemplateSlotDefinition.slot_group_id.in_(
+                            self.db.query(ProjectTemplateSlotGroup.id).filter(
+                                ProjectTemplateSlotGroup.entity_type_id.in_(
+                                    self.db.query(ProjectTemplateEntityType.id).filter(
+                                        ProjectTemplateEntityType.project_template_id == template_id
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            ).delete(synchronize_session=False)
+            
+            # Delete slot definitions
+            self.db.query(ProjectTemplateSlotDefinition).filter(
+                ProjectTemplateSlotDefinition.slot_group_id.in_(
+                    self.db.query(ProjectTemplateSlotGroup.id).filter(
+                        ProjectTemplateSlotGroup.entity_type_id.in_(
+                            self.db.query(ProjectTemplateEntityType.id).filter(
+                                ProjectTemplateEntityType.project_template_id == template_id
+                            )
+                        )
+                    )
+                )
+            ).delete(synchronize_session=False)
+            
+            # Delete slot groups
+            self.db.query(ProjectTemplateSlotGroup).filter(
+                ProjectTemplateSlotGroup.entity_type_id.in_(
+                    self.db.query(ProjectTemplateEntityType.id).filter(
+                        ProjectTemplateEntityType.project_template_id == template_id
+                    )
+                )
+            ).delete(synchronize_session=False)
+            
+            # Delete parameter definitions
+            self.db.query(ProjectTemplateParameterDefinition).filter(
+                ProjectTemplateParameterDefinition.entity_type_id.in_(
+                    self.db.query(ProjectTemplateEntityType.id).filter(
+                        ProjectTemplateEntityType.project_template_id == template_id
+                    )
+                )
+            ).delete(synchronize_session=False)
+            
+            # Delete entity types
+            self.db.query(ProjectTemplateEntityType).filter(
+                ProjectTemplateEntityType.project_template_id == template_id
+            ).delete(synchronize_session=False)
+            
+            # Delete the template
             self.db.delete(template)
             self.db.commit()
             return True

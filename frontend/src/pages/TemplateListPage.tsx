@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getTemplates, deleteTemplate, cloneTemplate } from '../api/templates';
+import { getTemplates, deleteTemplate, cloneTemplate, exportTemplate, importTemplate } from '../api/templates';
 import { ProjectTemplate, CloneTemplateRequest } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 
@@ -12,8 +12,11 @@ export function TemplateListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCloning, setIsCloning] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -65,6 +68,43 @@ export function TemplateListPage() {
     }
   };
 
+  const handleExportTemplate = async (templateId: string) => {
+    setIsExporting(templateId);
+    setActionError(null);
+    try {
+      const data = await exportTemplate(templateId);
+      const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `template-${templateId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError('Could not export template');
+    } finally {
+      setIsExporting(null);
+    }
+  };
+
+  const handleImportTemplate = async (file: File) => {
+    setIsImporting(true);
+    setActionError(null);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await importTemplate(data);
+      await loadTemplates();
+      setShowImportDialog(false);
+    } catch (err) {
+      setActionError('Could not import template');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const filteredTemplates = templates.filter((template) => {
     const query = searchQuery.toLowerCase();
     return (
@@ -90,6 +130,9 @@ export function TemplateListPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
+          <button onClick={() => setShowImportDialog(true)} className="button button--secondary">
+            Import Template
+          </button>
           <button onClick={handleCreateTemplate} className="button button--primary page-actions__create">
             Create Template
           </button>
@@ -157,6 +200,13 @@ export function TemplateListPage() {
                   >
                     {isCloning === template.id ? 'Cloning...' : 'Clone'}
                   </button>
+                  <button
+                    onClick={() => handleExportTemplate(template.id)}
+                    disabled={isExporting === template.id}
+                    className="button button--secondary"
+                  >
+                    {isExporting === template.id ? 'Exporting...' : 'Export'}
+                  </button>
                   {deleteConfirm === template.id ? (
                     <>
                       <button
@@ -187,6 +237,36 @@ export function TemplateListPage() {
           </div>
         )}
       </div>
+
+      {showImportDialog && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h2 className="modal__title">Import Template</h2>
+            <p className="modal__description">Select a JSON file to import a template.</p>
+            <input
+              type="file"
+              accept=".json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  handleImportTemplate(file);
+                }
+              }}
+              disabled={isImporting}
+              className="modal__input"
+            />
+            <div className="modal__actions">
+              <button
+                onClick={() => setShowImportDialog(false)}
+                disabled={isImporting}
+                className="button button--secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
