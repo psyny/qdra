@@ -266,6 +266,7 @@ class ProjectTemplateDetailResponse(BaseModel):
 
 class TemplateImportRequest(BaseModel):
     data: Dict[str, Any]
+    name: Optional[str] = None
 
 
 class TemplateExportResponse(BaseModel):
@@ -389,7 +390,7 @@ def import_template(
 ):
     repo = ProjectTemplateRepository(db)
     try:
-        template = repo.import_template(request.data)
+        template = repo.import_template(request.data, request.name)
         return template
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

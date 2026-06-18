@@ -17,6 +17,8 @@ export function TemplateListPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importTemplateName, setImportTemplateName] = useState('');
+  const [importData, setImportData] = useState<any>(null);
 
   const loadTemplates = async () => {
     setLoading(true);
@@ -90,19 +92,39 @@ export function TemplateListPage() {
   };
 
   const handleImportTemplate = async (file: File) => {
-    setIsImporting(true);
     setActionError(null);
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      await importTemplate(data);
+      setImportData(data);
+      setImportTemplateName(data.template?.name || '');
+    } catch (err) {
+      setActionError('Could not read template file');
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importData) return;
+    setIsImporting(true);
+    setActionError(null);
+    try {
+      await importTemplate(importData, importTemplateName);
       await loadTemplates();
       setShowImportDialog(false);
+      setImportData(null);
+      setImportTemplateName('');
     } catch (err) {
       setActionError('Could not import template');
     } finally {
       setIsImporting(false);
     }
+  };
+
+  const handleCancelImport = () => {
+    setShowImportDialog(false);
+    setImportData(null);
+    setImportTemplateName('');
+    setActionError(null);
   };
 
   const filteredTemplates = templates.filter((template) => {
@@ -255,14 +277,36 @@ export function TemplateListPage() {
               disabled={isImporting}
               className="modal__input"
             />
+            {importData && (
+              <>
+                <label className="form-label">Template Name</label>
+                <input
+                  type="text"
+                  value={importTemplateName}
+                  onChange={(e) => setImportTemplateName(e.target.value)}
+                  disabled={isImporting}
+                  className="modal__input"
+                  placeholder="Enter template name..."
+                />
+              </>
+            )}
             <div className="modal__actions">
               <button
-                onClick={() => setShowImportDialog(false)}
+                onClick={handleCancelImport}
                 disabled={isImporting}
                 className="button button--secondary"
               >
                 Cancel
               </button>
+              {importData && (
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={isImporting || !importTemplateName.trim()}
+                  className="button button--primary"
+                >
+                  {isImporting ? 'Importing...' : 'Import'}
+                </button>
+              )}
             </div>
           </div>
         </div>

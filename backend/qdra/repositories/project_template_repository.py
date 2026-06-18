@@ -1019,15 +1019,18 @@ class ProjectTemplateRepository:
         et = self.get_entity_type_by_id(entity_type_id)
         return et.name if et else None
 
-    def import_template(self, data: Dict[str, Any]) -> ProjectTemplate:
+    def import_template(self, data: Dict[str, Any], name: Optional[str] = None) -> ProjectTemplate:
         """Import a project template from a JSON-serializable dictionary."""
         template_data = data["template"]
         entity_types_data = data["entity_types"]
         views_data = data["views"]
 
+        # Use provided name or fall back to the name in the JSON
+        template_name = name if name and name.strip() else template_data["name"]
+
         # Create the template
         template = self.create(
-            name=template_data["name"],
+            name=template_name,
             description=template_data.get("description"),
             is_builtin=False,
         )

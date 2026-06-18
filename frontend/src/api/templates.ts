@@ -88,13 +88,13 @@ export async function exportTemplate(templateId: string): Promise<any> {
   return response.json();
 }
 
-export async function importTemplate(data: any): Promise<ProjectTemplate> {
+export async function importTemplate(data: any, name?: string): Promise<ProjectTemplate> {
   const response = await fetch(`${API_URL}/project-templates/import`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data, name }),
   });
   if (!response.ok) {
     throw new Error('Failed to import template');
