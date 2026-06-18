@@ -232,3 +232,174 @@ export async function deleteParameterDefinition(
   );
   if (!response.ok) throw new Error('Failed to delete parameter definition');
 }
+
+// Slot Group operations
+
+export async function listSlotGroups(entityTypeId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/project-template-entity-types/${entityTypeId}/slot-groups`);
+  if (!response.ok) throw new Error('Failed to fetch slot groups');
+  return response.json();
+}
+
+export async function createSlotGroup(
+  entityTypeId: string,
+  payload: {
+    kind: string;
+    min_slots?: number;
+    max_slots?: number | null;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-entity-types/${entityTypeId}/slot-groups`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create slot group');
+  return response.json();
+}
+
+export async function updateSlotGroup(
+  slotGroupId: string,
+  payload: {
+    kind?: string;
+    min_slots?: number;
+    max_slots?: number | null;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-groups/${slotGroupId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update slot group');
+  return response.json();
+}
+
+export async function deleteSlotGroup(slotGroupId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/project-template-slot-groups/${slotGroupId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete slot group');
+}
+
+// Slot Definition operations
+
+export async function createSlotDefinition(
+  slotGroupId: string,
+  payload: {
+    slot_key: string;
+    min_occurrences?: number;
+    max_occurrences?: number | null;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-groups/${slotGroupId}/slot-definitions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create slot definition');
+  return response.json();
+}
+
+export async function updateSlotDefinition(
+  slotDefinitionId: string,
+  payload: {
+    slot_key?: string;
+    min_occurrences?: number;
+    max_occurrences?: number | null;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-definitions/${slotDefinitionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update slot definition');
+  return response.json();
+}
+
+export async function deleteSlotDefinition(slotDefinitionId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/project-template-slot-definitions/${slotDefinitionId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete slot definition');
+}
+
+// Slot Constraint operations
+
+export async function createGroupConstraint(
+  slotGroupId: string,
+  payload: {
+    domain?: string | null;
+    key?: string | null;
+    operator?: string | null;
+    value_string?: string | null;
+    value_number?: number | null;
+    value_boolean?: boolean | null;
+    is_wildcard?: boolean;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-groups/${slotGroupId}/constraints`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create constraint');
+  return response.json();
+}
+
+export async function createDefinitionConstraint(
+  slotDefinitionId: string,
+  payload: {
+    domain?: string | null;
+    key?: string | null;
+    operator?: string | null;
+    value_string?: string | null;
+    value_number?: number | null;
+    value_boolean?: boolean | null;
+    is_wildcard?: boolean;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-definitions/${slotDefinitionId}/constraints`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create constraint');
+  return response.json();
+}
+
+export async function updateSlotConstraint(
+  constraintId: string,
+  payload: {
+    domain?: string | null;
+    key?: string | null;
+    operator?: string | null;
+    value_string?: string | null;
+    value_number?: number | null;
+    value_boolean?: boolean | null;
+    is_wildcard?: boolean;
+    sort_order?: number;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/project-template-slot-constraints/${constraintId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update constraint');
+  return response.json();
+}
+
+export async function deleteSlotConstraint(constraintId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/project-template-slot-constraints/${constraintId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete constraint');
+}

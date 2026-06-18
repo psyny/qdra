@@ -640,3 +640,556 @@ def delete_view_config(
     repo = ProjectTemplateRepository(db)
     if not repo.delete_view_config(config_id):
         raise HTTPException(status_code=404, detail="View config not found")
+
+
+# ---------------------------------------------------------------------------
+# Slot Group Models
+# ---------------------------------------------------------------------------
+
+class SlotGroupCreate(BaseModel):
+    kind: str
+    min_slots: int = 0
+    max_slots: Optional[int] = None
+    sort_order: int = 0
+
+
+class SlotGroupUpdate(BaseModel):
+    kind: Optional[str] = None
+    min_slots: Optional[int] = None
+    max_slots: Optional[int] = None
+    sort_order: Optional[int] = None
+
+
+class SlotConstraintResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    slot_group_id: Optional[uuid.UUID]
+    slot_definition_id: Optional[uuid.UUID]
+    domain: Optional[str]
+    key: Optional[str]
+    operator: Optional[str]
+    value_string: Optional[str]
+    value_number: Optional[float]
+    value_boolean: Optional[bool]
+    is_wildcard: bool
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class SlotDefinitionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    slot_group_id: uuid.UUID
+    slot_key: str
+    min_occurrences: int
+    max_occurrences: Optional[int]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    constraints: List[SlotConstraintResponse] = []
+
+
+class SlotGroupResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    entity_type_id: uuid.UUID
+    kind: str
+    min_slots: int
+    max_slots: Optional[int]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    constraints: List[SlotConstraintResponse] = []
+    slot_definitions: List[SlotDefinitionResponse] = []
+
+
+# ---------------------------------------------------------------------------
+# Slot Definition Models
+# ---------------------------------------------------------------------------
+
+class SlotDefinitionCreate(BaseModel):
+    slot_key: str
+    min_occurrences: int = 0
+    max_occurrences: Optional[int] = None
+    sort_order: int = 0
+
+
+class SlotDefinitionUpdate(BaseModel):
+    slot_key: Optional[str] = None
+    min_occurrences: Optional[int] = None
+    max_occurrences: Optional[int] = None
+    sort_order: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Slot Constraint Models
+# ---------------------------------------------------------------------------
+
+class SlotConstraintCreate(BaseModel):
+    domain: Optional[str] = None
+    key: Optional[str] = None
+    operator: Optional[str] = None
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+    is_wildcard: bool = False
+    sort_order: int = 0
+
+
+class SlotConstraintUpdate(BaseModel):
+    domain: Optional[str] = None
+    key: Optional[str] = None
+    operator: Optional[str] = None
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+    is_wildcard: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+# ---------------------------------------------------------------------------
+# Slot Group Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/project-template-entity-types/{entity_type_id}/slot-groups",
+    response_model=List[SlotGroupResponse],
+)
+def list_slot_groups(
+    entity_type_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    entity_type = repo.get_entity_type_by_id(entity_type_id)
+    if not entity_type:
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    
+    slot_groups = repo.list_slot_groups(entity_type_id)
+    
+    # Build nested response with constraints and definitions
+    result = []
+    for sg in slot_groups:
+        sg_response = SlotGroupResponse.model_validate(sg)
+        sg_response.constraints = [
+            SlotConstraintResponse.model_validate(c)
+            for c in repo.list_slot_constraints_for_group(sg.id)
+        ]
+        
+        slot_defs = repo.list_slot_definitions(sg.id)
+        sg_response.slot_definitions = []
+        for sd in slot_defs:
+            sd_response = SlotDefinitionResponse.model_validate(sd)
+            sd_response.constraints = [
+                SlotConstraintResponse.model_validate(c)
+                for c in repo.list_slot_constraints_for_definition(sd.id)
+            ]
+            sg_response.slot_definitions.append(sd_response)
+        
+        result.append(sg_response)
+    
+    return result
+
+
+@router.post(
+    "/project-template-entity-types/{entity_type_id}/slot-groups",
+    response_model=SlotGroupResponse,
+)
+def create_slot_group(
+    entity_type_id: uuid.UUID,
+    data: SlotGroupCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    entity_type = repo.get_entity_type_by_id(entity_type_id)
+    if not entity_type:
+        raise HTTPException(status_code=404, detail="Entity type not found")
+    
+    # Validate entity type is recipe
+    if entity_type.kind != "recipe":
+        raise HTTPException(
+            status_code=400,
+            detail="Slot groups can only be created for recipe entity types"
+        )
+    
+    # Validate kind
+    if data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    # Validate min/max slots
+    if data.min_slots < 0:
+        raise HTTPException(status_code=400, detail="min_slots must be >= 0")
+    if data.max_slots is not None and data.max_slots < data.min_slots:
+        raise HTTPException(status_code=400, detail="max_slots must be >= min_slots")
+    
+    # Check for duplicate kind
+    existing_groups = repo.list_slot_groups(entity_type_id)
+    for eg in existing_groups:
+        if eg.kind == data.kind:
+            raise HTTPException(
+                status_code=409,
+                detail=f"A {data.kind} slot group already exists for this entity type"
+            )
+    
+    slot_group = repo.create_slot_group(
+        entity_type_id=entity_type_id,
+        kind=data.kind,
+        min_slots=data.min_slots,
+        max_slots=data.max_slots,
+        sort_order=data.sort_order,
+    )
+    
+    response = SlotGroupResponse.model_validate(slot_group)
+    response.constraints = []
+    response.slot_definitions = []
+    return response
+
+
+@router.patch(
+    "/project-template-slot-groups/{slot_group_id}",
+    response_model=SlotGroupResponse,
+)
+def update_slot_group(
+    slot_group_id: uuid.UUID,
+    data: SlotGroupUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    # Validate kind if provided
+    if data.kind is not None and data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    # Validate min/max slots if provided
+    if data.min_slots is not None and data.min_slots < 0:
+        raise HTTPException(status_code=400, detail="min_slots must be >= 0")
+    
+    if data.min_slots is not None and data.max_slots is not None:
+        if data.max_slots < data.min_slots:
+            raise HTTPException(status_code=400, detail="max_slots must be >= min_slots")
+    
+    # Check for duplicate kind if changing
+    if data.kind is not None and data.kind != slot_group.kind:
+        existing_groups = repo.list_slot_groups(slot_group.entity_type_id)
+        for eg in existing_groups:
+            if eg.id != slot_group_id and eg.kind == data.kind:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A {data.kind} slot group already exists for this entity type"
+                )
+    
+    updated = repo.update_slot_group(
+        slot_group_id=slot_group_id,
+        kind=data.kind,
+        min_slots=data.min_slots,
+        max_slots=data.max_slots,
+        sort_order=data.sort_order,
+    )
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    response = SlotGroupResponse.model_validate(updated)
+    response.constraints = [
+        SlotConstraintResponse.model_validate(c)
+        for c in repo.list_slot_constraints_for_group(slot_group_id)
+    ]
+    response.slot_definitions = []
+    for sd in repo.list_slot_definitions(slot_group_id):
+        sd_response = SlotDefinitionResponse.model_validate(sd)
+        sd_response.constraints = [
+            SlotConstraintResponse.model_validate(c)
+            for c in repo.list_slot_constraints_for_definition(sd.id)
+        ]
+        response.slot_definitions.append(sd_response)
+    
+    return response
+
+
+@router.delete("/project-template-slot-groups/{slot_group_id}", status_code=204)
+def delete_slot_group(
+    slot_group_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_slot_group(slot_group_id):
+        raise HTTPException(status_code=404, detail="Slot group not found")
+
+
+# ---------------------------------------------------------------------------
+# Slot Definition Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/project-template-slot-groups/{slot_group_id}/slot-definitions",
+    response_model=SlotDefinitionResponse,
+)
+def create_slot_definition(
+    slot_group_id: uuid.UUID,
+    data: SlotDefinitionCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    # Validate min/max occurrences
+    if data.min_occurrences < 0:
+        raise HTTPException(status_code=400, detail="min_occurrences must be >= 0")
+    if data.max_occurrences is not None and data.max_occurrences < data.min_occurrences:
+        raise HTTPException(status_code=400, detail="max_occurrences must be >= min_occurrences")
+    
+    # Check for duplicate slot_key
+    existing_defs = repo.list_slot_definitions(slot_group_id)
+    for ed in existing_defs:
+        if ed.slot_key == data.slot_key:
+            raise HTTPException(
+                status_code=409,
+                detail=f"A slot definition with key '{data.slot_key}' already exists in this group"
+            )
+    
+    slot_def = repo.create_slot_definition(
+        slot_group_id=slot_group_id,
+        slot_key=data.slot_key,
+        min_occurrences=data.min_occurrences,
+        max_occurrences=data.max_occurrences,
+        sort_order=data.sort_order,
+    )
+    
+    response = SlotDefinitionResponse.model_validate(slot_def)
+    response.constraints = []
+    return response
+
+
+@router.patch(
+    "/project-template-slot-definitions/{slot_definition_id}",
+    response_model=SlotDefinitionResponse,
+)
+def update_slot_definition(
+    slot_definition_id: uuid.UUID,
+    data: SlotDefinitionUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_def = repo.get_slot_definition_by_id(slot_definition_id)
+    if not slot_def:
+        raise HTTPException(status_code=404, detail="Slot definition not found")
+    
+    # Validate min/max occurrences if provided
+    if data.min_occurrences is not None and data.min_occurrences < 0:
+        raise HTTPException(status_code=400, detail="min_occurrences must be >= 0")
+    
+    if data.min_occurrences is not None and data.max_occurrences is not None:
+        if data.max_occurrences < data.min_occurrences:
+            raise HTTPException(status_code=400, detail="max_occurrences must be >= min_occurrences")
+    
+    # Check for duplicate slot_key if changing
+    if data.slot_key is not None and data.slot_key != slot_def.slot_key:
+        existing_defs = repo.list_slot_definitions(slot_def.slot_group_id)
+        for ed in existing_defs:
+            if ed.id != slot_definition_id and ed.slot_key == data.slot_key:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A slot definition with key '{data.slot_key}' already exists in this group"
+                )
+    
+    updated = repo.update_slot_definition(
+        slot_def_id=slot_definition_id,
+        slot_key=data.slot_key,
+        min_occurrences=data.min_occurrences,
+        max_occurrences=data.max_occurrences,
+        sort_order=data.sort_order,
+    )
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Slot definition not found")
+    
+    response = SlotDefinitionResponse.model_validate(updated)
+    response.constraints = [
+        SlotConstraintResponse.model_validate(c)
+        for c in repo.list_slot_constraints_for_definition(slot_definition_id)
+    ]
+    return response
+
+
+@router.delete("/project-template-slot-definitions/{slot_definition_id}", status_code=204)
+def delete_slot_definition(
+    slot_definition_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_slot_definition(slot_definition_id):
+        raise HTTPException(status_code=404, detail="Slot definition not found")
+
+
+# ---------------------------------------------------------------------------
+# Slot Constraint Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/project-template-slot-groups/{slot_group_id}/constraints",
+    response_model=SlotConstraintResponse,
+)
+def create_group_constraint(
+    slot_group_id: uuid.UUID,
+    data: SlotConstraintCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    # Validate constraint
+    if not data.is_wildcard:
+        if not data.domain or not data.key or not data.operator:
+            raise HTTPException(
+                status_code=400,
+                detail="Non-wildcard constraints require domain, key, and operator"
+            )
+        if not any([data.value_string is not None, data.value_number is not None, data.value_boolean is not None]):
+            raise HTTPException(
+                status_code=400,
+                detail="Non-wildcard constraints require at least one value field"
+            )
+    
+    constraint = repo.create_slot_constraint(
+        slot_group_id=slot_group_id,
+        domain=data.domain,
+        key=data.key,
+        operator=data.operator,
+        value_string=data.value_string,
+        value_number=data.value_number,
+        value_boolean=data.value_boolean,
+        is_wildcard=data.is_wildcard,
+        sort_order=data.sort_order,
+    )
+    
+    return SlotConstraintResponse.model_validate(constraint)
+
+
+@router.post(
+    "/project-template-slot-definitions/{slot_definition_id}/constraints",
+    response_model=SlotConstraintResponse,
+)
+def create_definition_constraint(
+    slot_definition_id: uuid.UUID,
+    data: SlotConstraintCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_def = repo.get_slot_definition_by_id(slot_definition_id)
+    if not slot_def:
+        raise HTTPException(status_code=404, detail="Slot definition not found")
+    
+    # Validate constraint
+    if not data.is_wildcard:
+        if not data.domain or not data.key or not data.operator:
+            raise HTTPException(
+                status_code=400,
+                detail="Non-wildcard constraints require domain, key, and operator"
+            )
+        if not any([data.value_string is not None, data.value_number is not None, data.value_boolean is not None]):
+            raise HTTPException(
+                status_code=400,
+                detail="Non-wildcard constraints require at least one value field"
+            )
+    
+    constraint = repo.create_slot_constraint(
+        slot_definition_id=slot_definition_id,
+        domain=data.domain,
+        key=data.key,
+        operator=data.operator,
+        value_string=data.value_string,
+        value_number=data.value_number,
+        value_boolean=data.value_boolean,
+        is_wildcard=data.is_wildcard,
+        sort_order=data.sort_order,
+    )
+    
+    return SlotConstraintResponse.model_validate(constraint)
+
+
+@router.patch(
+    "/project-template-slot-constraints/{constraint_id}",
+    response_model=SlotConstraintResponse,
+)
+def update_slot_constraint(
+    constraint_id: uuid.UUID,
+    data: SlotConstraintUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    constraint = repo.get_slot_constraint_by_id(constraint_id)
+    if not constraint:
+        raise HTTPException(status_code=404, detail="Slot constraint not found")
+    
+    # Validate constraint if changing wildcard status
+    if data.is_wildcard is not None:
+        if not data.is_wildcard:
+            # Becoming non-wildcard - need domain, key, operator, and value
+            if not data.domain and not constraint.domain:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Non-wildcard constraints require domain"
+                )
+            if not data.key and not constraint.key:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Non-wildcard constraints require key"
+                )
+            if not data.operator and not constraint.operator:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Non-wildcard constraints require operator"
+                )
+            has_value = (
+                (data.value_string is not None) or
+                (data.value_number is not None) or
+                (data.value_boolean is not None) or
+                (constraint.value_string is not None) or
+                (constraint.value_number is not None) or
+                (constraint.value_boolean is not None)
+            )
+            if not has_value:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Non-wildcard constraints require at least one value field"
+                )
+    
+    updated = repo.update_slot_constraint(
+        constraint_id=constraint_id,
+        domain=data.domain,
+        key=data.key,
+        operator=data.operator,
+        value_string=data.value_string,
+        value_number=data.value_number,
+        value_boolean=data.value_boolean,
+        is_wildcard=data.is_wildcard,
+        sort_order=data.sort_order,
+    )
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Slot constraint not found")
+    
+    return SlotConstraintResponse.model_validate(updated)
+
+
+@router.delete("/project-template-slot-constraints/{constraint_id}", status_code=204)
+def delete_slot_constraint(
+    constraint_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_slot_constraint(constraint_id):
+        raise HTTPException(status_code=404, detail="Slot constraint not found")

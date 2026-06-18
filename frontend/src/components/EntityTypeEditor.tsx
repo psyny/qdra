@@ -393,6 +393,15 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
               <button onClick={() => { setExpandedType(expandedType === et.id ? null : et.id); if (expandedType !== et.id) loadParameterDefinitions(et.id); }} className="button button--secondary" style={{ fontSize: '12px' }}>
                 {expandedType === et.id ? 'Collapse' : 'Parameters'}
               </button>
+              {et.kind === 'recipe' && (
+                <button 
+                  onClick={() => window.location.href = `/templates/${templateId}/entity-types/${et.id}/slots`}
+                  className="button button--secondary" 
+                  style={{ fontSize: '12px' }}
+                >
+                  Slots
+                </button>
+              )}
               <button onClick={() => startEdit(et)} className="button button--secondary" style={{ fontSize: '12px' }}>
                 Edit
               </button>

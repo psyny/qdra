@@ -9,6 +9,9 @@ from models.project_template import (
     ProjectTemplateParameterDefinition,
     ProjectTemplateView,
     ProjectTemplateViewConfig,
+    ProjectTemplateSlotGroup,
+    ProjectTemplateSlotDefinition,
+    ProjectTemplateSlotConstraint,
 )
 
 
@@ -457,6 +460,237 @@ class ProjectTemplateRepository:
         config = self.get_view_config_by_id(config_id)
         if config:
             self.db.delete(config)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateSlotGroup CRUD
+
+    def create_slot_group(
+        self,
+        entity_type_id: uuid.UUID,
+        kind: str,
+        min_slots: int = 0,
+        max_slots: Optional[int] = None,
+        sort_order: int = 0,
+    ) -> ProjectTemplateSlotGroup:
+        slot_group = ProjectTemplateSlotGroup(
+            entity_type_id=entity_type_id,
+            kind=kind,
+            min_slots=min_slots,
+            max_slots=max_slots,
+            sort_order=sort_order,
+        )
+        self.db.add(slot_group)
+        self.db.commit()
+        self.db.refresh(slot_group)
+        return slot_group
+
+    def get_slot_group_by_id(self, slot_group_id: uuid.UUID) -> Optional[ProjectTemplateSlotGroup]:
+        return (
+            self.db.query(ProjectTemplateSlotGroup)
+            .filter(ProjectTemplateSlotGroup.id == slot_group_id)
+            .first()
+        )
+
+    def list_slot_groups(self, entity_type_id: uuid.UUID) -> List[ProjectTemplateSlotGroup]:
+        return (
+            self.db.query(ProjectTemplateSlotGroup)
+            .filter(ProjectTemplateSlotGroup.entity_type_id == entity_type_id)
+            .order_by(ProjectTemplateSlotGroup.sort_order)
+            .all()
+        )
+
+    def update_slot_group(
+        self,
+        slot_group_id: uuid.UUID,
+        kind: Optional[str] = None,
+        min_slots: Optional[int] = None,
+        max_slots: Optional[int] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateSlotGroup]:
+        slot_group = self.get_slot_group_by_id(slot_group_id)
+        if slot_group:
+            if kind is not None:
+                slot_group.kind = kind
+            if min_slots is not None:
+                slot_group.min_slots = min_slots
+            if max_slots is not None:
+                slot_group.max_slots = max_slots
+            if sort_order is not None:
+                slot_group.sort_order = sort_order
+            self.db.commit()
+            self.db.refresh(slot_group)
+        return slot_group
+
+    def delete_slot_group(self, slot_group_id: uuid.UUID) -> bool:
+        slot_group = self.get_slot_group_by_id(slot_group_id)
+        if slot_group:
+            self.db.delete(slot_group)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateSlotDefinition CRUD
+
+    def create_slot_definition(
+        self,
+        slot_group_id: uuid.UUID,
+        slot_key: str,
+        min_occurrences: int = 0,
+        max_occurrences: Optional[int] = None,
+        sort_order: int = 0,
+    ) -> ProjectTemplateSlotDefinition:
+        slot_def = ProjectTemplateSlotDefinition(
+            slot_group_id=slot_group_id,
+            slot_key=slot_key,
+            min_occurrences=min_occurrences,
+            max_occurrences=max_occurrences,
+            sort_order=sort_order,
+        )
+        self.db.add(slot_def)
+        self.db.commit()
+        self.db.refresh(slot_def)
+        return slot_def
+
+    def get_slot_definition_by_id(self, slot_def_id: uuid.UUID) -> Optional[ProjectTemplateSlotDefinition]:
+        return (
+            self.db.query(ProjectTemplateSlotDefinition)
+            .filter(ProjectTemplateSlotDefinition.id == slot_def_id)
+            .first()
+        )
+
+    def list_slot_definitions(self, slot_group_id: uuid.UUID) -> List[ProjectTemplateSlotDefinition]:
+        return (
+            self.db.query(ProjectTemplateSlotDefinition)
+            .filter(ProjectTemplateSlotDefinition.slot_group_id == slot_group_id)
+            .order_by(ProjectTemplateSlotDefinition.sort_order)
+            .all()
+        )
+
+    def update_slot_definition(
+        self,
+        slot_def_id: uuid.UUID,
+        slot_key: Optional[str] = None,
+        min_occurrences: Optional[int] = None,
+        max_occurrences: Optional[int] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateSlotDefinition]:
+        slot_def = self.get_slot_definition_by_id(slot_def_id)
+        if slot_def:
+            if slot_key is not None:
+                slot_def.slot_key = slot_key
+            if min_occurrences is not None:
+                slot_def.min_occurrences = min_occurrences
+            if max_occurrences is not None:
+                slot_def.max_occurrences = max_occurrences
+            if sort_order is not None:
+                slot_def.sort_order = sort_order
+            self.db.commit()
+            self.db.refresh(slot_def)
+        return slot_def
+
+    def delete_slot_definition(self, slot_def_id: uuid.UUID) -> bool:
+        slot_def = self.get_slot_definition_by_id(slot_def_id)
+        if slot_def:
+            self.db.delete(slot_def)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateSlotConstraint CRUD
+
+    def create_slot_constraint(
+        self,
+        slot_group_id: Optional[uuid.UUID] = None,
+        slot_definition_id: Optional[uuid.UUID] = None,
+        domain: Optional[str] = None,
+        key: Optional[str] = None,
+        operator: Optional[str] = None,
+        value_string: Optional[str] = None,
+        value_number: Optional[float] = None,
+        value_boolean: Optional[bool] = None,
+        is_wildcard: bool = False,
+        sort_order: int = 0,
+    ) -> ProjectTemplateSlotConstraint:
+        constraint = ProjectTemplateSlotConstraint(
+            slot_group_id=slot_group_id,
+            slot_definition_id=slot_definition_id,
+            domain=domain,
+            key=key,
+            operator=operator,
+            value_string=value_string,
+            value_number=value_number,
+            value_boolean=value_boolean,
+            is_wildcard=is_wildcard,
+            sort_order=sort_order,
+        )
+        self.db.add(constraint)
+        self.db.commit()
+        self.db.refresh(constraint)
+        return constraint
+
+    def get_slot_constraint_by_id(self, constraint_id: uuid.UUID) -> Optional[ProjectTemplateSlotConstraint]:
+        return (
+            self.db.query(ProjectTemplateSlotConstraint)
+            .filter(ProjectTemplateSlotConstraint.id == constraint_id)
+            .first()
+        )
+
+    def list_slot_constraints_for_group(self, slot_group_id: uuid.UUID) -> List[ProjectTemplateSlotConstraint]:
+        return (
+            self.db.query(ProjectTemplateSlotConstraint)
+            .filter(ProjectTemplateSlotConstraint.slot_group_id == slot_group_id)
+            .order_by(ProjectTemplateSlotConstraint.sort_order)
+            .all()
+        )
+
+    def list_slot_constraints_for_definition(self, slot_def_id: uuid.UUID) -> List[ProjectTemplateSlotConstraint]:
+        return (
+            self.db.query(ProjectTemplateSlotConstraint)
+            .filter(ProjectTemplateSlotConstraint.slot_definition_id == slot_def_id)
+            .order_by(ProjectTemplateSlotConstraint.sort_order)
+            .all()
+        )
+
+    def update_slot_constraint(
+        self,
+        constraint_id: uuid.UUID,
+        domain: Optional[str] = None,
+        key: Optional[str] = None,
+        operator: Optional[str] = None,
+        value_string: Optional[str] = None,
+        value_number: Optional[float] = None,
+        value_boolean: Optional[bool] = None,
+        is_wildcard: Optional[bool] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateSlotConstraint]:
+        constraint = self.get_slot_constraint_by_id(constraint_id)
+        if constraint:
+            if domain is not None:
+                constraint.domain = domain
+            if key is not None:
+                constraint.key = key
+            if operator is not None:
+                constraint.operator = operator
+            if value_string is not None:
+                constraint.value_string = value_string
+            if value_number is not None:
+                constraint.value_number = value_number
+            if value_boolean is not None:
+                constraint.value_boolean = value_boolean
+            if is_wildcard is not None:
+                constraint.is_wildcard = is_wildcard
+            if sort_order is not None:
+                constraint.sort_order = sort_order
+            self.db.commit()
+            self.db.refresh(constraint)
+        return constraint
+
+    def delete_slot_constraint(self, constraint_id: uuid.UUID) -> bool:
+        constraint = self.get_slot_constraint_by_id(constraint_id)
+        if constraint:
+            self.db.delete(constraint)
             self.db.commit()
             return True
         return False
