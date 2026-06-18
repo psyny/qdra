@@ -120,6 +120,12 @@ class ProjectTemplateView(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    __table_args__ = (
+        UniqueConstraint(
+            "project_template_id", "view_key", name="uq_view_template_key"
+        ),
+    )
+
 
 class ProjectTemplateViewConfig(Base):
     __tablename__ = "project_template_view_configs"

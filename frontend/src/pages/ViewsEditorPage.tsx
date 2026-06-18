@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getTemplateViews, createView, updateView, deleteView, seedSystemViews, View } from '../api/views';
+import { getTemplateViews, updateView, deleteView, seedSystemViews, View } from '../api/views';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 
 export function ViewsEditorPage() {
@@ -10,12 +10,6 @@ export function ViewsEditorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [views, setViews] = useState<View[]>([]);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newViewForm, setNewViewForm] = useState({
-    view_key: '',
-    label: '',
-    description: '',
-  });
 
   useEffect(() => {
     if (templateId) {
@@ -27,29 +21,15 @@ export function ViewsEditorPage() {
     setLoading(true);
     setError(null);
     try {
+      // First seed system views (idempotent - won't create duplicates)
+      await seedSystemViews(templateId!);
+      // Then load views
       const data = await getTemplateViews(templateId!);
       setViews(data);
     } catch (err) {
       setError('Failed to load views');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCreateView = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createView(templateId!, {
-        view_key: newViewForm.view_key,
-        label: newViewForm.label,
-        description: newViewForm.description,
-        sort_order: views.length,
-      });
-      setNewViewForm({ view_key: '', label: '', description: '' });
-      setShowCreateForm(false);
-      loadViews();
-    } catch (err) {
-      setError('Failed to create view');
     }
   };
 
@@ -60,15 +40,6 @@ export function ViewsEditorPage() {
       loadViews();
     } catch (err) {
       setError('Failed to delete view');
-    }
-  };
-
-  const handleSeedSystemViews = async () => {
-    try {
-      await seedSystemViews(templateId!);
-      loadViews();
-    } catch (err) {
-      setError('Failed to seed system views');
     }
   };
 
@@ -121,14 +92,6 @@ export function ViewsEditorPage() {
 
       <div className="page-header">
         <h1 className="page-title">Views</h1>
-        <div className="page-actions">
-          <button onClick={handleSeedSystemViews} className="button button--secondary">
-            Seed System Views
-          </button>
-          <button onClick={() => setShowCreateForm(true)} className="button button--primary page-actions__create">
-            Create View
-          </button>
-        </div>
       </div>
 
       {error && (
@@ -140,56 +103,10 @@ export function ViewsEditorPage() {
         </div>
       )}
 
-      {showCreateForm && (
-        <div className="mt-8 card">
-          <h2 className="card__title">Create New View</h2>
-          <form onSubmit={handleCreateView}>
-            <div className="form-field">
-              <label className="form-label">View Key *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newViewForm.view_key}
-                onChange={(e) => setNewViewForm({ ...newViewForm, view_key: e.target.value })}
-                placeholder="e.g., material_catalog"
-                required
-              />
-            </div>
-            <div className="form-field">
-              <label className="form-label">Label *</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newViewForm.label}
-                onChange={(e) => setNewViewForm({ ...newViewForm, label: e.target.value })}
-                placeholder="e.g., Material Catalog"
-                required
-              />
-            </div>
-            <div className="form-field">
-              <label className="form-label">Description</label>
-              <input
-                type="text"
-                className="form-input"
-                value={newViewForm.description}
-                onChange={(e) => setNewViewForm({ ...newViewForm, description: e.target.value })}
-                placeholder="Description of this view"
-              />
-            </div>
-            <div className="form-actions">
-              <button type="submit" className="button button--primary">Create</button>
-              <button type="button" onClick={() => setShowCreateForm(false)} className="button button--secondary">
-                Cancel
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       <div className="mt-8 card">
         <h2 className="card__title">All Views</h2>
         {views.length === 0 ? (
-          <p className="state-message__text">No views yet. Create one or seed system views.</p>
+          <p className="state-message__text">No views yet. System views will be seeded automatically.</p>
         ) : (
           <div className="template-grid">
             {views.map((view, index) => (
