@@ -152,18 +152,18 @@ export function ViewsEditorPage() {
 
       <div className="page-header">
         <h1 className="page-title">Views</h1>
-        <div className="page-header__actions">
+        <div className="page-actions">
           <button onClick={handleSeedSystemViews} className="button button--secondary">
             Seed System Views
           </button>
-          <button onClick={() => setShowCreateForm(true)} className="button button--primary">
+          <button onClick={() => setShowCreateForm(true)} className="button button--primary page-actions__create">
             Create View
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="card state-message">
+        <div className="mt-4 card state-message">
           <p className="state-message__text state-message__text--error">{error}</p>
           <button onClick={() => setError(null)} className="button button--secondary">
             Dismiss
@@ -172,7 +172,7 @@ export function ViewsEditorPage() {
       )}
 
       {showCreateForm && (
-        <div className="card">
+        <div className="mt-8 card">
           <h2 className="card__title">Create New View</h2>
           <form onSubmit={handleCreateView}>
             <div className="form-field">
@@ -217,25 +217,27 @@ export function ViewsEditorPage() {
         </div>
       )}
 
-      <div className="card">
+      <div className="mt-8 card">
         <h2 className="card__title">All Views</h2>
         {views.length === 0 ? (
           <p className="state-message__text">No views yet. Create one or seed system views.</p>
         ) : (
-          <div className="list">
+          <div className="template-grid">
             {views.map((view, index) => (
-              <div key={view.id} className="list-item">
-                <div className="list-item__content">
-                  <div className="list-item__title">
+              <div key={view.id} className="card template-card">
+                <div className="template-card__content">
+                  <div className="template-card__title">
                     {view.label}
                     {view.is_system && <span className="badge badge--system">System</span>}
                   </div>
-                  <div className="list-item__subtitle">{view.description}</div>
-                  <div className="list-item__meta">
+                  {view.description && (
+                    <p className="template-card__description">{view.description}</p>
+                  )}
+                  <p className="template-card__meta">
                     Key: {view.view_key} • Configs: {view.configs?.length || 0}
-                  </div>
+                  </p>
                 </div>
-                <div className="list-item__actions">
+                <div className="template-card__actions">
                   <button
                     onClick={() => handleReorder(view.id, 'up')}
                     disabled={index === 0}

@@ -523,7 +523,7 @@ class ProjectTemplateRepository:
         return config
 
     def seed_system_views(self, project_template_id: uuid.UUID) -> List[ProjectTemplateView]:
-        """Create seeded system views for a project template."""
+        """Create seeded system views for a project template if they don't already exist."""
         system_views_data = [
             {
                 "view_key": "material_catalog",
@@ -563,17 +563,22 @@ class ProjectTemplateRepository:
             },
         ]
         
+        # Get existing views to avoid duplicates
+        existing_views = self.list_views(project_template_id)
+        existing_view_keys = {view.view_key for view in existing_views}
+        
         created_views = []
         for view_data in system_views_data:
-            view = self.create_view(
-                project_template_id=project_template_id,
-                view_key=view_data["view_key"],
-                label=view_data["label"],
-                description=view_data["description"],
-                is_system=True,
-                sort_order=view_data["sort_order"],
-            )
-            created_views.append(view)
+            if view_data["view_key"] not in existing_view_keys:
+                view = self.create_view(
+                    project_template_id=project_template_id,
+                    view_key=view_data["view_key"],
+                    label=view_data["label"],
+                    description=view_data["description"],
+                    is_system=True,
+                    sort_order=view_data["sort_order"],
+                )
+                created_views.append(view)
         
         return created_views
 
