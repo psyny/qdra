@@ -15,7 +15,10 @@ import {
   deleteSlotConstraint,
   getTemplate,
   getEntityType,
+  listEntityTypes,
+  listParameterDefinitions,
 } from '../api/templates';
+import { EntityType, ParameterDefinition } from '../types/template';
 
 type SlotGroup = {
   id: string;
@@ -60,6 +63,8 @@ export function SlotDefinitionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [entityName, setEntityName] = useState<string>('');
+  const [entityTypes, setEntityTypes] = useState<EntityType[]>([]);
+  const [parameterDefinitions, setParameterDefinitions] = useState<Record<string, ParameterDefinition[]>>({});
   
   const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
   const [editingGroup, setEditingGroup] = useState<SlotGroup | null>(null);
@@ -85,6 +90,8 @@ export function SlotDefinitionsPage() {
   const [editingConstraint, setEditingConstraint] = useState<SlotConstraint | null>(null);
   const [constraintForm, setConstraintForm] = useState({
     is_wildcard: false,
+    entity_type_id: '',
+    parameter_id: '',
     domain: '',
     key: '',
     operator: '=',
@@ -101,6 +108,9 @@ export function SlotDefinitionsPage() {
     }
     if (templateId && entityTypeId) {
       loadEntityName();
+    }
+    if (templateId) {
+      loadEntityTypesAndParameters();
     }
   }, [entityTypeId, templateId]);
 
@@ -123,6 +133,25 @@ export function SlotDefinitionsPage() {
       setEntityName(data.name);
     } catch (err) {
       // Don't set error for entity name loading failure
+    }
+  };
+
+  const loadEntityTypesAndParameters = async () => {
+    try {
+      const types = await listEntityTypes(templateId!);
+      // Filter to only material entity types for slot constraints
+      const materialTypes = types.filter((t) => t.kind === 'material');
+      setEntityTypes(materialTypes);
+      
+      // Load parameter definitions for each material entity type
+      const paramsMap: Record<string, ParameterDefinition[]> = {};
+      for (const type of materialTypes) {
+        const params = await listParameterDefinitions(templateId!, type.id);
+        paramsMap[type.id] = params;
+      }
+      setParameterDefinitions(paramsMap);
+    } catch (err) {
+      // Don't set error for this - it's optional for the constraint UI
     }
   };
 
@@ -258,6 +287,8 @@ export function SlotDefinitionsPage() {
       setConstraintParent(null);
       setConstraintForm({
         is_wildcard: false,
+        entity_type_id: '',
+        parameter_id: '',
         domain: '',
         key: '',
         operator: '=',
@@ -300,6 +331,8 @@ export function SlotDefinitionsPage() {
       setEditingConstraint(null);
       setConstraintForm({
         is_wildcard: false,
+        entity_type_id: '',
+        parameter_id: '',
         domain: '',
         key: '',
         operator: '=',
@@ -686,11 +719,64 @@ export function SlotDefinitionsPage() {
           {!constraintForm.is_wildcard && (
             <>
               <div className="form-field">
+                <label className="form-label">Entity Type</label>
+                <select
+                  className="form-input"
+                  value={constraintForm.entity_type_id}
+                  onChange={(e) => {
+                    const selectedEntityTypeId = e.target.value;
+                    setConstraintForm({ 
+                      ...constraintForm, 
+                      entity_type_id: selectedEntityTypeId,
+                      parameter_id: '',
+                      domain: '',
+                      key: '',
+                      value_type: 'string'
+                    });
+                  }}
+                >
+                  <option value="">Select entity type...</option>
+                  {entityTypes.map((et) => (
+                    <option key={et.id} value={et.id}>{et.name} ({et.kind})</option>
+                  ))}
+                </select>
+              </div>
+              {constraintForm.entity_type_id && (
+                <div className="form-field">
+                  <label className="form-label">Parameter</label>
+                  <select
+                    className="form-input"
+                    value={constraintForm.parameter_id}
+                    onChange={(e) => {
+                      const selectedParamId = e.target.value;
+                      const params = parameterDefinitions[constraintForm.entity_type_id] || [];
+                      const selectedParam = params.find((p) => p.id === selectedParamId);
+                      if (selectedParam) {
+                        setConstraintForm({
+                          ...constraintForm,
+                          parameter_id: selectedParamId,
+                          domain: selectedParam.domain,
+                          key: selectedParam.key,
+                          value_type: selectedParam.value_type
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">Select parameter...</option>
+                    {(parameterDefinitions[constraintForm.entity_type_id] || []).map((param) => (
+                      <option key={param.id} value={param.id}>{param.label || param.key} ({param.domain}:{param.key})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="form-field">
                 <label className="form-label">Domain *</label>
                 <input
                   type="text"
                   className="form-input"
                   value={constraintForm.domain}
+                  disabled={!!constraintForm.parameter_id}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
                   onChange={(e) => setConstraintForm({ ...constraintForm, domain: e.target.value })}
                   placeholder="e.g., identity"
                 />
@@ -701,9 +787,25 @@ export function SlotDefinitionsPage() {
                   type="text"
                   className="form-input"
                   value={constraintForm.key}
+                  disabled={!!constraintForm.parameter_id}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
                   onChange={(e) => setConstraintForm({ ...constraintForm, key: e.target.value })}
                   placeholder="e.g., category"
                 />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Value Type *</label>
+                <select
+                  className="form-input"
+                  value={constraintForm.value_type}
+                  disabled={!!constraintForm.parameter_id}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
+                  onChange={(e) => setConstraintForm({ ...constraintForm, value_type: e.target.value })}
+                >
+                  <option value="string">String</option>
+                  <option value="number">Number</option>
+                  <option value="boolean">Boolean</option>
+                </select>
               </div>
               <div className="form-field">
                 <label className="form-label">Operator *</label>
@@ -719,18 +821,6 @@ export function SlotDefinitionsPage() {
                   <option value=">">&gt;</option>
                   <option value=">=">&gt;=</option>
                   <option value="contains">contains</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label className="form-label">Value Type *</label>
-                <select
-                  className="form-input"
-                  value={constraintForm.value_type}
-                  onChange={(e) => setConstraintForm({ ...constraintForm, value_type: e.target.value })}
-                >
-                  <option value="string">String</option>
-                  <option value="number">Number</option>
-                  <option value="boolean">Boolean</option>
                 </select>
               </div>
               {constraintForm.value_type === 'string' && (
@@ -771,7 +861,7 @@ export function SlotDefinitionsPage() {
             </>
           )}
           <div className="form-actions">
-            <button onClick={() => { setShowConstraintForm(false); setConstraintParent(null); setEditingConstraint(null); setConstraintForm({ is_wildcard: false, domain: '', key: '', operator: '=', value_type: 'string', value_string: '', value_number: '', value_boolean: false, sort_order: 0 }); }} className="button button--secondary">Cancel</button>
+            <button onClick={() => { setShowConstraintForm(false); setConstraintParent(null); setEditingConstraint(null); setConstraintForm({ is_wildcard: false, entity_type_id: '', parameter_id: '', domain: '', key: '', operator: '=', value_type: 'string', value_string: '', value_number: '', value_boolean: false, sort_order: 0 }); }} className="button button--secondary">Cancel</button>
             <button onClick={editingConstraint ? handleUpdateConstraint : handleCreateConstraint} className="button button--primary">
               {editingConstraint ? 'Save' : 'Create'}
             </button>
