@@ -1,4 +1,5 @@
 import uuid
+import json
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -812,3 +813,261 @@ class ProjectTemplateRepository:
             self.db.commit()
             return True
         return False
+
+    # Template Export/Import
+
+    def export_template(self, project_template_id: uuid.UUID) -> Dict[str, Any]:
+        """Export a project template and all its related data to a JSON-serializable dictionary."""
+        template = self.get_by_id(project_template_id)
+        if not template:
+            raise ValueError(f"Template {project_template_id} not found")
+
+        # Export entity types with their parameter definitions
+        entity_types = []
+        for et in self.list_entity_types(project_template_id):
+            param_defs = self.list_parameter_definitions_by_entity_type(et.id)
+            slot_groups = self.list_slot_groups(et.id)
+            
+            slot_groups_data = []
+            for sg in slot_groups:
+                slot_defs = self.list_slot_definitions(sg.id)
+                slot_defs_data = []
+                for sd in slot_defs:
+                    constraints = self.list_slot_constraints_for_definition(sd.id)
+                    constraints_data = [
+                        {
+                            "domain": c.domain,
+                            "key": c.key,
+                            "operator": c.operator,
+                            "value_string": c.value_string,
+                            "value_number": c.value_number,
+                            "value_boolean": c.value_boolean,
+                            "is_wildcard": c.is_wildcard,
+                            "sort_order": c.sort_order,
+                        }
+                        for c in constraints
+                    ]
+                    slot_defs_data.append({
+                        "slot_key": sd.slot_key,
+                        "min_occurrences": sd.min_occurrences,
+                        "max_occurrences": sd.max_occurrences,
+                        "sort_order": sd.sort_order,
+                        "constraints": constraints_data,
+                    })
+                
+                # Also get constraints at the group level
+                group_constraints = self.list_slot_constraints_for_group(sg.id)
+                group_constraints_data = [
+                    {
+                        "domain": c.domain,
+                        "key": c.key,
+                        "operator": c.operator,
+                        "value_string": c.value_string,
+                        "value_number": c.value_number,
+                        "value_boolean": c.value_boolean,
+                        "is_wildcard": c.is_wildcard,
+                        "sort_order": c.sort_order,
+                    }
+                    for c in group_constraints
+                ]
+                
+                slot_groups_data.append({
+                    "kind": sg.kind,
+                    "min_slots": sg.min_slots,
+                    "max_slots": sg.max_slots,
+                    "sort_order": sg.sort_order,
+                    "slot_definitions": slot_defs_data,
+                    "constraints": group_constraints_data,
+                })
+            
+            param_defs_data = [
+                {
+                    "domain": pd.domain,
+                    "key": pd.key,
+                    "value_type": pd.value_type,
+                    "label": pd.label,
+                    "description": pd.description,
+                    "required": pd.required,
+                    "sort_order": pd.sort_order,
+                    "is_label": pd.is_label,
+                    "is_unique": pd.is_unique,
+                    "is_searchable": pd.is_searchable,
+                    "is_hidden": pd.is_hidden,
+                    "default_value": pd.default_value,
+                    "validation_min": pd.validation_min,
+                    "validation_max": pd.validation_max,
+                    "validation_regex": pd.validation_regex,
+                }
+                for pd in param_defs
+            ]
+            
+            entity_types.append({
+                "kind": et.kind,
+                "name": et.name,
+                "description": et.description,
+                "sort_order": et.sort_order,
+                "parameter_definitions": param_defs_data,
+                "slot_groups": slot_groups_data,
+            })
+
+        # Export views with their configs
+        views = []
+        for view in self.list_views(project_template_id):
+            configs = self.list_view_configs(view.id)
+            configs_data = [
+                {
+                    "entity_type_name": self._get_entity_type_name_by_id(config.entity_type_id) if config.entity_type_id else None,
+                    "filter_params": config.filter_params,
+                    "display_slots": config.display_slots,
+                    "sort_order": config.sort_order,
+                }
+                for config in configs
+            ]
+            views.append({
+                "view_key": view.view_key,
+                "label": view.label,
+                "description": view.description,
+                "is_system": view.is_system,
+                "sort_order": view.sort_order,
+                "configs": configs_data,
+            })
+
+        return {
+            "template": {
+                "name": template.name,
+                "description": template.description,
+                "version": template.version,
+            },
+            "entity_types": entity_types,
+            "views": views,
+        }
+
+    def _get_entity_type_name_by_id(self, entity_type_id: Optional[uuid.UUID]) -> Optional[str]:
+        """Helper to get entity type name by ID for export."""
+        if not entity_type_id:
+            return None
+        et = self.get_entity_type_by_id(entity_type_id)
+        return et.name if et else None
+
+    def import_template(self, data: Dict[str, Any]) -> ProjectTemplate:
+        """Import a project template from a JSON-serializable dictionary."""
+        template_data = data["template"]
+        entity_types_data = data["entity_types"]
+        views_data = data["views"]
+
+        # Create the template
+        template = self.create(
+            name=template_data["name"],
+            description=template_data.get("description"),
+            is_builtin=False,
+        )
+
+        # Track entity type name -> ID mapping for references
+        entity_type_id_map: Dict[str, uuid.UUID] = {}
+
+        # Import entity types with their parameter definitions and slot groups
+        for et_data in entity_types_data:
+            et = self.create_entity_type(
+                project_template_id=template.id,
+                kind=et_data["kind"],
+                name=et_data["name"],
+                description=et_data.get("description"),
+                sort_order=et_data["sort_order"],
+            )
+            entity_type_id_map[et_data["name"]] = et.id
+
+            # Import parameter definitions
+            for pd_data in et_data["parameter_definitions"]:
+                self.create_parameter_definition(
+                    project_template_id=template.id,
+                    entity_type_id=et.id,
+                    domain=pd_data["domain"],
+                    key=pd_data["key"],
+                    value_type=pd_data["value_type"],
+                    label=pd_data["label"],
+                    description=pd_data.get("description"),
+                    required=pd_data["required"],
+                    sort_order=pd_data["sort_order"],
+                    is_label=pd_data["is_label"],
+                    is_unique=pd_data["is_unique"],
+                    is_searchable=pd_data["is_searchable"],
+                    is_hidden=pd_data["is_hidden"],
+                    default_value=pd_data.get("default_value"),
+                    validation_min=pd_data.get("validation_min"),
+                    validation_max=pd_data.get("validation_max"),
+                    validation_regex=pd_data.get("validation_regex"),
+                )
+
+            # Import slot groups
+            for sg_data in et_data.get("slot_groups", []):
+                sg = self.create_slot_group(
+                    entity_type_id=et.id,
+                    kind=sg_data["kind"],
+                    min_slots=sg_data["min_slots"],
+                    max_slots=sg_data.get("max_slots"),
+                    sort_order=sg_data["sort_order"],
+                )
+
+                # Import group-level constraints
+                for c_data in sg_data.get("constraints", []):
+                    self.create_slot_constraint(
+                        slot_group_id=sg.id,
+                        domain=c_data.get("domain"),
+                        key=c_data.get("key"),
+                        operator=c_data.get("operator"),
+                        value_string=c_data.get("value_string"),
+                        value_number=c_data.get("value_number"),
+                        value_boolean=c_data.get("value_boolean"),
+                        is_wildcard=c_data["is_wildcard"],
+                        sort_order=c_data["sort_order"],
+                    )
+
+                # Import slot definitions
+                for sd_data in sg_data.get("slot_definitions", []):
+                    sd = self.create_slot_definition(
+                        slot_group_id=sg.id,
+                        slot_key=sd_data["slot_key"],
+                        min_occurrences=sd_data["min_occurrences"],
+                        max_occurrences=sd_data.get("max_occurrences"),
+                        sort_order=sd_data["sort_order"],
+                    )
+
+                    # Import slot definition constraints
+                    for c_data in sd_data.get("constraints", []):
+                        self.create_slot_constraint(
+                            slot_definition_id=sd.id,
+                            domain=c_data.get("domain"),
+                            key=c_data.get("key"),
+                            operator=c_data.get("operator"),
+                            value_string=c_data.get("value_string"),
+                            value_number=c_data.get("value_number"),
+                            value_boolean=c_data.get("value_boolean"),
+                            is_wildcard=c_data["is_wildcard"],
+                            sort_order=c_data["sort_order"],
+                        )
+
+        # Import views with their configs
+        for view_data in views_data:
+            view = self.create_view(
+                project_template_id=template.id,
+                view_key=view_data["view_key"],
+                label=view_data["label"],
+                description=view_data.get("description"),
+                is_system=view_data["is_system"],
+                sort_order=view_data["sort_order"],
+            )
+
+            for config_data in view_data.get("configs", []):
+                entity_type_id = None
+                if config_data.get("entity_type_name"):
+                    entity_type_id = entity_type_id_map.get(config_data["entity_type_name"])
+
+                self.create_view_config(
+                    view_id=view.id,
+                    entity_type_id=entity_type_id,
+                    filter_params=config_data.get("filter_params"),
+                    display_slots=config_data.get("display_slots"),
+                    sort_order=config_data["sort_order"],
+                )
+
+        return template

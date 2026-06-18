@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -263,11 +264,19 @@ class ProjectTemplateDetailResponse(BaseModel):
     views: List[ViewWithConfigsResponse]
 
 
+class TemplateImportRequest(BaseModel):
+    data: Dict[str, Any]
+
+
+class TemplateExportResponse(BaseModel):
+    data: Dict[str, Any]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/project-templates", response_model=ProjectTemplateResponse)
+@router.post("/project-templates", response_model=ProjectTemplateResponse, status_code=201)
 def create_project_template(data: ProjectTemplateCreate, db: Session = Depends(get_db)):
     repo = ProjectTemplateRepository(db)
     return repo.create(name=data.name, description=data.description, is_builtin=False)
@@ -341,7 +350,7 @@ def delete_project_template(
         )
 
 
-@router.post("/project-templates/{project_template_id}/clone", response_model=ProjectTemplateResponse)
+@router.post("/project-templates/{project_template_id}/clone", response_model=ProjectTemplateResponse, status_code=201)
 def clone_project_template(
     project_template_id: uuid.UUID,
     data: ProjectTemplateCloneRequest,
@@ -354,9 +363,43 @@ def clone_project_template(
     return cloned
 
 
+@router.get(
+    "/project-templates/{project_template_id}/export",
+    response_model=TemplateExportResponse,
+)
+def export_template(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    data = repo.export_template(project_template_id)
+    return TemplateExportResponse(data=data)
+
+
+@router.post(
+    "/project-templates/import",
+    response_model=ProjectTemplateResponse,
+    status_code=201,
+)
+def import_template(
+    request: TemplateImportRequest,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    try:
+        template = repo.import_template(request.data)
+        return template
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to import template: {str(e)}")
+
+
 # Entity types
 
-@router.post("/project-templates/{project_template_id}/entity-types", response_model=EntityTypeResponse)
+@router.post("/project-templates/{project_template_id}/entity-types", response_model=EntityTypeResponse, status_code=201)
 def create_entity_type(
     project_template_id: uuid.UUID,
     data: EntityTypeCreate,
@@ -422,6 +465,7 @@ def get_entity_type(
 @router.post(
     "/project-templates/{project_template_id}/entity-types/{entity_type_id}/clone",
     response_model=EntityTypeResponse,
+    status_code=201,
 )
 def clone_entity_type(
     project_template_id: uuid.UUID,
@@ -521,6 +565,7 @@ def delete_entity_type(
 @router.post(
     "/project-templates/{project_template_id}/entity-types/{entity_type_id}/parameter-definitions",
     response_model=ParameterDefinitionResponse,
+    status_code=201,
 )
 def create_parameter_definition(
     project_template_id: uuid.UUID,
@@ -655,7 +700,7 @@ def delete_parameter_definition(
 
 # Views
 
-@router.post("/project-templates/{project_template_id}/views", response_model=ViewResponse)
+@router.post("/project-templates/{project_template_id}/views", response_model=ViewResponse, status_code=201)
 def create_view(
     project_template_id: uuid.UUID,
     data: ViewCreate,
@@ -765,6 +810,7 @@ def seed_system_views(
 @router.post(
     "/project-templates/{project_template_id}/views/{view_id}/configs",
     response_model=ViewConfigResponse,
+    status_code=201,
 )
 def create_view_config(
     project_template_id: uuid.UUID,
@@ -982,6 +1028,7 @@ def list_slot_groups(
 @router.post(
     "/project-template-entity-types/{entity_type_id}/slot-groups",
     response_model=SlotGroupResponse,
+    status_code=201,
 )
 def create_slot_group(
     entity_type_id: uuid.UUID,
@@ -1120,6 +1167,7 @@ def delete_slot_group(
 @router.post(
     "/project-template-slot-groups/{slot_group_id}/slot-definitions",
     response_model=SlotDefinitionResponse,
+    status_code=201,
 )
 def create_slot_definition(
     slot_group_id: uuid.UUID,
@@ -1227,6 +1275,7 @@ def delete_slot_definition(
 @router.post(
     "/project-template-slot-groups/{slot_group_id}/constraints",
     response_model=SlotConstraintResponse,
+    status_code=201,
 )
 def create_group_constraint(
     slot_group_id: uuid.UUID,
@@ -1269,6 +1318,7 @@ def create_group_constraint(
 @router.post(
     "/project-template-slot-definitions/{slot_definition_id}/constraints",
     response_model=SlotConstraintResponse,
+    status_code=201,
 )
 def create_definition_constraint(
     slot_definition_id: uuid.UUID,
