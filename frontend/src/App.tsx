@@ -10,6 +10,7 @@ import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
 import { TemplateListPage } from './pages/TemplateListPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { ViewsEditorPage } from './pages/ViewsEditorPage';
+import { ViewEditorPage } from './pages/ViewEditorPage';
 import { SlotDefinitionsPage } from './pages/SlotDefinitionsPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
 import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
@@ -25,6 +26,7 @@ function App() {
         <Route path="/templates/new" element={<TemplateEditorPage />} />
         <Route path="/templates/:templateId/edit" element={<TemplateEditorPage />} />
         <Route path="/templates/:templateId/views" element={<ViewsEditorPage />} />
+        <Route path="/templates/:templateId/views/:viewId/edit" element={<ViewEditorPage />} />
         <Route path="/templates/:templateId/entity-types/:entityTypeId/slots" element={<SlotDefinitionsPage />} />
         <Route path="/projects/:projectId" element={<ProjectHomePage />} />
         <Route

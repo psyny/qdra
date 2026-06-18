@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getTemplateViews, createView, updateView, deleteView, seedSystemViews, View } from '../api/views';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
-import { ViewConfigEditor } from '../components/ViewConfigEditor';
 
 export function ViewsEditorPage() {
   const { templateId } = useParams<{ templateId: string }>();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [views, setViews] = useState<View[]>([]);
-  const [editingView, setEditingView] = useState<View | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newViewForm, setNewViewForm] = useState({
     view_key: '',
@@ -107,36 +106,6 @@ export function ViewsEditorPage() {
         <div className="card state-message">
           <p className="state-message__text">Loading views...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (editingView) {
-    return (
-      <div className="page">
-        <WorkspaceHeader breadcrumbItems={[
-          { label: 'Home', to: '/home' },
-          { label: 'Templates', to: '/templates' },
-          { label: 'Edit Template', to: `/templates/${templateId}/edit` },
-          { label: 'Edit View' }
-        ]} />
-        
-        <div className="page-header">
-          <h1 className="page-title">Edit View: {editingView.label}</h1>
-          <button onClick={() => setEditingView(null)} className="button button--secondary">
-            Back to Views
-          </button>
-        </div>
-
-        <ViewConfigEditor 
-          templateId={templateId!}
-          view={editingView}
-          onSave={() => {
-            setEditingView(null);
-            loadViews();
-          }}
-          onCancel={() => setEditingView(null)}
-        />
       </div>
     );
   }
@@ -255,7 +224,7 @@ export function ViewsEditorPage() {
                     ↓
                   </button>
                   <button
-                    onClick={() => setEditingView(view)}
+                    onClick={() => navigate(`/templates/${templateId}/views/${view.id}/edit`)}
                     className="button button--secondary"
                   >
                     Edit
