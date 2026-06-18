@@ -119,6 +119,7 @@
 /* Form */
 .form-card {
   max-width: 600px;
+  margin-bottom: 24px;
 }
 
 .form-field {
@@ -214,6 +215,27 @@
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+/* Status Dot */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  cursor: help;
+}
+
+.status-dot--success {
+  background: var(--success);
+}
+
+.status-dot--danger {
+  background: var(--danger);
+}
+
+.status-dot--loading {
+  background: var(--warning);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 .status-pill--loading {
   color: var(--warning);
 }
@@ -256,6 +278,10 @@
   padding: 24px 32px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-main);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .workspace-header__breadcrumb {

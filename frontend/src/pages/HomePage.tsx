@@ -5,6 +5,7 @@ export function HomePage() {
   return (
     <div className="page">
       <div className="workspace-header">
+        <BackendStatus />
         <div className="workspace-header__breadcrumb">
           <Link to="/home">Home</Link>
         </div>
@@ -12,9 +13,6 @@ export function HomePage() {
       <div className="page-header">
         <h1 className="page-title">Qdra</h1>
         <p className="page-description">Choose where to start.</p>
-        <div className="mt-4">
-          <BackendStatus />
-        </div>
       </div>
 
       <div className="mt-12">

@@ -100,6 +100,7 @@ export function ProjectSelectionPage() {
   return (
     <div className="page">
       <div className="workspace-header">
+        <BackendStatus />
         <div className="workspace-header__breadcrumb">
           <Link to="/home">Home</Link> &gt; <Link to="/projects">Projects</Link>
         </div>
@@ -107,9 +108,6 @@ export function ProjectSelectionPage() {
       <div className="page-header">
         <h1 className="page-title">Projects</h1>
         <p className="page-description">Create, edit, and open Qdra workspaces.</p>
-        <div className="mt-4">
-          <BackendStatus />
-        </div>
       </div>
 
       <div className="mt-8">

@@ -10,12 +10,12 @@ export function BackendStatus() {
       .catch(() => setStatus('disconnected'));
   }, []);
 
+  const statusText = status === 'loading' ? 'Loading...' : status === 'connected' ? 'Connected' : 'Disconnected';
+
   return (
-    <div className={`status-pill ${status === 'connected' ? 'status-pill--success' : status === 'disconnected' ? 'status-pill--danger' : 'status-pill--loading'}`}>
-      <span className="status-pill__dot"></span>
-      {status === 'loading' && 'Loading...'}
-      {status === 'connected' && 'Connected'}
-      {status === 'disconnected' && 'Disconnected'}
-    </div>
+    <div
+      className={`status-dot ${status === 'connected' ? 'status-dot--success' : status === 'disconnected' ? 'status-dot--danger' : 'status-dot--loading'}`}
+      title={statusText}
+    />
   );
 }

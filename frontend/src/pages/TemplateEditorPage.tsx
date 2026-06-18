@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { getTemplate, createTemplate, updateTemplate } from '../api/templates';
 import { ProjectTemplateDraft, ProjectTemplateDetail } from '../types/template';
+import { BackendStatus } from '../components/BackendStatus';
 import { EntityTypeEditor } from '../components/EntityTypeEditor';
 
 export function TemplateEditorPage() {
@@ -81,6 +82,7 @@ export function TemplateEditorPage() {
   return (
     <div className="page">
       <div className="workspace-header">
+        <BackendStatus />
         <div className="workspace-header__breadcrumb">
           <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link> &gt; <span>{isNew ? 'New Template' : 'Edit Template'}</span>
         </div>

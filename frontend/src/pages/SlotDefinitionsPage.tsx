@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { BackendStatus } from '../components/BackendStatus';
 import {
   listSlotGroups,
   createSlotGroup,
@@ -397,6 +398,7 @@ export function SlotDefinitionsPage() {
   return (
     <div className="page">
       <div className="workspace-header">
+        <BackendStatus />
         <div className="workspace-header__breadcrumb">
           <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link> &gt; <Link to={`/templates/${templateId}/edit`}>Edit Template</Link> &gt; <span>Edit Slot Definitions</span>
         </div>
