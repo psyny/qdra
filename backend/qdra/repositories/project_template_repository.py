@@ -2,7 +2,7 @@ import uuid
 import json
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from models.project_template import (
     ProjectTemplate,
@@ -485,6 +485,7 @@ class ProjectTemplateRepository:
     ) -> List[ProjectTemplateView]:
         return (
             self.db.query(ProjectTemplateView)
+            .options(selectinload(ProjectTemplateView.configs))
             .filter(
                 ProjectTemplateView.project_template_id == project_template_id
             )

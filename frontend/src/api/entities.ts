@@ -11,6 +11,12 @@ export async function getEntities(projectId: string, kind?: string): Promise<Ent
   return response.json();
 }
 
+export async function getEntitiesByViewConfig(projectId: string, configId: string): Promise<Entity[]> {
+  const response = await fetch(`${API_URL}/projects/${projectId}/view-configs/${configId}/entities`);
+  if (!response.ok) throw new Error('Failed to fetch entities by view config');
+  return response.json();
+}
+
 export async function getEntity(projectId: string, entityId: string): Promise<Entity> {
   const response = await fetch(`${API_URL}/projects/${projectId}/entities/${entityId}`);
   if (!response.ok) throw new Error('Failed to fetch entity');
@@ -24,6 +30,16 @@ export async function createEntity(projectId: string, payload: CreateEntityReque
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create entity');
+  return response.json();
+}
+
+export async function updateEntity(projectId: string, entityId: string, payload: { parameters?: any[] }): Promise<Entity> {
+  const response = await fetch(`${API_URL}/projects/${projectId}/entities/${entityId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update entity');
   return response.json();
 }
 

@@ -1,24 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProject } from '../api/projects';
+import { getProject, getProjectTemplate } from '../api/projects';
 import { Project } from '../types/project';
+import { ProjectTemplateDetail } from '../types/template';
 import { WorkspaceLayout } from '../components/WorkspaceLayout';
 
 export function ProjectHomePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
+  const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
 
-    const loadProject = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getProject(projectId);
-        setProject(data);
+        const [projectData, templateData] = await Promise.all([
+          getProject(projectId),
+          getProjectTemplate(projectId),
+        ]);
+        setProject(projectData);
+        setTemplate(templateData);
       } catch (err) {
         setError('Project not found');
       } finally {
@@ -26,7 +32,7 @@ export function ProjectHomePage() {
       }
     };
 
-    loadProject();
+    loadData();
   }, [projectId]);
 
   if (loading) {
@@ -60,13 +66,39 @@ export function ProjectHomePage() {
 
   return (
     <WorkspaceLayout projectId={project.id} projectName={project.name}>
-      <h2 className="card-title">Project Home</h2>
-      <p className="card-description">
-        Welcome to {project.name}.
-      </p>
-      <p className="card-description">
-        Use the navigation menu to access project resources.
-      </p>
+      <h2 className="card-title">Project Details</h2>
+      <div className="form-field">
+        <label className="form-label">Project Name</label>
+        <p className="card-description">{project.name}</p>
+      </div>
+      <div className="form-field">
+        <label className="form-label">Project ID</label>
+        <p className="card-description">{project.id}</p>
+      </div>
+      {template && (
+        <>
+          <div className="form-field">
+            <label className="form-label">Template Name</label>
+            <p className="card-description">{template.template.name}</p>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Template ID</label>
+            <p className="card-description">{template.template.id}</p>
+          </div>
+        </>
+      )}
+      {project.created_at && (
+        <div className="form-field">
+          <label className="form-label">Created At</label>
+          <p className="card-description">{new Date(project.created_at).toLocaleString()}</p>
+        </div>
+      )}
+      {project.updated_at && (
+        <div className="form-field">
+          <label className="form-label">Updated At</label>
+          <p className="card-description">{new Date(project.updated_at).toLocaleString()}</p>
+        </div>
+      )}
     </WorkspaceLayout>
   );
 }

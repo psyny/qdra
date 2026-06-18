@@ -146,6 +146,46 @@ def get_entity(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+class UpdateEntityRequest(BaseModel):
+    parameters: Optional[List[ParameterValueModel]] = None
+
+
+@router.put("/projects/{project_id}/entities/{entity_id}", response_model=EntityResponse)
+def update_entity(
+    project_id: uuid.UUID,
+    entity_id: uuid.UUID,
+    request: UpdateEntityRequest,
+    db: Session = Depends(get_db),
+):
+    """Update an entity's parameters."""
+    service = EntityService(db)
+    try:
+        # Verify entity exists
+        service.get_entity(entity_id)
+        
+        # Update parameters if provided
+        if request.parameters:
+            # First, delete existing parameters for this entity
+            existing_params = service.get_entity_parameters(entity_id)
+            for param in existing_params:
+                service.delete_parameter(param.id)
+            
+            # Add new parameters
+            for param in request.parameters:
+                service.add_parameter(
+                    entity_id=entity_id,
+                    domain=param.domain,
+                    key=param.key,
+                    value_string=param.value_string,
+                    value_number=param.value_number,
+                    value_boolean=param.value_boolean,
+                )
+        
+        return service.get_entity(entity_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.delete("/projects/{project_id}/entities/{entity_id}", status_code=204)
 def delete_entity(
     project_id: uuid.UUID,
@@ -195,6 +235,23 @@ def list_entity_parameters(
     service = EntityService(db)
     try:
         return service.get_entity_parameters(entity_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get(
+    "/projects/{project_id}/view-configs/{config_id}/entities",
+    response_model=List[EntityResponse],
+)
+def list_entities_by_view_config(
+    project_id: uuid.UUID,
+    config_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """List entities filtered by a view config's entity_type_id and filter_params."""
+    service = EntityService(db)
+    try:
+        return service.list_entities_by_view_config(project_id, config_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

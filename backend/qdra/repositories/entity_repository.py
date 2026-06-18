@@ -43,6 +43,16 @@ class EntityRepository:
             .all()
         )
 
+    def list_by_project_and_entity_type(
+        self, project_id: uuid.UUID, entity_type_id: uuid.UUID
+    ) -> List[Entity]:
+        return (
+            self.db.query(Entity)
+            .filter(Entity.project_id == project_id)
+            .filter(Entity.entity_type_id == entity_type_id)
+            .all()
+        )
+
     def delete(self, entity_id: uuid.UUID) -> bool:
         entity = self.get_by_id(entity_id)
         if not entity:

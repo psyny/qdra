@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,6 +10,7 @@ from db.session import get_db
 from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
 from services.planning.output_planner_service import PlanningService
+from api.project_templates import ProjectTemplateDetailResponse
 
 from domain.planning.output_planner import (
     PlanningRequest,
@@ -52,6 +54,8 @@ class ProjectResponse(BaseModel):
     id: uuid.UUID
     name: str
     project_template_id: uuid.UUID
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 # Planning API Models
@@ -210,6 +214,36 @@ def get_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+@router.get("/projects/{project_id}/template", response_model=ProjectTemplateDetailResponse)
+def get_project_template(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Get the project template for a project."""
+    project_repo = ProjectRepository(db)
+    project = project_repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    template_repo = ProjectTemplateRepository(db)
+    template = template_repo.get_by_id(project.project_template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Project template not found")
+    
+    # Build the detailed response
+    entity_types = template_repo.list_entity_types(template.id)
+    parameter_definitions = []
+    for et in entity_types:
+        param_defs = template_repo.list_parameter_definitions_by_entity_type(et.id)
+        parameter_definitions.extend(param_defs)
+    
+    views = template_repo.list_views(template.id)
+    
+    return ProjectTemplateDetailResponse(
+        template=template,
+        entity_types=entity_types,
+        parameter_definitions=parameter_definitions,
+        views=views,
+    )
 
 
 class ProjectUpdateTemplate(BaseModel):

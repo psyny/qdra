@@ -245,6 +245,7 @@ class ViewConfigResponse(BaseModel):
 
 
 class ViewWithConfigsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_template_id: uuid.UUID
     view_key: str

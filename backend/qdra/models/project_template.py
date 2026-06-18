@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID, DOUBLE_PRECISION
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
 
@@ -118,6 +118,10 @@ class ProjectTemplateView(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    configs: Mapped[List["ProjectTemplateViewConfig"]] = relationship(
+        "ProjectTemplateViewConfig", backref="view", order_by="ProjectTemplateViewConfig.sort_order"
     )
 
     __table_args__ = (

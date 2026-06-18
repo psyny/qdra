@@ -1,4 +1,5 @@
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
+import { ProjectTemplateDetail } from '../types/template';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -14,6 +15,14 @@ export async function getProject(projectId: string): Promise<Project> {
   const response = await fetch(`${API_URL}/projects/${projectId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch project');
+  }
+  return response.json();
+}
+
+export async function getProjectTemplate(projectId: string): Promise<ProjectTemplateDetail> {
+  const response = await fetch(`${API_URL}/projects/${projectId}/template`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch project template');
   }
   return response.json();
 }

@@ -152,3 +152,55 @@ class EntityService:
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
         return self.entity_parameter_repository.list_by_entity(entity_id)
+
+    def list_entities_by_view_config(
+        self,
+        project_id: uuid.UUID,
+        view_config_id: uuid.UUID,
+    ) -> List[Dict[str, Any]]:
+        """List entities filtered by a view config's entity_type_id and filter_params."""
+        project = self.project_repository.get_by_id(project_id)
+        if not project:
+            raise ValueError(f"Project '{project_id}' not found")
+
+        view_config = self.template_repository.get_view_config_by_id(view_config_id)
+        if not view_config:
+            raise ValueError(f"View config '{view_config_id}' not found")
+
+        entity_type_id = view_config.entity_type_id
+        if not entity_type_id:
+            raise ValueError(f"View config '{view_config_id}' has no entity_type_id")
+
+        # Get entities by project and entity type
+        entities = self.entity_repository.list_by_project_and_entity_type(
+            project_id, entity_type_id
+        )
+
+        # TODO: Apply filter_params from view_config if needed
+        # For now, return all entities of the type
+        result = []
+
+        for entity in entities:
+            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+            entity_kind = entity_type.kind if entity_type else "unknown"
+
+            image = self.image_asset_repository.get_primary_image(entity.id)
+            entity_data: Dict[str, Any] = {
+                "id": entity.id,
+                "project_id": entity.project_id,
+                "entity_type_id": entity.entity_type_id,
+                "kind": entity_kind,
+                "created_at": entity.created_at,
+                "updated_at": entity.updated_at,
+                "image": None,
+            }
+            if image:
+                entity_data["image"] = {
+                    "id": image.id,
+                    "url": f"/projects/{entity.project_id}/images/{image.id}",
+                    "mime_type": image.mime_type,
+                    "alt_text": image.alt_text,
+                }
+            result.append(entity_data)
+
+        return result

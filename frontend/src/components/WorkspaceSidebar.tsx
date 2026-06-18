@@ -5,12 +5,10 @@ type WorkspaceSidebarProps = {
 };
 
 const navItems = [
-  { path: '', label: 'Home' },
-  { path: 'materials', label: 'Materials' },
-  { path: 'recipes', label: 'Recipes' },
+  { path: '', label: 'Project' },
+  { path: 'materials', label: 'Material Catalog' },
+  { path: 'recipes', label: 'Recipe Catalog' },
   { path: 'planning', label: 'Planning' },
-  { path: 'templates', label: 'Templates' },
-  { path: 'settings', label: 'Settings' },
 ];
 
 export function WorkspaceSidebar({ projectId }: WorkspaceSidebarProps) {
