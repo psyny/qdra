@@ -50,7 +50,9 @@ export type ParameterDefinition = {
   is_searchable: boolean;
   is_hidden: boolean;
   default_value?: string | null;
-  validation?: Record<string, any> | null;
+  validation_min?: number | null;
+  validation_max?: number | null;
+  validation_regex?: string | null;
   created_at: string;
   updated_at: string;
 };

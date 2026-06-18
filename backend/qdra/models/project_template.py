@@ -82,7 +82,9 @@ class ProjectTemplateParameterDefinition(Base):
     is_searchable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     default_value: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-    validation: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    validation_min: Mapped[Optional[float]] = mapped_column(DOUBLE_PRECISION, nullable=True)
+    validation_max: Mapped[Optional[float]] = mapped_column(DOUBLE_PRECISION, nullable=True)
+    validation_regex: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

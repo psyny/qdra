@@ -174,7 +174,9 @@ export async function createParameterDefinition(
     is_searchable?: boolean;
     is_hidden?: boolean;
     default_value?: string | null;
-    validation?: Record<string, unknown> | null;
+    validation_min?: number | null;
+    validation_max?: number | null;
+    validation_regex?: string | null;
   },
 ): Promise<ParameterDefinition> {
   const response = await fetch(
@@ -206,7 +208,9 @@ export async function updateParameterDefinition(
     is_searchable?: boolean;
     is_hidden?: boolean;
     default_value?: string | null;
-    validation?: Record<string, unknown> | null;
+    validation_min?: number | null;
+    validation_max?: number | null;
+    validation_regex?: string | null;
   },
 ): Promise<ParameterDefinition> {
   const response = await fetch(

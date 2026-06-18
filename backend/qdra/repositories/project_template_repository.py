@@ -253,7 +253,9 @@ class ProjectTemplateRepository:
         is_searchable: bool = False,
         is_hidden: bool = False,
         default_value: Optional[str] = None,
-        validation: Optional[Dict[str, Any]] = None,
+        validation_min: Optional[float] = None,
+        validation_max: Optional[float] = None,
+        validation_regex: Optional[str] = None,
     ) -> ProjectTemplateParameterDefinition:
         param_def = ProjectTemplateParameterDefinition(
             project_template_id=project_template_id,
@@ -270,7 +272,9 @@ class ProjectTemplateRepository:
             is_searchable=is_searchable,
             is_hidden=is_hidden,
             default_value=default_value,
-            validation=validation,
+            validation_min=validation_min,
+            validation_max=validation_max,
+            validation_regex=validation_regex,
         )
         self.db.add(param_def)
         self.db.commit()
@@ -334,7 +338,9 @@ class ProjectTemplateRepository:
         is_searchable: Optional[bool] = None,
         is_hidden: Optional[bool] = None,
         default_value: Optional[str] = None,
-        validation: Optional[Dict[str, Any]] = None,
+        validation_min: Optional[float] = None,
+        validation_max: Optional[float] = None,
+        validation_regex: Optional[str] = None,
     ) -> Optional[ProjectTemplateParameterDefinition]:
         param_def = self.get_parameter_definition_by_id(definition_id)
         if param_def:
@@ -362,8 +368,12 @@ class ProjectTemplateRepository:
                 param_def.is_hidden = is_hidden
             if default_value is not None:
                 param_def.default_value = default_value
-            if validation is not None:
-                param_def.validation = validation
+            if validation_min is not None:
+                param_def.validation_min = validation_min
+            if validation_max is not None:
+                param_def.validation_max = validation_max
+            if validation_regex is not None:
+                param_def.validation_regex = validation_regex
             self.db.commit()
             self.db.refresh(param_def)
         return param_def

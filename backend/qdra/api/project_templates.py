@@ -1,4 +1,5 @@
 import uuid
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -10,6 +11,67 @@ from db.session import get_db
 from repositories.project_template_repository import ProjectTemplateRepository
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Validation Functions
+# ---------------------------------------------------------------------------
+
+def validate_parameter_definition(
+    value_type: str,
+    validation_min: Optional[float] = None,
+    validation_max: Optional[float] = None,
+    validation_regex: Optional[str] = None,
+) -> tuple[Optional[float], Optional[float], Optional[str]]:
+    """
+    Validate and normalize parameter definition validation fields.
+    
+    Returns normalized (validation_min, validation_max, validation_regex).
+    Raises HTTPException if validation fails.
+    """
+    # Normalize empty regex to None
+    if validation_regex is not None and validation_regex.strip() == "":
+        validation_regex = None
+    
+    # For boolean parameters, ignore all validation fields
+    if value_type == "boolean":
+        return None, None, None
+    
+    # For number parameters, ignore regex
+    if value_type == "number":
+        validation_regex = None
+    
+    # Validate min/max relationship
+    if validation_min is not None and validation_max is not None:
+        if validation_min > validation_max:
+            raise HTTPException(
+                status_code=400,
+                detail="validation_min cannot be greater than validation_max"
+            )
+    
+    # For string parameters, validate that min/max are non-negative
+    if value_type == "string":
+        if validation_min is not None and validation_min < 0:
+            raise HTTPException(
+                status_code=400,
+                detail="validation_min for string parameters must be >= 0"
+            )
+        if validation_max is not None and validation_max < 0:
+            raise HTTPException(
+                status_code=400,
+                detail="validation_max for string parameters must be >= 0"
+            )
+        # Validate regex compiles
+        if validation_regex is not None:
+            try:
+                re.compile(validation_regex)
+            except re.error as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid regex: {str(e)}"
+                )
+    
+    return validation_min, validation_max, validation_regex
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +130,9 @@ class ParameterDefinitionCreate(BaseModel):
     is_searchable: bool = False
     is_hidden: bool = False
     default_value: Optional[str] = None
-    validation: Optional[Dict[str, Any]] = None
+    validation_min: Optional[float] = None
+    validation_max: Optional[float] = None
+    validation_regex: Optional[str] = None
 
 
 class ParameterDefinitionResponse(BaseModel):
@@ -88,7 +152,9 @@ class ParameterDefinitionResponse(BaseModel):
     is_searchable: bool
     is_hidden: bool
     default_value: Optional[str]
-    validation: Optional[Dict[str, Any]]
+    validation_min: Optional[float]
+    validation_max: Optional[float]
+    validation_regex: Optional[str]
     created_at: datetime
     updated_at: datetime
 
@@ -106,7 +172,9 @@ class ParameterDefinitionUpdate(BaseModel):
     is_searchable: Optional[bool] = None
     is_hidden: Optional[bool] = None
     default_value: Optional[str] = None
-    validation: Optional[Dict[str, Any]] = None
+    validation_min: Optional[float] = None
+    validation_max: Optional[float] = None
+    validation_regex: Optional[str] = None
 
 
 class EntityTypeResponse(BaseModel):
@@ -120,22 +188,6 @@ class EntityTypeResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     parameter_definitions: List[ParameterDefinitionResponse] = []
-
-
-class ParameterDefinitionUpdate(BaseModel):
-    domain: Optional[str] = None
-    key: Optional[str] = None
-    value_type: Optional[str] = None
-    label: Optional[str] = None
-    description: Optional[str] = None
-    required: Optional[bool] = None
-    sort_order: Optional[int] = None
-    is_label: Optional[bool] = None
-    is_unique: Optional[bool] = None
-    is_searchable: Optional[bool] = None
-    is_hidden: Optional[bool] = None
-    default_value: Optional[str] = None
-    validation: Optional[Dict[str, Any]] = None
 
 
 class ViewCreate(BaseModel):
@@ -460,6 +512,15 @@ def create_parameter_definition(
         raise HTTPException(status_code=404, detail="Entity type not found")
     if data.value_type not in ("string", "number", "boolean"):
         raise HTTPException(status_code=400, detail="value_type must be one of: string, number, boolean")
+    
+    # Validate and normalize validation fields
+    validation_min, validation_max, validation_regex = validate_parameter_definition(
+        data.value_type,
+        data.validation_min,
+        data.validation_max,
+        data.validation_regex,
+    )
+    
     return repo.create_parameter_definition(
         project_template_id=project_template_id,
         entity_type_id=entity_type_id,
@@ -475,7 +536,9 @@ def create_parameter_definition(
         is_searchable=data.is_searchable,
         is_hidden=data.is_hidden,
         default_value=data.default_value,
-        validation=data.validation,
+        validation_min=validation_min,
+        validation_max=validation_max,
+        validation_regex=validation_regex,
     )
 
 
@@ -510,6 +573,23 @@ def update_parameter_definition(
     repo = ProjectTemplateRepository(db)
     if not repo.get_by_id(project_template_id):
         raise HTTPException(status_code=404, detail="Project template not found")
+    
+    # Get existing param_def to check value_type if not being updated
+    existing_param_def = repo.get_parameter_definition_by_id(definition_id)
+    if not existing_param_def:
+        raise HTTPException(status_code=404, detail="Parameter definition not found")
+    
+    # Use the value_type from the update if provided, otherwise use existing
+    value_type = data.value_type if data.value_type is not None else existing_param_def.value_type
+    
+    # Validate and normalize validation fields
+    validation_min, validation_max, validation_regex = validate_parameter_definition(
+        value_type,
+        data.validation_min,
+        data.validation_max,
+        data.validation_regex,
+    )
+    
     param_def = repo.update_parameter_definition(
         definition_id=definition_id,
         domain=data.domain,
@@ -524,7 +604,9 @@ def update_parameter_definition(
         is_searchable=data.is_searchable,
         is_hidden=data.is_hidden,
         default_value=data.default_value,
-        validation=data.validation,
+        validation_min=validation_min,
+        validation_max=validation_max,
+        validation_regex=validation_regex,
     )
     if not param_def:
         raise HTTPException(status_code=404, detail="Parameter definition not found")

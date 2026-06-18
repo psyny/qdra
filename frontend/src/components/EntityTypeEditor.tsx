@@ -35,7 +35,9 @@ type ParameterDefinitionForm = {
   is_searchable: boolean;
   is_hidden: boolean;
   default_value: string;
-  validation: string;
+  validation_min: string;
+  validation_max: string;
+  validation_regex: string;
 };
 
 export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
@@ -66,7 +68,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
     is_searchable: false,
     is_hidden: false,
     default_value: '',
-    validation: '',
+    validation_min: '',
+    validation_max: '',
+    validation_regex: '',
   });
 
   const [showParamForm, setShowParamForm] = useState(false);
@@ -188,7 +192,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
         is_searchable: paramForm.is_searchable,
         is_hidden: paramForm.is_hidden,
         default_value: paramForm.default_value.trim() || null,
-        validation: paramForm.validation.trim() || null,
+        validation_min: paramForm.validation_min ? parseFloat(paramForm.validation_min) : null,
+        validation_max: paramForm.validation_max ? parseFloat(paramForm.validation_max) : null,
+        validation_regex: paramForm.validation_regex.trim() || null,
       });
       setShowParamForm(false);
       setEditingParam(null);
@@ -205,7 +211,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
         is_searchable: false,
         is_hidden: false,
         default_value: '',
-        validation: '',
+        validation_min: '',
+        validation_max: '',
+        validation_regex: '',
       });
       loadParameterDefinitions(entityTypeId);
     } catch (err) {
@@ -228,7 +236,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
         is_searchable: paramForm.is_searchable,
         is_hidden: paramForm.is_hidden,
         default_value: paramForm.default_value.trim() || null,
-        validation: paramForm.validation.trim() || null,
+        validation_min: paramForm.validation_min ? parseFloat(paramForm.validation_min) : null,
+        validation_max: paramForm.validation_max ? parseFloat(paramForm.validation_max) : null,
+        validation_regex: paramForm.validation_regex.trim() || null,
       });
       setShowParamForm(false);
       setEditingParam(null);
@@ -245,7 +255,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
         is_searchable: false,
         is_hidden: false,
         default_value: '',
-        validation: '',
+        validation_min: '',
+        validation_max: '',
+        validation_regex: '',
       });
       loadParameterDefinitions(entityTypeId);
     } catch (err) {
@@ -278,7 +290,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
       is_searchable: param.is_searchable,
       is_hidden: param.is_hidden,
       default_value: param.default_value || '',
-      validation: param.validation ? JSON.stringify(param.validation) : '',
+      validation_min: param.validation_min?.toString() || '',
+      validation_max: param.validation_max?.toString() || '',
+      validation_regex: param.validation_regex || '',
     });
   };
 
@@ -298,7 +312,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
       is_searchable: false,
       is_hidden: false,
       default_value: '',
-      validation: '',
+      validation_min: '',
+      validation_max: '',
+      validation_regex: '',
     });
   };
 
@@ -478,7 +494,16 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                     <select
                       className="form-input"
                       value={paramForm.value_type}
-                      onChange={(e) => setParamForm({ ...paramForm, value_type: e.target.value as 'string' | 'number' | 'boolean' })}
+                      onChange={(e) => {
+                        const newType = e.target.value as 'string' | 'number' | 'boolean';
+                        if (newType === 'boolean') {
+                          setParamForm({ ...paramForm, value_type: newType, validation_min: '', validation_max: '', validation_regex: '' });
+                        } else if (newType === 'number') {
+                          setParamForm({ ...paramForm, value_type: newType, validation_regex: '' });
+                        } else {
+                          setParamForm({ ...paramForm, value_type: newType });
+                        }
+                      }}
                     >
                       <option value="string">String</option>
                       <option value="number">Number</option>
@@ -557,15 +582,70 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                       onChange={(e) => setParamForm({ ...paramForm, default_value: e.target.value })}
                     />
                   </div>
-                  <div className="form-field">
-                    <label className="form-label">Validation (JSON)</label>
-                    <textarea
-                      className="form-textarea"
-                      value={paramForm.validation}
-                      onChange={(e) => setParamForm({ ...paramForm, validation: e.target.value })}
-                      placeholder='{"min": 0, "max": 100}'
-                    />
-                  </div>
+                  {paramForm.value_type !== 'boolean' && (
+                    <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px' }}>Validation</h4>
+                      {paramForm.value_type === 'string' ? (
+                        <>
+                          <div className="form-field">
+                            <label className="form-label">Min Length</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              value={paramForm.validation_min}
+                              onChange={(e) => setParamForm({ ...paramForm, validation_min: e.target.value })}
+                              min="0"
+                              placeholder="Optional"
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label className="form-label">Max Length</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              value={paramForm.validation_max}
+                              onChange={(e) => setParamForm({ ...paramForm, validation_max: e.target.value })}
+                              min="0"
+                              placeholder="Optional"
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label className="form-label">Regex Pattern</label>
+                            <input
+                              type="text"
+                              className="form-input"
+                              value={paramForm.validation_regex}
+                              onChange={(e) => setParamForm({ ...paramForm, validation_regex: e.target.value })}
+                              placeholder="Optional (e.g., ^[A-Za-z]+$)"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="form-field">
+                            <label className="form-label">Min Value</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              value={paramForm.validation_min}
+                              onChange={(e) => setParamForm({ ...paramForm, validation_min: e.target.value })}
+                              placeholder="Optional"
+                            />
+                          </div>
+                          <div className="form-field">
+                            <label className="form-label">Max Value</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              value={paramForm.validation_max}
+                              onChange={(e) => setParamForm({ ...paramForm, validation_max: e.target.value })}
+                              placeholder="Optional"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="form-actions">
                     <button onClick={cancelEditParam} className="button button--secondary">Cancel</button>
                     <button
@@ -600,7 +680,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.label || '-'}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.required ? 'Yes' : 'No'}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>
-                          <button onClick={() => { setEditingParam(param); setParamForm({ domain: param.domain, key: param.key, value_type: param.value_type as 'string' | 'number' | 'boolean', label: param.label, description: param.description || '', required: param.required, sort_order: param.sort_order, is_label: param.is_label, is_unique: param.is_unique, is_searchable: param.is_searchable, is_hidden: param.is_hidden, default_value: param.default_value || '', validation: param.validation ? JSON.stringify(param.validation) : '' }); setShowParamForm(true); }} className="button button--secondary" style={{ fontSize: '11px', padding: '4px 8px' }}>
+                          <button onClick={() => { startEditParam(param); setShowParamForm(true); }} className="button button--secondary" style={{ fontSize: '11px', padding: '4px 8px' }}>
                             Edit
                           </button>
                           <button onClick={() => handleDeleteParam(et.id, param.id)} className="button button--secondary" style={{ fontSize: '11px', padding: '4px 8px', color: '#c33' }}>
