@@ -121,6 +121,9 @@ export function ImageUpload({
 
   return (
     <div className="image-upload">
+      <div className="image-info mb-4" style={{ fontSize: '14px', color: '#666' }}>
+        Target size: {targetSize}x{targetSize}px (square)
+      </div>
       <div className="image-preview">
         {previewUrl ? (
           <img src={previewUrl} alt="Preview" style={{ width: targetSize, height: targetSize, objectFit: 'cover' }} />
