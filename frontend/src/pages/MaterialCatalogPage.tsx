@@ -149,16 +149,46 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     return key || '';
   };
 
+  // Get searchable parameter definitions for the current entity type
+  const getSearchableParameters = () => {
+    if (!selectedConfig?.entity_type_id || !template) {
+      return [];
+    }
+    const entityType = template.entity_types.find((et: any) => et.id === selectedConfig.entity_type_id);
+    if (!entityType) {
+      return [];
+    }
+    return entityType.parameter_definitions?.filter((pd: any) => pd.is_searchable) || [];
+  };
+
   const filteredEntities = searchQuery
     ? entities.filter((e: Entity) => {
-        const slot0 = getDisplaySlotValue(e, 0);
-        const slot1 = getDisplaySlotValue(e, 1);
         const searchLower = searchQuery.toLowerCase();
-        return (
-          slot0.toLowerCase().includes(searchLower) ||
-          slot1.toLowerCase().includes(searchLower) ||
-          e.id.toLowerCase().includes(searchLower)
-        );
+        const searchableParams = getSearchableParameters();
+        const params = entityParameters[e.id] || [];
+        
+        // Check if any searchable parameter matches
+        for (const paramDef of searchableParams) {
+          const param = params.find((p: EntityParameter) => 
+            p.domain === paramDef.domain && p.key === paramDef.key
+          );
+          if (param) {
+            let value = '';
+            if (param.value_string !== null && param.value_string !== undefined) {
+              value = param.value_string;
+            } else if (param.value_number !== null && param.value_number !== undefined) {
+              value = String(param.value_number);
+            } else if (param.value_boolean !== null && param.value_boolean !== undefined) {
+              value = String(param.value_boolean);
+            }
+            if (value.toLowerCase().includes(searchLower)) {
+              return true;
+            }
+          }
+        }
+        
+        // Also check entity ID
+        return e.id.toLowerCase().includes(searchLower);
       })
     : entities;
 
