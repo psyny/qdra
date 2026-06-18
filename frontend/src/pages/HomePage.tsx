@@ -1,15 +1,10 @@
 import { Link } from 'react-router-dom';
-import { BackendStatus } from '../components/BackendStatus';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
 
 export function HomePage() {
   return (
     <div className="page">
-      <div className="workspace-header">
-        <BackendStatus />
-        <div className="workspace-header__breadcrumb">
-          <Link to="/home">Home</Link>
-        </div>
-      </div>
+      <WorkspaceHeader breadcrumbItems={[{ label: 'Home', to: '/home' }]} />
       <div className="page-header">
         <h1 className="page-title">Qdra</h1>
         <p className="page-description">Choose where to start.</p>

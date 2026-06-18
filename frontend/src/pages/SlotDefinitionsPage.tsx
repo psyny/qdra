@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { BackendStatus } from '../components/BackendStatus';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import {
   listSlotGroups,
   createSlotGroup,
@@ -397,12 +397,12 @@ export function SlotDefinitionsPage() {
 
   return (
     <div className="page">
-      <div className="workspace-header">
-        <BackendStatus />
-        <div className="workspace-header__breadcrumb">
-          <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link> &gt; <Link to={`/templates/${templateId}/edit`}>Edit Template</Link> &gt; <span>Edit Slot Definitions</span>
-        </div>
-      </div>
+      <WorkspaceHeader breadcrumbItems={[
+        { label: 'Home', to: '/home' },
+        { label: 'Templates', to: '/templates' },
+        { label: 'Edit Template', to: `/templates/${templateId}/edit` },
+        { label: 'Edit Slot Definitions' }
+      ]} />
 
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

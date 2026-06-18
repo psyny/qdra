@@ -4,7 +4,7 @@ import { getProjects, createProject, updateProject } from '../api/projects';
 import { getTemplates } from '../api/templates';
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
 import { ProjectTemplate } from '../types/template';
-import { BackendStatus } from '../components/BackendStatus';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { ProjectForm } from '../components/ProjectForm';
 
 export function ProjectSelectionPage() {
@@ -99,12 +99,7 @@ export function ProjectSelectionPage() {
 
   return (
     <div className="page">
-      <div className="workspace-header">
-        <BackendStatus />
-        <div className="workspace-header__breadcrumb">
-          <Link to="/home">Home</Link> &gt; <Link to="/projects">Projects</Link>
-        </div>
-      </div>
+      <WorkspaceHeader breadcrumbItems={[{ label: 'Home', to: '/home' }, { label: 'Projects', to: '/projects' }]} />
       <div className="page-header">
         <h1 className="page-title">Projects</h1>
         <p className="page-description">Create, edit, and open Qdra workspaces.</p>

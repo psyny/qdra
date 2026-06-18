@@ -1,15 +1,15 @@
-import { Link } from 'react-router-dom';
+import { BackendStatus } from './BackendStatus';
+import { Breadcrumb, BreadcrumbItem } from './Breadcrumb';
 
-type WorkspaceHeaderProps = {
-  projectName: string;
-};
+interface WorkspaceHeaderProps {
+  breadcrumbItems: BreadcrumbItem[];
+}
 
-export function WorkspaceHeader({ projectName }: WorkspaceHeaderProps) {
+export function WorkspaceHeader({ breadcrumbItems }: WorkspaceHeaderProps) {
   return (
     <div className="workspace-header">
-      <div className="workspace-header__breadcrumb">
-        <Link to="/projects">Qdra</Link> &gt; <span>{projectName}</span>
-      </div>
+      <BackendStatus />
+      <Breadcrumb items={breadcrumbItems} />
     </div>
   );
 }

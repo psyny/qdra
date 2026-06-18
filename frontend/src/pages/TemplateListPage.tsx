@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getTemplates, deleteTemplate, cloneTemplate } from '../api/templates';
 import { ProjectTemplate, CloneTemplateRequest } from '../types/template';
-import { BackendStatus } from '../components/BackendStatus';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
 
 export function TemplateListPage() {
   const navigate = useNavigate();
@@ -75,12 +75,7 @@ export function TemplateListPage() {
 
   return (
     <div className="page">
-      <div className="workspace-header">
-        <BackendStatus />
-        <div className="workspace-header__breadcrumb">
-          <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link>
-        </div>
-      </div>
+      <WorkspaceHeader breadcrumbItems={[{ label: 'Home', to: '/home' }, { label: 'Templates', to: '/templates' }]} />
       <div className="page-header">
         <h1 className="page-title">Project Templates</h1>
         <p className="page-description">Define schemas and display configurations for your projects</p>
