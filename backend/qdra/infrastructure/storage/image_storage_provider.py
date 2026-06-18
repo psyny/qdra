@@ -25,3 +25,24 @@ class ImageStorageProvider(Protocol):
     async def open_read_stream(self, storage_key: str) -> BinaryIO:
         """Open a read stream for the image."""
         ...
+    
+    async def create_presigned_upload_url(
+        self,
+        storage_key: str,
+        content_type: str,
+        expires_in_seconds: int = 3600,
+    ) -> str:
+        """Create a presigned URL for uploading an image."""
+        ...
+    
+    async def create_presigned_download_url(
+        self,
+        storage_key: str,
+        expires_in_seconds: int = 3600,
+    ) -> str:
+        """Create a presigned URL for downloading an image."""
+        ...
+    
+    async def object_exists(self, storage_key: str) -> bool:
+        """Check if an object exists in storage."""
+        ...

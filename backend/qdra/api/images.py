@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from services.image_service import ImageService
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 class ImageResponse(BaseModel):
@@ -21,6 +21,34 @@ class ImageResponse(BaseModel):
     url: Optional[str] = None
     alt_text: Optional[str] = None
     is_primary: bool
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+class PresignUploadRequest(BaseModel):
+    filename: str
+    mime_type: str
+    file_size_bytes: int
+    width: int
+    height: int
+    alt_text: Optional[str] = None
+
+
+class PresignUploadResponse(BaseModel):
+    image_asset_id: uuid.UUID
+    upload_url: str
+    storage_key: str
+    required_method: str
+    required_headers: dict
+
+
+class FinalizeResponse(BaseModel):
+    id: uuid.UUID
+    entity_id: uuid.UUID
+    mime_type: str
+    width: int
+    height: int
+    url: str
 
 
 def _make_response(image_asset, project_id: uuid.UUID) -> ImageResponse:
@@ -33,7 +61,70 @@ def _make_response(image_asset, project_id: uuid.UUID) -> ImageResponse:
         url=f"/projects/{project_id}/images/{image_asset.id}",
         alt_text=image_asset.alt_text,
         is_primary=image_asset.is_primary,
+        width=image_asset.width,
+        height=image_asset.height,
     )
+
+
+@router.post("/entities/{entity_id}/images/presign-upload", response_model=PresignUploadResponse, status_code=201)
+async def presign_upload(
+    entity_id: uuid.UUID,
+    request: PresignUploadRequest,
+    db: Session = Depends(get_db),
+):
+    """Create a presigned URL for uploading an image."""
+    service = ImageService(db)
+    try:
+        result = await service.presign_upload(
+            entity_id=entity_id,
+            filename=request.filename,
+            mime_type=request.mime_type,
+            file_size_bytes=request.file_size_bytes,
+            width=request.width,
+            height=request.height,
+            alt_text=request.alt_text,
+        )
+        return PresignUploadResponse(
+            image_asset_id=result["image_asset_id"],
+            upload_url=result["upload_url"],
+            storage_key=result["storage_key"],
+            required_method="PUT",
+            required_headers={"Content-Type": request.mime_type},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/image-assets/{image_asset_id}/finalize", response_model=FinalizeResponse)
+async def finalize_upload(
+    image_asset_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Finalize an image upload after the file is uploaded to storage."""
+    service = ImageService(db)
+    try:
+        result = await service.finalize_upload(image_asset_id)
+        return FinalizeResponse(
+            id=result["id"],
+            entity_id=result["entity_id"],
+            mime_type=result["mime_type"],
+            width=result["width"],
+            height=result["height"],
+            url=result["url"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/entities/{entity_id}/images", response_model=list[ImageResponse])
+async def get_entity_images(
+    entity_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Get all images for an entity."""
+    service = ImageService(db)
+    images = service.get_entity_images(entity_id)
+    return [_make_response(img, img.entity.project_id) for img in images]
 
 
 @router.post("/projects/{project_id}/entities/{entity_id}/image", response_model=ImageResponse, status_code=201)

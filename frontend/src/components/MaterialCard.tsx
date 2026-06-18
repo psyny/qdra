@@ -12,6 +12,19 @@ export function MaterialCard({ material, projectId, name = 'Unnamed Material', c
 
   return (
     <div className="card project-card">
+      <div className="material-card__image">
+        {material.image ? (
+          <img 
+            src={material.image.url} 
+            alt={material.image.alt_text || name}
+            className="material-card__img"
+          />
+        ) : (
+          <div className="material-card__placeholder">
+            <span>No Image</span>
+          </div>
+        )}
+      </div>
       <div>
         <h3 className="project-card__title">{name}</h3>
         {category && <p className="project-card__description">{category}</p>}

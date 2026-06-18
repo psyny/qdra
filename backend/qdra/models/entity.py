@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -33,3 +33,7 @@ class Entity(Base):
     parameters: Mapped[List["EntityParameter"]] = relationship(
         "EntityParameter", back_populates="entity", cascade="all, delete-orphan"
     )
+    images: Mapped[List["ImageAsset"]] = relationship(
+        "ImageAsset", back_populates="entity", cascade="all, delete-orphan"
+    )
+    project: Mapped["Project"] = relationship("Project", back_populates="entities")

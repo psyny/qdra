@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from services.entity_service import EntityService
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 # ---------------------------------------------------------------------------
@@ -121,27 +121,27 @@ def bulk_create_entities(
 
 
 @router.get("/projects/{project_id}/entities", response_model=List[EntityResponse])
-def list_entities(
+async def list_entities(
     project_id: uuid.UUID,
     kind: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     service = EntityService(db)
     try:
-        return service.list_entities(project_id=project_id, kind=kind)
+        return await service.list_entities(project_id=project_id, kind=kind)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/projects/{project_id}/entities/{entity_id}", response_model=EntityResponse)
-def get_entity(
+async def get_entity(
     project_id: uuid.UUID,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
     service = EntityService(db)
     try:
-        return service.get_entity(entity_id)
+        return await service.get_entity(entity_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -151,7 +151,7 @@ class UpdateEntityRequest(BaseModel):
 
 
 @router.put("/projects/{project_id}/entities/{entity_id}", response_model=EntityResponse)
-def update_entity(
+async def update_entity(
     project_id: uuid.UUID,
     entity_id: uuid.UUID,
     request: UpdateEntityRequest,
@@ -161,7 +161,7 @@ def update_entity(
     service = EntityService(db)
     try:
         # Verify entity exists
-        service.get_entity(entity_id)
+        await service.get_entity(entity_id)
         
         # Update parameters if provided
         if request.parameters:
@@ -181,7 +181,7 @@ def update_entity(
                     value_boolean=param.value_boolean,
                 )
         
-        return service.get_entity(entity_id)
+        return await service.get_entity(entity_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -243,7 +243,7 @@ def list_entity_parameters(
     "/projects/{project_id}/view-configs/{config_id}/entities",
     response_model=List[EntityResponse],
 )
-def list_entities_by_view_config(
+async def list_entities_by_view_config(
     project_id: uuid.UUID,
     config_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -251,7 +251,7 @@ def list_entities_by_view_config(
     """List entities filtered by a view config's entity_type_id and filter_params."""
     service = EntityService(db)
     try:
-        return service.list_entities_by_view_config(project_id, config_id)
+        return await service.list_entities_by_view_config(project_id, config_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

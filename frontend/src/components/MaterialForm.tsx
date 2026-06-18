@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import { DraftParameter } from './ParameterRow';
+import { ImageUpload } from './ImageUpload';
 
 type MaterialFormProps = {
   initialParameters?: DraftParameter[];
   isSubmitting?: boolean;
   errorMessage?: string | null;
-  onSubmit: (parameters: DraftParameter[]) => void;
+  onSubmit: (parameters: DraftParameter[], imageUrl?: string) => void;
   onCancel: () => void;
   submitLabel: string;
+  entityId?: string;
+  targetImageSize?: number;
+  currentImage?: string | null;
 };
 
 export function MaterialForm({
@@ -17,9 +21,13 @@ export function MaterialForm({
   onSubmit,
   onCancel,
   submitLabel,
+  entityId,
+  targetImageSize = 256,
+  currentImage,
 }: MaterialFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(currentImage || null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +49,7 @@ export function MaterialForm({
       }
     }
 
-    onSubmit(parameters);
+    onSubmit(parameters, imageUrl || undefined);
   };
 
   const updateParameter = (index: number, value: any) => {
@@ -102,6 +110,19 @@ export function MaterialForm({
           </div>
         ))}
       </div>
+
+      {entityId && (
+        <div className="card mb-6">
+          <h3 className="card-title mb-4">Material Image</h3>
+          <ImageUpload
+            entityId={entityId}
+            targetSize={targetImageSize}
+            currentImage={currentImage}
+            onUploadComplete={setImageUrl}
+            onUploadError={(error) => setValidationError(error)}
+          />
+        </div>
+      )}
 
       <div className="form-actions">
         <button

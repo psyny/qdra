@@ -347,7 +347,17 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
                   </button>
                 </div>
               </div>
-              <div className="material-catalog-card__image-region" />
+              <div className="material-catalog-card__image-region">
+                {entity.image ? (
+                  <img 
+                    src={entity.image.url} 
+                    alt={entity.image.alt_text || getDisplaySlotValue(entity, 0) || 'Material'}
+                    className="material-catalog-card__image"
+                  />
+                ) : (
+                  <span className="material-catalog-card__placeholder">No Image</span>
+                )}
+              </div>
             </div>
           ))}
         </div>

@@ -9,8 +9,14 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
+from repositories.image_asset_repository import ImageAssetRepository
+from repositories.entity_repository import EntityRepository
 from services.planning.output_planner_service import PlanningService
 from api.project_templates import ProjectTemplateDetailResponse
+from infrastructure.storage.image_storage_provider import ImageStorageProvider
+from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
+from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
+from infrastructure.config.settings import settings
 
 from domain.planning.output_planner import (
     PlanningRequest,
@@ -44,9 +50,28 @@ from domain.planning.output_planner import (
 router = APIRouter()
 
 
+def _get_storage_provider() -> ImageStorageProvider:
+    """Get the configured storage provider."""
+    if settings.image_storage_backend == "local":
+        return LocalImageStorageProvider(settings.local_storage_root)
+    elif settings.image_storage_backend == "s3":
+        return S3ImageStorageProvider(
+            bucket=settings.s3_bucket,
+            region=settings.s3_region,
+            endpoint_url=settings.s3_endpoint_url or None,
+            access_key_id=settings.s3_access_key_id or None,
+            secret_access_key=settings.s3_secret_access_key or None,
+            public_base_url=settings.s3_public_base_url or None,
+            force_path_style=getattr(settings, 's3_force_path_style', False),
+        )
+    else:
+        raise ValueError(f"Unknown storage backend: {settings.image_storage_backend}")
+
+
 class ProjectCreate(BaseModel):
     name: str
     project_template_id: uuid.UUID  # Required as of template hub milestone
+    image_size_px: int = 256  # Default 256, range 32-1024
 
 
 class ProjectResponse(BaseModel):
@@ -54,6 +79,7 @@ class ProjectResponse(BaseModel):
     id: uuid.UUID
     name: str
     project_template_id: uuid.UUID
+    image_size_px: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -196,8 +222,16 @@ def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
     if not template:
         raise HTTPException(status_code=400, detail="Project template not found")
 
+    # Validate image_size_px range
+    if not (32 <= project_data.image_size_px <= 1024):
+        raise HTTPException(status_code=400, detail="image_size_px must be between 32 and 1024")
+
     repo = ProjectRepository(db)
-    project = repo.create(project_data.name, project_data.project_template_id)
+    project = repo.create(
+        project_data.name, 
+        project_data.project_template_id,
+        image_size_px=project_data.image_size_px
+    )
     return project
 
 
@@ -250,6 +284,11 @@ class ProjectUpdateTemplate(BaseModel):
     project_template_id: uuid.UUID
 
 
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    image_size_px: Optional[int] = None
+
+
 @router.patch("/projects/{project_id}/template", response_model=ProjectResponse)
 def update_project_template(
     project_id: uuid.UUID,
@@ -267,6 +306,49 @@ def update_project_template(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectResponse)
+def update_project(
+    project_id: uuid.UUID,
+    data: ProjectUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update a project's name or image_size_px."""
+    # Validate image_size_px range if provided
+    if data.image_size_px is not None and not (32 <= data.image_size_px <= 1024):
+        raise HTTPException(status_code=400, detail="image_size_px must be between 32 and 1024")
+
+    repo = ProjectRepository(db)
+    project = repo.update(project_id, name=data.name, image_size_px=data.image_size_px)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@router.delete("/projects/{project_id}", status_code=204)
+def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Delete a project and all its entities and images."""
+    entity_repo = EntityRepository(db)
+    image_repo = ImageAssetRepository(db)
+    storage_provider = _get_storage_provider()
+    
+    # Get all entities in the project
+    entities = entity_repo.list_by_project(project_id)
+    
+    # Delete images from storage for all entities
+    for entity in entities:
+        images = image_repo.get_by_entity_id(entity.id)
+        for image in images:
+            try:
+                storage_provider.delete(image.storage_key)
+            except Exception:
+                pass  # Ignore storage deletion errors
+    
+    # Delete the project (repository handles entity cascade)
+    repo = ProjectRepository(db)
+    if not repo.delete(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
 
 
 @router.post("/projects/{project_id}/plan/output", response_model=PlanningResponseModel)

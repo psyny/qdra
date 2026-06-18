@@ -10,6 +10,10 @@ from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.image_asset_repository import ImageAssetRepository
+from infrastructure.storage.image_storage_provider import ImageStorageProvider
+from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
+from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
+from infrastructure.config.settings import settings
 
 
 class EntityService:
@@ -20,6 +24,24 @@ class EntityService:
         self.project_repository = ProjectRepository(db)
         self.template_repository = ProjectTemplateRepository(db)
         self.image_asset_repository = ImageAssetRepository(db)
+        self.storage_provider = self._get_storage_provider()
+    
+    def _get_storage_provider(self) -> ImageStorageProvider:
+        """Get the configured storage provider."""
+        if settings.image_storage_backend == "local":
+            return LocalImageStorageProvider(settings.local_storage_root)
+        elif settings.image_storage_backend == "s3":
+            return S3ImageStorageProvider(
+                bucket=settings.s3_bucket,
+                region=settings.s3_region,
+                endpoint_url=settings.s3_endpoint_url or None,
+                access_key_id=settings.s3_access_key_id or None,
+                secret_access_key=settings.s3_secret_access_key or None,
+                public_base_url=settings.s3_public_base_url or None,
+                force_path_style=getattr(settings, 's3_force_path_style', False),
+            )
+        else:
+            raise ValueError(f"Unknown storage backend: {settings.image_storage_backend}")
 
     def create_entity(
         self,
@@ -39,7 +61,7 @@ class EntityService:
             entity_type_id=entity_type_id,
         )
 
-    def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
+    async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         entity = self.entity_repository.get_by_id(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
@@ -59,17 +81,24 @@ class EntityService:
             "image": None,
         }
 
-        if image:
+        if image and image.status == 'ready':
+            # Generate presigned download URL
+            download_url = await self.storage_provider.create_presigned_download_url(
+                storage_key=image.storage_key,
+                expires_in_seconds=3600,
+            )
             result["image"] = {
                 "id": image.id,
-                "url": f"/projects/{entity.project_id}/images/{image.id}",
+                "url": download_url,
                 "mime_type": image.mime_type,
                 "alt_text": image.alt_text,
+                "width": image.width,
+                "height": image.height,
             }
 
         return result
 
-    def list_entities(
+    async def list_entities(
         self,
         project_id: uuid.UUID,
         kind: Optional[str] = None,
@@ -95,12 +124,19 @@ class EntityService:
                 "updated_at": entity.updated_at,
                 "image": None,
             }
-            if image:
+            if image and image.status == 'ready':
+                # Generate presigned download URL
+                download_url = await self.storage_provider.create_presigned_download_url(
+                    storage_key=image.storage_key,
+                    expires_in_seconds=3600,
+                )
                 entity_data["image"] = {
                     "id": image.id,
-                    "url": f"/projects/{entity.project_id}/images/{image.id}",
+                    "url": download_url,
                     "mime_type": image.mime_type,
                     "alt_text": image.alt_text,
+                    "width": image.width,
+                    "height": image.height,
                 }
             result.append(entity_data)
 
@@ -110,6 +146,15 @@ class EntityService:
         entity = self.entity_repository.get_by_id(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
+        
+        # Delete images from storage before deleting the entity
+        images = self.image_asset_repository.get_by_entity_id(entity_id)
+        for image in images:
+            try:
+                self.storage_provider.delete(image.storage_key)
+            except Exception:
+                pass  # Ignore storage deletion errors
+        
         return self.entity_repository.delete(entity_id)
 
     def add_parameter(
@@ -153,7 +198,7 @@ class EntityService:
             raise ValueError(f"Entity '{entity_id}' not found")
         return self.entity_parameter_repository.list_by_entity(entity_id)
 
-    def list_entities_by_view_config(
+    async def list_entities_by_view_config(
         self,
         project_id: uuid.UUID,
         view_config_id: uuid.UUID,
@@ -194,12 +239,19 @@ class EntityService:
                 "updated_at": entity.updated_at,
                 "image": None,
             }
-            if image:
+            if image and image.status == 'ready':
+                # Generate presigned download URL
+                download_url = await self.storage_provider.create_presigned_download_url(
+                    storage_key=image.storage_key,
+                    expires_in_seconds=3600,
+                )
                 entity_data["image"] = {
                     "id": image.id,
-                    "url": f"/projects/{entity.project_id}/images/{image.id}",
+                    "url": download_url,
                     "mime_type": image.mime_type,
                     "alt_text": image.alt_text,
+                    "width": image.width,
+                    "height": image.height,
                 }
             result.append(entity_data)
 

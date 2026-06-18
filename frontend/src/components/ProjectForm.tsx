@@ -5,11 +5,12 @@ type ProjectFormProps = {
   initialName?: string;
   initialDescription?: string | null;
   initialTemplateId?: string | null;
+  initialImageSizePx?: number;
   templates: ProjectTemplate[];
   submitLabel: string;
   isSubmitting?: boolean;
   errorMessage?: string | null;
-  onSubmit: (payload: { name: string; project_template_id: string; description?: string | null }) => void;
+  onSubmit: (payload: { name: string; project_template_id: string; description?: string | null; image_size_px?: number }) => void;
   onCancel?: () => void;
 };
 
@@ -17,6 +18,7 @@ export function ProjectForm({
   initialName = '',
   initialDescription = '',
   initialTemplateId = null,
+  initialImageSizePx = 256,
   templates,
   submitLabel,
   isSubmitting = false,
@@ -27,13 +29,19 @@ export function ProjectForm({
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState(initialDescription || '');
   const [templateId, setTemplateId] = useState(initialTemplateId || '');
+  const [imageSizePx, setImageSizePx] = useState(initialImageSizePx);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !templateId) {
       return;
     }
-    onSubmit({ name: name.trim(), project_template_id: templateId, description: description.trim() || null });
+    onSubmit({ 
+      name: name.trim(), 
+      project_template_id: templateId, 
+      description: description.trim() || null,
+      image_size_px: imageSizePx
+    });
   };
 
   return (
@@ -82,6 +90,23 @@ export function ProjectForm({
           rows={3}
           className="form-textarea"
         />
+      </div>
+      <div className="form-field">
+        <label htmlFor="imageSizePx" className="form-label">
+          Image Size (px)
+        </label>
+        <input
+          id="imageSizePx"
+          type="number"
+          min="32"
+          max="1024"
+          step="32"
+          value={imageSizePx}
+          onChange={(e) => setImageSizePx(Number(e.target.value))}
+          disabled={isSubmitting}
+          className="form-input"
+        />
+        <p className="form-hint">Size for material images (32-1024, must be square)</p>
       </div>
       {errorMessage && (
         <p className="form-error">{errorMessage}</p>

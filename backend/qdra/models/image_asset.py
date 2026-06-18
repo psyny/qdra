@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, CheckConstraint, func, Text, BigInteger, Integer, Boolean, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base
 
@@ -28,7 +28,7 @@ class ImageAsset(Base):
     width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     alt_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default='pending')
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -36,9 +36,19 @@ class ImageAsset(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    entity: Mapped["Entity"] = relationship("Entity", back_populates="images")
+
     __table_args__ = (
         CheckConstraint(
             "storage_backend IN ('local', 's3')",
             name="check_storage_backend"
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'ready', 'failed')",
+            name="check_image_status"
+        ),
+        CheckConstraint(
+            "width = height",
+            name="check_square_image"
         ),
     )

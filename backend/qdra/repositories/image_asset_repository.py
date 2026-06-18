@@ -22,7 +22,7 @@ class ImageAssetRepository:
         width: Optional[int] = None,
         height: Optional[int] = None,
         alt_text: Optional[str] = None,
-        is_primary: bool = True,
+        status: str = 'pending',
     ) -> ImageAsset:
         image_asset = ImageAsset(
             entity_id=entity_id,
@@ -34,7 +34,7 @@ class ImageAssetRepository:
             width=width,
             height=height,
             alt_text=alt_text,
-            is_primary=is_primary,
+            status=status,
         )
         self.db.add(image_asset)
         self.db.commit()
@@ -47,11 +47,12 @@ class ImageAssetRepository:
     def get_primary_image(
         self, entity_id: uuid.UUID
     ) -> Optional[ImageAsset]:
+        # Since each entity has only one image, just get the first one
         return (
             self.db.query(ImageAsset)
             .filter(
                 ImageAsset.entity_id == entity_id,
-                ImageAsset.is_primary == True,
+                ImageAsset.status == 'ready',
             )
             .first()
         )
@@ -75,18 +76,16 @@ class ImageAssetRepository:
         self.db.commit()
         return True
 
-    def set_primary(self, image_asset_id: uuid.UUID) -> Optional[ImageAsset]:
+    def update_status(self, image_asset_id: uuid.UUID, status: str) -> ImageAsset:
+        """Update the status of an image asset."""
         image_asset = self.get_by_id(image_asset_id)
         if not image_asset:
-            return None
-
-        # Unset primary for all images of the same entity
-        self.db.query(ImageAsset).filter(
-            ImageAsset.entity_id == image_asset.entity_id,
-        ).update({"is_primary": False})
-
-        # Set the new primary
-        image_asset.is_primary = True
+            raise ValueError("Image asset not found")
+        image_asset.status = status
         self.db.commit()
         self.db.refresh(image_asset)
         return image_asset
+
+    def get_by_entity_id(self, entity_id: uuid.UUID) -> List[ImageAsset]:
+        """Get all images for an entity."""
+        return self.list_by_entity(entity_id)

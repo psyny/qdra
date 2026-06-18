@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { getProjectTemplate } from '../api/projects';
+import { getProjectTemplate, getProject } from '../api/projects';
 import { getEntity, createEntity, getEntityParameters, addEntityParameter, updateEntity } from '../api/entities';
 import { ProjectTemplateDetail, ViewConfig, ParameterDefinition } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
@@ -21,6 +21,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   const [parameterDefinitions, setParameterDefinitions] = useState<ParameterDefinition[]>([]);
   const [entity, setEntity] = useState<Entity | null>(null);
   const [entityParameters, setEntityParameters] = useState<EntityParameter[]>([]);
+  const [imageSizePx, setImageSizePx] = useState(256);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +33,10 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
       try {
         const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
+
+        // Load project to get image_size_px
+        const projectData = await getProject(projectId);
+        setImageSizePx(projectData.image_size_px || 256);
 
         if (configId) {
           // Find the config in template
@@ -72,7 +77,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
     return { domain: p.domain, key: p.key, value_string: null };
   };
 
-  const handleSubmit = async (parameters: DraftParameter[]) => {
+  const handleSubmit = async (parameters: DraftParameter[], imageUrl?: string) => {
     setIsSubmitting(true);
     setError(null);
 
@@ -88,9 +93,13 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         for (const p of parameters) {
           await addEntityParameter(projectId, newEntity.id, draftToApiParam(p));
         }
+
+        // If image was uploaded, it's already handled by ImageUpload component
+        // The entity will have the image attached via the backend
       } else {
         // Update existing entity
         await updateEntity(projectId, materialId, { parameters: parameters.map(draftToApiParam) });
+        // Image upload is handled separately by ImageUpload component
       }
       navigate(`/projects/${projectId}/materials${configId ? `?configId=${configId}` : ''}`);
     } catch (err) {
@@ -161,6 +170,9 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         submitLabel={materialId ? 'Save Material' : 'Create Material'}
+        entityId={materialId || undefined}
+        targetImageSize={imageSizePx}
+        currentImage={entity?.image?.url || null}
       />
     </div>
   );

@@ -33,6 +33,7 @@ class ImageService:
                 access_key_id=settings.s3_access_key_id or None,
                 secret_access_key=settings.s3_secret_access_key or None,
                 public_base_url=settings.s3_public_base_url or None,
+                force_path_style=getattr(settings, 's3_force_path_style', False),
             )
         else:
             raise ValueError(f"Unknown storage backend: {settings.image_storage_backend}")
@@ -138,3 +139,118 @@ class ImageService:
             raise ValueError("Image not found")
         
         return await self.storage_provider.open_read_stream(image_asset.storage_key)
+    
+    async def presign_upload(
+        self,
+        entity_id: uuid.UUID,
+        filename: str,
+        mime_type: str,
+        file_size_bytes: int,
+        width: int,
+        height: int,
+        alt_text: Optional[str] = None,
+    ):
+        """Create a presigned upload URL for an image."""
+        entity = self.entity_repo.get_by_id(entity_id)
+        if not entity:
+            raise ValueError("Entity not found")
+        
+        # Validate dimensions match project image size
+        project = entity.project
+        if width != project.image_size_px or height != project.image_size_px:
+            raise ValueError(f"Image dimensions must be {project.image_size_px}x{project.image_size_px}")
+        
+        # Validate square image
+        if width != height:
+            raise ValueError("Image must be square")
+        
+        # Validate MIME type
+        allowed_types = [t.strip() for t in settings.allowed_image_mime_types.split(",")]
+        if mime_type not in allowed_types:
+            raise ValueError(f"MIME type {mime_type} not allowed")
+        
+        # Validate file size
+        max_size = settings.max_image_size_mb * 1024 * 1024
+        if file_size_bytes > max_size:
+            raise ValueError(f"Image size exceeds {settings.max_image_size_mb}MB limit")
+        
+        # Delete any existing image for this entity (one image per entity)
+        existing_images = self.image_asset_repo.get_by_entity_id(entity_id)
+        for existing_image in existing_images:
+            try:
+                await self.storage_provider.delete(existing_image.storage_key)
+            except Exception:
+                pass
+            self.image_asset_repo.delete(existing_image.id)
+        
+        # Create image asset record in pending state
+        image_asset_id = uuid.uuid4()
+        extension = self._get_extension_from_mime_type(mime_type)
+        storage_key = self._generate_storage_key(entity.project_id, entity_id, image_asset_id, extension)
+        
+        image_asset = self.image_asset_repo.create(
+            entity_id=entity_id,
+            storage_backend=settings.image_storage_backend,
+            storage_key=storage_key,
+            mime_type=mime_type,
+            original_filename=filename,
+            file_size_bytes=file_size_bytes,
+            width=width,
+            height=height,
+            alt_text=alt_text,
+            status='pending',
+        )
+        
+        # Generate presigned upload URL
+        upload_url = await self.storage_provider.create_presigned_upload_url(
+            storage_key=storage_key,
+            content_type=mime_type,
+            expires_in_seconds=3600,
+        )
+        
+        return {
+            "image_asset_id": image_asset.id,
+            "upload_url": upload_url,
+            "storage_key": storage_key,
+        }
+    
+    async def finalize_upload(self, image_asset_id: uuid.UUID):
+        """Finalize an image upload after the file is uploaded to storage."""
+        image_asset = self.image_asset_repo.get_by_id(image_asset_id)
+        if not image_asset:
+            raise ValueError("Image asset not found")
+        
+        # Check if object exists in storage
+        exists = await self.storage_provider.object_exists(image_asset.storage_key)
+        if not exists:
+            # Delete the pending record
+            self.image_asset_repo.delete(image_asset_id)
+            raise ValueError("Uploaded object not found in storage")
+        
+        # Mark as ready
+        image_asset = self.image_asset_repo.update_status(image_asset_id, 'ready')
+        
+        # Generate public URL
+        public_url = await self.storage_provider.get_public_url(image_asset.storage_key)
+        
+        return {
+            "id": image_asset.id,
+            "entity_id": image_asset.entity_id,
+            "mime_type": image_asset.mime_type,
+            "width": image_asset.width,
+            "height": image_asset.height,
+            "url": public_url,
+        }
+    
+    def get_entity_images(self, entity_id: uuid.UUID):
+        """Get all images for an entity."""
+        return self.image_asset_repo.get_by_entity_id(entity_id)
+    
+    def _get_extension_from_mime_type(self, mime_type: str) -> str:
+        """Get file extension from MIME type."""
+        mime_to_ext = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/webp": ".webp",
+        }
+        return mime_to_ext.get(mime_type, ".jpg")
