@@ -147,7 +147,12 @@ export function TemplateEditorPage() {
 
       <div className="card" style={{ marginTop: '24px' }}>
         <h2 className="card-title">Entity Views</h2>
-        <p className="card-description">Configure how entities are displayed in different views. (Coming soon)</p>
+        <p className="card-description">Configure how entities are displayed in different views.</p>
+        {templateId && (
+          <Link to={`/templates/${templateId}/views`} className="button button--primary">
+            Manage Views
+          </Link>
+        )}
       </div>
     </div>
   );

@@ -60,10 +60,9 @@ export type ParameterDefinition = {
 export type ViewConfig = {
   id: string;
   view_id: string;
-  entity_kind?: string | null;
   entity_type_id?: string | null;
   filter_params?: Array<Record<string, any>> | null;
-  slots?: Array<Record<string, any>> | null;
+  display_slots?: Array<Record<string, any>> | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -72,7 +71,10 @@ export type ViewConfig = {
 export type View = {
   id: string;
   project_template_id: string;
-  view_name: string;
+  view_key: string;
+  label: string;
+  description?: string | null;
+  is_system: boolean;
   sort_order: number;
   configs: ViewConfig[];
   created_at: string;

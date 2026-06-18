@@ -383,12 +383,18 @@ class ProjectTemplateRepository:
     def create_view(
         self,
         project_template_id: uuid.UUID,
-        view_name: str,
+        view_key: str,
+        label: str,
+        description: Optional[str] = None,
+        is_system: bool = False,
         sort_order: int = 0,
     ) -> ProjectTemplateView:
         view = ProjectTemplateView(
             project_template_id=project_template_id,
-            view_name=view_name,
+            view_key=view_key,
+            label=label,
+            description=description,
+            is_system=is_system,
             sort_order=sort_order,
         )
         self.db.add(view)
@@ -423,23 +429,43 @@ class ProjectTemplateRepository:
             return True
         return False
 
+    def update_view(
+        self,
+        view_id: uuid.UUID,
+        view_key: Optional[str] = None,
+        label: Optional[str] = None,
+        description: Optional[str] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateView]:
+        view = self.get_view_by_id(view_id)
+        if view:
+            if view_key is not None:
+                view.view_key = view_key
+            if label is not None:
+                view.label = label
+            if description is not None:
+                view.description = description
+            if sort_order is not None:
+                view.sort_order = sort_order
+            self.db.commit()
+            self.db.refresh(view)
+        return view
+
     # ProjectTemplateViewConfig CRUD
 
     def create_view_config(
         self,
         view_id: uuid.UUID,
-        entity_kind: Optional[str] = None,
         entity_type_id: Optional[uuid.UUID] = None,
-        slots: Optional[List[Dict[str, Any]]] = None,
+        display_slots: Optional[List[Dict[str, Any]]] = None,
         filter_params: Optional[List[Dict[str, Any]]] = None,
         sort_order: int = 0,
     ) -> ProjectTemplateViewConfig:
         config = ProjectTemplateViewConfig(
             view_id=view_id,
-            entity_kind=entity_kind,
             entity_type_id=entity_type_id,
             filter_params=filter_params,
-            slots=slots,
+            display_slots=display_slots,
             sort_order=sort_order,
         )
         self.db.add(config)
@@ -473,6 +499,83 @@ class ProjectTemplateRepository:
             self.db.commit()
             return True
         return False
+
+    def update_view_config(
+        self,
+        config_id: uuid.UUID,
+        entity_type_id: Optional[uuid.UUID] = None,
+        filter_params: Optional[List[Dict[str, Any]]] = None,
+        display_slots: Optional[List[Dict[str, Any]]] = None,
+        sort_order: Optional[int] = None,
+    ) -> Optional[ProjectTemplateViewConfig]:
+        config = self.get_view_config_by_id(config_id)
+        if config:
+            if entity_type_id is not None:
+                config.entity_type_id = entity_type_id
+            if filter_params is not None:
+                config.filter_params = filter_params
+            if display_slots is not None:
+                config.display_slots = display_slots
+            if sort_order is not None:
+                config.sort_order = sort_order
+            self.db.commit()
+            self.db.refresh(config)
+        return config
+
+    def seed_system_views(self, project_template_id: uuid.UUID) -> List[ProjectTemplateView]:
+        """Create seeded system views for a project template."""
+        system_views_data = [
+            {
+                "view_key": "material_catalog",
+                "label": "Material Catalog",
+                "description": "Full catalog of all materials",
+                "sort_order": 0,
+            },
+            {
+                "view_key": "recipe_catalog",
+                "label": "Recipe Catalog",
+                "description": "Full catalog of all recipes",
+                "sort_order": 1,
+            },
+            {
+                "view_key": "plan_catalog",
+                "label": "Plan Catalog",
+                "description": "Full catalog of all plans",
+                "sort_order": 2,
+            },
+            {
+                "view_key": "plan_results",
+                "label": "Plan Results",
+                "description": "Results from plan execution",
+                "sort_order": 3,
+            },
+            {
+                "view_key": "material_compact_catalog",
+                "label": "Material Compact Catalog",
+                "description": "Compact view of materials",
+                "sort_order": 4,
+            },
+            {
+                "view_key": "recipe_compact_catalog",
+                "label": "Recipe Compact Catalog",
+                "description": "Compact view of recipes",
+                "sort_order": 5,
+            },
+        ]
+        
+        created_views = []
+        for view_data in system_views_data:
+            view = self.create_view(
+                project_template_id=project_template_id,
+                view_key=view_data["view_key"],
+                label=view_data["label"],
+                description=view_data["description"],
+                is_system=True,
+                sort_order=view_data["sort_order"],
+            )
+            created_views.append(view)
+        
+        return created_views
 
     # ProjectTemplateSlotGroup CRUD
 

@@ -108,7 +108,10 @@ class ProjectTemplateView(Base):
     project_template_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("project_templates.id"), nullable=False
     )
-    view_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    view_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -127,14 +130,13 @@ class ProjectTemplateViewConfig(Base):
     view_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("project_template_views.id"), nullable=False
     )
-    entity_kind: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     entity_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("project_template_entity_types.id"),
         nullable=True,
     )
     filter_params: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
-    slots: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    display_slots: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

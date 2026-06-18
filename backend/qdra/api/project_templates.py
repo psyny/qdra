@@ -191,36 +191,53 @@ class EntityTypeResponse(BaseModel):
 
 
 class ViewCreate(BaseModel):
-    view_name: str
+    view_key: str
+    label: str
+    description: Optional[str] = None
     sort_order: int = 0
+
+
+class ViewUpdate(BaseModel):
+    view_key: Optional[str] = None
+    label: Optional[str] = None
+    description: Optional[str] = None
+    sort_order: Optional[int] = None
 
 
 class ViewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     project_template_id: uuid.UUID
-    view_name: str
+    view_key: str
+    label: str
+    description: Optional[str]
+    is_system: bool
     sort_order: int
     created_at: datetime
     updated_at: datetime
 
 
 class ViewConfigCreate(BaseModel):
-    entity_kind: Optional[str] = None
     entity_type_id: Optional[uuid.UUID] = None
     filter_params: Optional[List[Dict[str, Any]]] = None
-    slots: Optional[List[Dict[str, Any]]] = None
+    display_slots: Optional[List[Dict[str, Any]]] = None
     sort_order: int = 0
+
+
+class ViewConfigUpdate(BaseModel):
+    entity_type_id: Optional[uuid.UUID] = None
+    filter_params: Optional[List[Dict[str, Any]]] = None
+    display_slots: Optional[List[Dict[str, Any]]] = None
+    sort_order: Optional[int] = None
 
 
 class ViewConfigResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     view_id: uuid.UUID
-    entity_kind: Optional[str]
     entity_type_id: Optional[uuid.UUID]
     filter_params: Optional[List[Dict[str, Any]]]
-    slots: Optional[List[Dict[str, Any]]]
+    display_slots: Optional[List[Dict[str, Any]]]
     sort_order: int
     created_at: datetime
     updated_at: datetime
@@ -229,7 +246,10 @@ class ViewConfigResponse(BaseModel):
 class ViewWithConfigsResponse(BaseModel):
     id: uuid.UUID
     project_template_id: uuid.UUID
-    view_name: str
+    view_key: str
+    label: str
+    description: Optional[str]
+    is_system: bool
     sort_order: int
     configs: List[ViewConfigResponse]
     created_at: datetime
@@ -275,7 +295,10 @@ def get_project_template_detail(
         ViewWithConfigsResponse(
             id=v.id,
             project_template_id=v.project_template_id,
-            view_name=v.view_name,
+            view_key=v.view_key,
+            label=v.label,
+            description=v.description,
+            is_system=v.is_system,
             sort_order=v.sort_order,
             configs=[ViewConfigResponse.model_validate(c) for c in repo.list_view_configs(v.id)],
             created_at=v.created_at,
@@ -643,7 +666,10 @@ def create_view(
         raise HTTPException(status_code=404, detail="Project template not found")
     return repo.create_view(
         project_template_id=project_template_id,
-        view_name=data.view_name,
+        view_key=data.view_key,
+        label=data.label,
+        description=data.description,
+        is_system=False,
         sort_order=data.sort_order,
     )
 
@@ -664,7 +690,10 @@ def list_views(
         ViewWithConfigsResponse(
             id=v.id,
             project_template_id=v.project_template_id,
-            view_name=v.view_name,
+            view_key=v.view_key,
+            label=v.label,
+            description=v.description,
+            is_system=v.is_system,
             sort_order=v.sort_order,
             configs=[ViewConfigResponse.model_validate(c) for c in repo.list_view_configs(v.id)],
             created_at=v.created_at,
@@ -681,8 +710,56 @@ def delete_view(
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
+    view = repo.get_view_by_id(view_id)
+    if not view or view.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="View not found")
+    if view.is_system:
+        raise HTTPException(status_code=403, detail="Cannot delete system views")
     if not repo.delete_view(view_id):
         raise HTTPException(status_code=404, detail="View not found")
+
+
+@router.put(
+    "/project-templates/{project_template_id}/views/{view_id}",
+    response_model=ViewResponse,
+)
+def update_view(
+    project_template_id: uuid.UUID,
+    view_id: uuid.UUID,
+    data: ViewUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    view = repo.get_view_by_id(view_id)
+    if not view or view.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="View not found")
+    if view.is_system and data.view_key is not None:
+        raise HTTPException(status_code=403, detail="Cannot modify system view key")
+    updated = repo.update_view(
+        view_id=view_id,
+        view_key=data.view_key,
+        label=data.label,
+        description=data.description,
+        sort_order=data.sort_order,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="View not found")
+    return updated
+
+
+@router.post(
+    "/project-templates/{project_template_id}/views/seed-system",
+    response_model=List[ViewResponse],
+)
+def seed_system_views(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    views = repo.seed_system_views(project_template_id)
+    return [ViewResponse.model_validate(v) for v in views]
 
 
 @router.post(
@@ -701,10 +778,9 @@ def create_view_config(
         raise HTTPException(status_code=404, detail="View not found")
     return repo.create_view_config(
         view_id=view_id,
-        entity_kind=data.entity_kind,
         entity_type_id=data.entity_type_id,
         filter_params=data.filter_params,
-        slots=data.slots,
+        display_slots=data.display_slots,
         sort_order=data.sort_order,
     )
 
@@ -720,8 +796,38 @@ def delete_view_config(
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
+    view = repo.get_view_by_id(view_id)
+    if not view or view.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="View not found")
     if not repo.delete_view_config(config_id):
         raise HTTPException(status_code=404, detail="View config not found")
+
+
+@router.put(
+    "/project-templates/{project_template_id}/views/{view_id}/configs/{config_id}",
+    response_model=ViewConfigResponse,
+)
+def update_view_config(
+    project_template_id: uuid.UUID,
+    view_id: uuid.UUID,
+    config_id: uuid.UUID,
+    data: ViewConfigUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    view = repo.get_view_by_id(view_id)
+    if not view or view.project_template_id != project_template_id:
+        raise HTTPException(status_code=404, detail="View not found")
+    updated = repo.update_view_config(
+        config_id=config_id,
+        entity_type_id=data.entity_type_id,
+        filter_params=data.filter_params,
+        display_slots=data.display_slots,
+        sort_order=data.sort_order,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="View config not found")
+    return updated
 
 
 # ---------------------------------------------------------------------------
