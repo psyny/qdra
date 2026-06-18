@@ -57,13 +57,12 @@ export function ImageUpload({
         const initialScale = targetSize / minDimension;
         setScale(initialScale);
         
-        // Center the image so the smallest dimension fills the target square
-        const scaledWidth = img.width * initialScale;
-        const scaledHeight = img.height * initialScale;
-        
-        // Position to center the image in the editor
-        const initialX = (editorSize - scaledWidth) / 2;
-        const initialY = (editorSize - scaledHeight) / 2;
+        // Center the image with center-based transform origin
+        // With transform-origin: center center, the visual center of the scaled image is at:
+        // position.x + (img.width * scale) / 2, position.y + (img.height * scale) / 2
+        // To center in editor: position.x + (img.width * scale) / 2 = editorSize / 2
+        const initialX = editorSize / 2 - img.width / 2;
+        const initialY = editorSize / 2 - img.height / 2;
         setPosition({ x: initialX, y: initialY });
       };
       img.src = e.target?.result as string;
@@ -111,18 +110,21 @@ export function ImageUpload({
       ctx.fillRect(0, 0, targetSize, targetSize);
       
       // Draw the image
-      // In CSS: image is at (position.x, position.y) with scale from top-left
-      // In canvas: we need to translate to position, then scale, then draw
-      // But we also need to account for the crop area offset
-      // Canvas (0,0) corresponds to editor (cropAreaLeft, cropAreaTop)
+      // CSS: left: position.x, top: position.y, transform: scale(scale), transform-origin: center center
+      // The transform-origin is at (img.width/2, img.height/2) relative to image top-left
+      // After scaling, the visual center stays at (position.x + img.width/2, position.y + img.height/2) in parent coords
       
       ctx.save();
-      // Translate to account for crop area offset
+      // Translate for crop area offset (canvas 0,0 = cropAreaLeft, cropAreaTop in editor)
       ctx.translate(-cropAreaLeft, -cropAreaTop);
       // Translate to image position
       ctx.translate(position.x, position.y);
-      // Apply scale (from top-left, same as CSS)
+      // Move to center of image (transform origin)
+      ctx.translate(img.width / 2, img.height / 2);
+      // Scale
       ctx.scale(scale, scale);
+      // Move back from center
+      ctx.translate(-img.width / 2, -img.height / 2);
       // Draw image
       ctx.drawImage(img, 0, 0);
       ctx.restore();
@@ -261,7 +263,7 @@ export function ImageUpload({
                 left: position.x,
                 top: position.y,
                 transform: `scale(${scale})`,
-                transformOrigin: 'top left',
+                transformOrigin: 'center center',
                 pointerEvents: 'none',
               }}
             />
