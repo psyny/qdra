@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   listSlotGroups,
   createSlotGroup,
@@ -12,6 +12,8 @@ import {
   createDefinitionConstraint,
   updateSlotConstraint,
   deleteSlotConstraint,
+  getTemplate,
+  getEntityType,
 } from '../api/templates';
 
 type SlotGroup = {
@@ -56,6 +58,7 @@ export function SlotDefinitionsPage() {
   const [slotGroups, setSlotGroups] = useState<SlotGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [entityName, setEntityName] = useState<string>('');
   
   const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
   const [editingGroup, setEditingGroup] = useState<SlotGroup | null>(null);
@@ -96,7 +99,10 @@ export function SlotDefinitionsPage() {
     if (entityTypeId) {
       loadSlotGroups();
     }
-  }, [entityTypeId]);
+    if (templateId && entityTypeId) {
+      loadEntityName();
+    }
+  }, [entityTypeId, templateId]);
 
   const loadSlotGroups = async () => {
     setLoading(true);
@@ -108,6 +114,15 @@ export function SlotDefinitionsPage() {
       setError('Failed to load slot groups');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadEntityName = async () => {
+    try {
+      const data = await getEntityType(templateId!, entityTypeId!);
+      setEntityName(data.name);
+    } catch (err) {
+      // Don't set error for entity name loading failure
     }
   };
 
@@ -381,23 +396,25 @@ export function SlotDefinitionsPage() {
   }
 
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div>
-          <h2 className="card-title">Edit Slot Definitions</h2>
-          <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px' }}>
-            <button onClick={() => navigate(`/templates/${templateId}/edit`)} style={{ background: 'none', border: 'none', color: '#666', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
-              Back to Template Editor
-            </button>
-          </p>
+    <div className="page">
+      <div className="workspace-header">
+        <div className="workspace-header__breadcrumb">
+          <Link to="/home">Home</Link> &gt; <Link to="/templates">Templates</Link> &gt; <Link to={`/templates/${templateId}/edit`}>Edit Template</Link> &gt; <span>Edit Slot Definitions</span>
         </div>
-        <button
-          onClick={() => setShowCreateGroupForm(true)}
-          className="button button--primary"
-        >
-          Add Slot Group
-        </button>
       </div>
+
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div>
+            <h2 className="card-title">Edit Slot Definitions{entityName && ` for ${entityName}`}</h2>
+          </div>
+          <button
+            onClick={() => setShowCreateGroupForm(true)}
+            className="button button--primary"
+          >
+            Add Slot Group
+          </button>
+        </div>
 
       {error && (
         <div style={{ padding: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', marginBottom: '16px' }}>
@@ -765,6 +782,7 @@ export function SlotDefinitionsPage() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
