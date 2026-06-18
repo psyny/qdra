@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { MaterialParameterEditor } from './MaterialParameterEditor';
 import { DraftParameter } from './ParameterRow';
 
 type MaterialFormProps = {
@@ -19,8 +18,6 @@ export function MaterialForm({
   onCancel,
   submitLabel,
 }: MaterialFormProps) {
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -28,49 +25,29 @@ export function MaterialForm({
     e.preventDefault();
     setValidationError(null);
 
-    // Validate name
-    if (!name.trim()) {
-      setValidationError('Material name is required');
-      return;
-    }
-
-    // Build final parameters list
-    const finalParameters: DraftParameter[] = [
-      { domain: 'identity', key: 'name', value: name.trim(), value_type: 'string' },
-    ];
-
-    if (category.trim()) {
-      finalParameters.push({
-        domain: 'identity',
-        key: 'category',
-        value: category.trim(),
-        value_type: 'string',
-      });
-    }
-
-    // Add custom parameters
-    finalParameters.push(...parameters);
-
-    // Validate no duplicate domain/key pairs
-    const seen = new Set<string>();
-    for (const param of finalParameters) {
-      const key = `${param.domain}:${param.key}`;
-      if (seen.has(key)) {
-        setValidationError(`Duplicate parameter: ${key}`);
+    // Validate required parameters
+    for (const param of parameters) {
+      if (param.required && (param.value === null || param.value === undefined || param.value === '')) {
+        setValidationError(`${param.label || param.key} is required`);
         return;
       }
-      seen.add(key);
     }
 
     // Validate all parameters have domain and key
-    for (const param of finalParameters) {
+    for (const param of parameters) {
       if (!param.domain.trim() || !param.key.trim()) {
         setValidationError('All parameters must have a domain and key');
         return;
       }
     }
 
-    onSubmit(finalParameters);
+    onSubmit(parameters);
+  };
+
+  const updateParameter = (index: number, value: any) => {
+    const updated = [...parameters];
+    updated[index] = { ...updated[index], value };
+    setParameters(updated);
   };
 
   return (
@@ -79,43 +56,51 @@ export function MaterialForm({
       {validationError && <p className="form-error">{validationError}</p>}
 
       <div className="card mb-6">
-        <h3 className="card-title mb-4">Material Identity</h3>
-        <div className="form-field">
-          <label htmlFor="name" className="form-label">
-            Name *
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={isSubmitting}
-            className="form-input"
-            placeholder="e.g., iron_ore"
-          />
-        </div>
-        <div className="form-field">
-          <label htmlFor="category" className="form-label">
-            Category
-          </label>
-          <input
-            id="category"
-            type="text"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            disabled={isSubmitting}
-            className="form-input"
-            placeholder="e.g., resource"
-          />
-        </div>
-      </div>
-
-      <div className="card mb-6">
-        <h3 className="card-title mb-4">Parameters</h3>
-        <MaterialParameterEditor
-          parameters={parameters}
-          onChange={setParameters}
-        />
+        <h3 className="card-title mb-4">Material Parameters</h3>
+        {parameters.map((param, index) => (
+          <div key={`${param.domain}:${param.key}`} className="form-field mb-4">
+            <label htmlFor={`param-${index}`} className="form-label">
+              {param.label || param.key}
+              {param.required && ' *'}
+            </label>
+            {param.description && (
+              <p className="form-hint">{param.description}</p>
+            )}
+            {param.value_type === 'boolean' && (
+              <select
+                id={`param-${index}`}
+                value={param.value ? 'true' : 'false'}
+                onChange={(e) => updateParameter(index, e.target.value === 'true')}
+                disabled={isSubmitting}
+                className="form-input"
+              >
+                <option value="true">Yes</option>
+                <option value="false">No</option>
+              </select>
+            )}
+            {param.value_type === 'number' && (
+              <input
+                id={`param-${index}`}
+                type="number"
+                value={param.value ?? ''}
+                onChange={(e) => updateParameter(index, e.target.value ? Number(e.target.value) : null)}
+                disabled={isSubmitting}
+                className="form-input"
+                step="any"
+              />
+            )}
+            {param.value_type === 'string' && (
+              <input
+                id={`param-${index}`}
+                type="text"
+                value={param.value ?? ''}
+                onChange={(e) => updateParameter(index, e.target.value)}
+                disabled={isSubmitting}
+                className="form-input"
+              />
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="form-actions">

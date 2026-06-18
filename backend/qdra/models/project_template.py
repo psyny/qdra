@@ -49,6 +49,10 @@ class ProjectTemplateEntityType(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    parameter_definitions: Mapped[List["ProjectTemplateParameterDefinition"]] = relationship(
+        "ProjectTemplateParameterDefinition", backref="entity_type", order_by="ProjectTemplateParameterDefinition.sort_order"
+    )
+
     __table_args__ = (
         UniqueConstraint(
             "project_template_id", "kind", "name", name="uq_entity_type_kind_name"

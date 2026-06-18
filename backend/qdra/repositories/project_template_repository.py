@@ -261,6 +261,7 @@ class ProjectTemplateRepository:
     ) -> List[ProjectTemplateEntityType]:
         q = (
             self.db.query(ProjectTemplateEntityType)
+            .options(selectinload(ProjectTemplateEntityType.parameter_definitions))
             .filter(
                 ProjectTemplateEntityType.project_template_id == project_template_id
             )
