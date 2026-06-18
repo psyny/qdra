@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getProjectTemplate } from '../api/projects';
 import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
@@ -10,6 +10,8 @@ type MaterialCatalogPageProps = {
 };
 
 export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
+  const [searchParams] = useSearchParams();
+  const urlConfigId = searchParams.get('configId');
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [materialCatalogView, setMaterialCatalogView] = useState<View | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
@@ -38,8 +40,13 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         
         setMaterialCatalogView(materialView);
         
-        // Auto-select if only one config
-        if (materialView.configs.length === 1) {
+        // Auto-select if only one config or if configId is in URL
+        if (urlConfigId) {
+          const config = materialView.configs.find(c => c.id === urlConfigId);
+          if (config) {
+            setSelectedConfig(config);
+          }
+        } else if (materialView.configs.length === 1) {
           setSelectedConfig(materialView.configs[0]);
         }
       } catch (err) {
@@ -50,7 +57,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     };
 
     loadData();
-  }, [projectId]);
+  }, [projectId, urlConfigId]);
 
   useEffect(() => {
     if (!selectedConfig) return;
@@ -255,7 +262,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         </button>
       )}
 
-      <div className="mb-6">
+      <div className="mb-6" style={{ marginBottom: '24px' }}>
         <input
           type="text"
           placeholder="Search materials..."
