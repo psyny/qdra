@@ -6,7 +6,9 @@ interface ImageUploadProps {
   targetSize: number;
   onUploadComplete?: (imageUrl: string) => void;
   onUploadError?: (error: string) => void;
+  onRemove?: () => void;
   currentImage?: string | null;
+  currentImageId?: string | null;
 }
 
 export function ImageUpload({
@@ -14,6 +16,7 @@ export function ImageUpload({
   targetSize,
   onUploadComplete,
   onUploadError,
+  onRemove,
   currentImage,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
@@ -96,9 +99,24 @@ export function ImageUpload({
 
   const handleRemove = async () => {
     if (!currentImage) return;
-    // TODO: Implement image removal via API
-    setPreviewUrl(null);
-    onUploadComplete?.('');
+    
+    try {
+      // Delete the image via API
+      const response = await fetch(`/api/entities/${entityId}/images`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to remove image');
+      }
+      
+      setPreviewUrl(null);
+      onUploadComplete?.('');
+      onRemove?.();
+    } catch (error) {
+      console.error('Remove error:', error);
+      onUploadError?.(error instanceof Error ? error.message : 'Failed to remove image');
+    }
   };
 
   return (

@@ -120,6 +120,7 @@ export function MaterialForm({
             currentImage={currentImage}
             onUploadComplete={setImageUrl}
             onUploadError={(error) => setValidationError(error)}
+            onRemove={() => setImageUrl(null)}
           />
         </div>
       )}

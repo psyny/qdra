@@ -241,6 +241,22 @@ async def stream_image(project_id: uuid.UUID, image_asset_id: uuid.UUID, db: Ses
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.delete("/entities/{entity_id}/images", status_code=204)
+async def delete_entity_image(
+    entity_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Delete the image for an entity."""
+    service = ImageService(db)
+    try:
+        # Get the entity's image
+        images = service.image_asset_repo.get_by_entity_id(entity_id)
+        for image in images:
+            await service.delete_image(image.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @router.delete("/projects/{project_id}/images/{image_asset_id}")
 async def delete_image(project_id: uuid.UUID, image_asset_id: uuid.UUID, db: Session = Depends(get_db)):
     service = ImageService(db)
