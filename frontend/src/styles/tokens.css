@@ -7,6 +7,11 @@
   --card-bg: rgba(255, 255, 255, 0.05);
   --card-bg-hover: rgba(255, 255, 255, 0.08);
 
+  /* Form Fields */
+  --field-bg: rgba(0, 0, 0, 0.5);
+  --field-border: rgba(255, 255, 255, 0.1);
+  --field-focus-border: rgba(255, 255, 255, 0.2);
+
   /* Borders */
   --border: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.14);

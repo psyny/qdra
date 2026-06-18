@@ -172,6 +172,33 @@ Qdra should feel calm and deliberate.
 --card-bg-hover: rgba(255,255,255,0.08);
 ```
 
+## Form Fields
+
+All form inputs should use a dark background with reduced opacity:
+
+```css
+--field-bg: rgba(0,0,0,0.5);
+--field-border: rgba(255,255,255,0.1);
+--field-focus-border: rgba(255,255,255,0.2);
+```
+
+Form field styling:
+
+```css
+background: var(--field-bg);
+border: 1px solid var(--field-border);
+border-radius: var(--radius-small);
+padding: 10px 12px;
+color: var(--text-primary);
+```
+
+On focus:
+
+```css
+border-color: var(--field-focus-border);
+outline: none;
+```
+
 ## Borders
 
 ```css

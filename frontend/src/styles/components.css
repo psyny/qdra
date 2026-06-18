@@ -138,9 +138,9 @@
   width: 100%;
   font-family: inherit;
   font-size: 14px;
-  background: var(--bg-secondary);
+  background: var(--field-bg);
   color: var(--text-primary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--field-border);
   border-radius: var(--radius-small);
   padding: 10px 12px;
   transition: border-color 0.2s ease;
@@ -149,7 +149,7 @@
 .form-input:focus,
 .form-textarea:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--field-focus-border);
 }
 
 .form-input:disabled,

@@ -319,14 +319,14 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
       </div>
 
       {error && (
-        <div style={{ padding: '12px', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', marginBottom: '16px' }}>
-          <p style={{ color: '#c33', margin: 0 }}>{error}</p>
-          <button onClick={() => setError(null)} style={{ marginTop: '8px' }}>Dismiss</button>
+        <div style={{ padding: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', marginBottom: '16px' }}>
+          <p style={{ color: '#EF4444', margin: 0 }}>{error}</p>
+          <button onClick={() => setError(null)} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</button>
         </div>
       )}
 
       {showCreateForm && (
-        <div style={{ padding: '16px', backgroundColor: '#f5f5f5', borderRadius: '4px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Entity Type</h3>
           <div className="form-field">
             <label className="form-label">Kind *</label>
@@ -415,7 +415,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
           </div>
 
           {editingType?.id === et.id && (
-            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
               <h4 style={{ marginTop: 0 }}>Edit Entity Type</h4>
               <div className="form-field">
                 <label className="form-label">Name *</label>
@@ -451,7 +451,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
               </div>
 
               {showParamForm && expandedType === et.id && (
-                <div style={{ padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px', marginBottom: '12px' }}>
+                <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '12px' }}>
                   <h5 style={{ marginTop: 0 }}>{editingParam ? 'Edit' : 'Create'} Parameter Definition</h5>
                   <div className="form-field">
                     <label className="form-label">Domain *</label>

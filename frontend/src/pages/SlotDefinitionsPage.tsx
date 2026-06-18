@@ -400,14 +400,14 @@ export function SlotDefinitionsPage() {
       </div>
 
       {error && (
-        <div style={{ padding: '12px', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', marginBottom: '16px' }}>
-          <p style={{ color: '#c33', margin: 0 }}>{error}</p>
-          <button onClick={() => setError(null)} style={{ marginTop: '8px' }}>Dismiss</button>
+        <div style={{ padding: '12px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '12px', marginBottom: '16px' }}>
+          <p style={{ color: '#EF4444', margin: 0 }}>{error}</p>
+          <button onClick={() => setError(null)} style={{ marginTop: '8px', background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</button>
         </div>
       )}
 
       {showCreateGroupForm && (
-        <div style={{ padding: '16px', backgroundColor: '#f5f5f5', borderRadius: '4px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Slot Group</h3>
           <div className="form-field">
             <label className="form-label">Kind *</label>
@@ -461,7 +461,7 @@ export function SlotDefinitionsPage() {
         const group = slotGroups.find(g => g.kind === kind);
         if (!group) {
           return (
-            <div key={kind} style={{ padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '4px', marginBottom: '12px', border: '1px dashed #ccc' }}>
+            <div key={kind} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '18px', marginBottom: '12px', border: '1px dashed rgba(255,255,255,0.15)' }}>
               <p style={{ margin: 0, color: '#666' }}>No {getGroupKindLabel(kind)} group defined</p>
               <button
                 onClick={() => { setShowCreateGroupForm(true); setGroupForm({ ...groupForm, kind }); }}
@@ -475,7 +475,7 @@ export function SlotDefinitionsPage() {
         }
 
         return (
-          <div key={group.id} style={{ padding: '16px', backgroundColor: '#f9f9f9', borderRadius: '4px', marginBottom: '12px' }}>
+          <div key={group.id} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0' }}>{getGroupKindLabel(group.kind)}</h3>
@@ -498,7 +498,7 @@ export function SlotDefinitionsPage() {
             </div>
 
             {editingGroup?.id === group.id && (
-              <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff', borderRadius: '4px' }}>
+              <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                 <h4 style={{ marginTop: 0 }}>Edit Slot Group</h4>
                 <div className="form-field">
                   <label className="form-label">Kind *</label>
@@ -574,7 +574,7 @@ export function SlotDefinitionsPage() {
                     <p style={{ color: '#666', fontSize: '14px' }}>No slot definitions</p>
                   ) : (
                     group.slot_definitions.map((def) => (
-                      <div key={def.id} style={{ padding: '8px', backgroundColor: '#fff', borderRadius: '4px', marginBottom: '8px' }}>
+                      <div key={def.id} style={{ padding: '8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <strong>{def.slot_key}</strong>
@@ -610,7 +610,7 @@ export function SlotDefinitionsPage() {
                 </div>
 
                 {showDefinitionForm && (
-                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fff', borderRadius: '4px' }}>
+                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
                     <h5 style={{ marginTop: 0 }}>{editingDefinition ? 'Edit' : 'Create'} Slot Definition</h5>
                     <div className="form-field">
                       <label className="form-label">Slot Key *</label>
@@ -658,7 +658,7 @@ export function SlotDefinitionsPage() {
       })}
 
       {showConstraintForm && (
-        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 1000, maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid rgba(255,255,255,0.1)', padding: '24px', borderRadius: '18px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 1000, maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
           <h3 style={{ marginTop: 0 }}>{editingConstraint ? 'Edit' : 'Create'} Constraint</h3>
           <div className="form-field">
             <label>
