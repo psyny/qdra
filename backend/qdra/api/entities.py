@@ -64,7 +64,7 @@ class EntityResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/projects/{project_id}/entities", response_model=EntityResponse)
-def create_entity(
+async def create_entity(
     project_id: uuid.UUID,
     request: CreateEntityRequest,
     db: Session = Depends(get_db),
@@ -85,13 +85,13 @@ def create_entity(
                     value_number=param.value_number,
                     value_boolean=param.value_boolean,
                 )
-        return service.get_entity(entity.id)
+        return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/projects/{project_id}/entities/bulk", response_model=List[EntityResponse])
-def bulk_create_entities(
+async def bulk_create_entities(
     project_id: uuid.UUID,
     request: BulkCreateEntityRequest,
     db: Session = Depends(get_db),
@@ -114,7 +114,7 @@ def bulk_create_entities(
                         value_number=param.value_number,
                         value_boolean=param.value_boolean,
                     )
-            results.append(service.get_entity(entity.id))
+            results.append(await service.get_entity(entity.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return results

@@ -75,7 +75,7 @@ class ParameterResponse(BaseModel):
 
 
 @router.post("/projects/{project_id}/materials", response_model=MaterialResponse, status_code=201)
-def create_material(
+async def create_material(
     project_id: uuid.UUID,
     data: MaterialCreate,
     db: Session = Depends(get_db),
@@ -91,13 +91,13 @@ def create_material(
                     value_string=p.value_string, value_number=p.value_number,
                     value_boolean=p.value_boolean,
                 )
-        return service.get_entity(entity.id)
+        return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/projects/{project_id}/materials/bulk", response_model=MaterialResponse, status_code=201)
-def create_material_bulk(
+async def create_material_bulk(
     project_id: uuid.UUID,
     material_data: MaterialBulkCreate,
     db: Session = Depends(get_db),
@@ -115,25 +115,25 @@ def create_material_bulk(
                 value_string=p.value_string, value_number=p.value_number,
                 value_boolean=p.value_boolean,
             )
-        return service.get_entity(entity.id)
+        return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/projects/{project_id}/materials", response_model=List[MaterialResponse])
-def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
+async def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
     service = EntityService(db)
     try:
-        return service.list_entities(project_id=project_id, kind="material")
+        return await service.list_entities(project_id=project_id, kind="material")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/projects/{project_id}/materials/{material_id}", response_model=MaterialResponse)
-def get_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Session = Depends(get_db)):
+async def get_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Session = Depends(get_db)):
     service = EntityService(db)
     try:
-        return service.get_entity(material_id)
+        return await service.get_entity(material_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

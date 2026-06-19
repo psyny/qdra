@@ -177,7 +177,7 @@ class RecipeExecutionResponse(BaseModel):
 
 
 @router.post("/projects/{project_id}/recipes", response_model=RecipeResponse, status_code=201)
-def create_recipe(
+async def create_recipe(
     project_id: uuid.UUID,
     data: RecipeCreate,
     db: Session = Depends(get_db),
@@ -186,13 +186,13 @@ def create_recipe(
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
         entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
-        return service.get_entity(entity.id)
+        return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/projects/{project_id}/recipes/bulk", response_model=RecipeResponse, status_code=201)
-def create_recipe_bulk(
+async def create_recipe_bulk(
     project_id: uuid.UUID,
     recipe_data: RecipeBulkCreate,
     db: Session = Depends(get_db),
@@ -227,27 +227,27 @@ def create_recipe_bulk(
                         value_boolean=c.value_boolean, is_wildcard=c.is_wildcard,
                     )
 
-        return service.get_entity(entity.id)
+        return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/projects/{project_id}/recipes", response_model=List[RecipeResponse])
-def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
+async def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
     service = EntityService(db)
     try:
-        return service.list_entities(project_id=project_id, kind="recipe")
+        return await service.list_entities(project_id=project_id, kind="recipe")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/projects/{project_id}/recipes/{recipe_id}", response_model=RecipeResponse)
-def get_recipe(
+async def get_recipe(
     project_id: uuid.UUID, recipe_id: uuid.UUID, db: Session = Depends(get_db)
 ):
     service = EntityService(db)
     try:
-        return service.get_entity(recipe_id)
+        return await service.get_entity(recipe_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
