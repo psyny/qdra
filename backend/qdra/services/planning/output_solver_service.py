@@ -108,10 +108,10 @@ class OutputSolverService:
         recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
-        # Load recipe params if needed for score rules, recipe target matching, OR forbidden_recipe_matching
+        # Load recipe params if needed for score rules, recipe target matching, forbidden_recipe_matching, OR required_recipe_matching
         if request.target.target_type == "recipe" or (request.score_rules and any(
             v.variable_type == "recipe" for v in request.score_rules.user_variables
-        )) or request.domain_constraints.forbidden_recipe_matching:
+        )) or request.domain_constraints.forbidden_recipe_matching or request.domain_constraints.required_recipe_matching:
             recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         # Initialize state based on target type (material or recipe)
@@ -246,7 +246,7 @@ class OutputSolverService:
                 break
 
         if current_id is None:
-            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level)
+            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level, request.domain_constraints)
             return
 
         current = state.material_nodes[current_id]
@@ -476,7 +476,7 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
@@ -489,6 +489,13 @@ class OutputSolverService:
 
         # Tag state nodes before computing scores
         self._tag_state_nodes(state)
+
+        # Check required materials and recipes before adding the plan
+        if domain_constraints:
+            if not self._check_required_materials(state, domain_constraints.required_materials_matching):
+                return
+            if not self._check_required_recipes(state, domain_constraints.required_recipe_matching, recipe_params):
+                return
 
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
         score = self._compute_score(state, score_rules, recipe_params)
@@ -838,6 +845,48 @@ class OutputSolverService:
 
     def _matches_rule(self, constraints, rules) -> bool:
         return any(self._constraints_match(constraints, r.constraints) for r in rules)
+
+    def _check_required_materials(self, state, required_materials_matching) -> bool:
+        """Check if the plan contains all materials matching the required constraints."""
+        if not required_materials_matching:
+            return True
+        
+        # Get all material constraints from the plan
+        material_constraints_list = [node.material_constraints for node in state.material_nodes.values()]
+        
+        # Check if each required rule matches at least one material in the plan
+        for rule in required_materials_matching:
+            required_match = False
+            for material_constraints in material_constraints_list:
+                if self._constraints_match(material_constraints, rule.constraints):
+                    required_match = True
+                    break
+            if not required_match:
+                return False
+        
+        return True
+
+    def _check_required_recipes(self, state, required_recipe_matching, recipe_params) -> bool:
+        """Check if the plan contains all recipes matching the required constraints."""
+        if not required_recipe_matching:
+            return True
+        
+        # Get all recipe IDs used in the plan
+        recipe_ids = set(node.recipe_id for node in state.recipe_nodes.values())
+        
+        # Check if each required rule matches at least one recipe in the plan
+        for rule in required_recipe_matching:
+            required_match = False
+            for recipe_id in recipe_ids:
+                rid_str = str(recipe_id)
+                if rid_str in recipe_params:
+                    if self._constraints_match(recipe_params[rid_str], rule.constraints):
+                        required_match = True
+                        break
+            if not required_match:
+                return False
+        
+        return True
 
     def _compute_score(
         self, state: "_State", score_rules, recipe_params: Dict
