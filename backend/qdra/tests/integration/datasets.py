@@ -130,7 +130,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(raw_resource["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "raw_resource"}
                             ],
                         }
                     ],
@@ -141,7 +141,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "intermediate_1"}
                             ],
                         }
                     ],
@@ -152,7 +152,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(byproduct["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "byproduct"}
                             ],
                         }
                     ],
@@ -174,7 +174,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "intermediate_1"}
                             ],
                         }
                     ],
@@ -185,7 +185,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1.5,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_2["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "intermediate_2"}
                             ],
                         }
                     ],
@@ -345,7 +345,7 @@ def create_medium_size_planning_dataset(client, project_id):
         },
     ).json()    
     
-    # Recipe 7: Assembly_B - consumes intermediate_6 + intermediate_5, produces final_product
+    # Recipe 7: Assembly_B - consumes intermediate_6 + intermediate_5, produces final_product_1
     assembly_b = client.post(
         f"/projects/{project_id}/recipes/bulk",
         json={
@@ -357,7 +357,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "intermediate_6"}
                             ],
                         }
                     ],
@@ -368,7 +368,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_5["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "intermediate_5"}
                             ],
                         }
                     ],
@@ -379,7 +379,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(final_product_1["id"])}
+                                {"domain": "identity", "key": "name", "operator": "=", "value_string": "final_product_1"}
                             ],
                         }
                     ],
