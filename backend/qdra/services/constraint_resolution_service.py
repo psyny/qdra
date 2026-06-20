@@ -2,10 +2,12 @@
 import uuid
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, exists
 from cachetools import TTLCache
 
 from models.entity import Entity
 from models.entity_parameter import EntityParameter
+from models.project_template import ProjectTemplateEntityType
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from qdra.infrastructure.cache.cache_service import CacheService
@@ -27,18 +29,18 @@ class ConstraintResolutionService:
         self.l1_cache = TTLCache(maxsize=1000, ttl=settings.cache_relationship_ttl)
 
     def find_materials_by_constraints(
-        self, 
-        constraints: List[ConstraintSpec], 
+        self,
+        constraints: List[ConstraintSpec],
         project_id: uuid.UUID
     ) -> List[uuid.UUID]:
-        """Find materials in the project that match the given constraints."""
+        """Find materials in the project that match the given constraints using SQL filtering."""
         # Create cache key from constraints
         cache_key = self._make_cache_key("materials", project_id, constraints)
-        
+
         # L1: Check local cache if enabled
         if self.settings.l1_caching and cache_key in self.l1_cache:
             return self.l1_cache[cache_key]
-        
+
         # L2: Check Redis cache if enabled
         if self.settings.l2_caching:
             cached = self.cache_service.get(cache_key)
@@ -47,38 +49,44 @@ class ConstraintResolutionService:
                 if self.settings.l1_caching:
                     self.l1_cache[cache_key] = result
                 return result
-        
-        # Compute result
-        materials = self.entity_repo.list_by_project(project_id, kind="material")
-        matching_materials = []
-        
-        for material in materials:
-            material_params = self.entity_param_repo.list_by_entity(material.id)
-            if self._material_matches_constraints(material, material_params, constraints):
-                matching_materials.append(material.id)
-        
+
+        # Build SQL query with constraint filtering
+        query = (
+            self.db.query(Entity.id)
+            .join(ProjectTemplateEntityType)
+            .filter(Entity.project_id == project_id)
+            .filter(ProjectTemplateEntityType.kind == "material")
+        )
+
+        # Add EXISTS clauses for each constraint
+        for constraint in constraints:
+            query = query.filter(self._build_constraint_exists_clause(constraint))
+
+        # Execute query
+        matching_materials = [row[0] for row in query.all()]
+
         # Cache result if enabled
         if self.settings.l1_caching:
             self.l1_cache[cache_key] = matching_materials
         if self.settings.l2_caching:
             serialized = [str(id) for id in matching_materials]
             self.cache_service.set(cache_key, serialized, self.settings.cache_relationship_ttl)
-        
+
         return matching_materials
 
     def find_recipes_by_constraints(
-        self, 
-        constraints: List[ConstraintSpec], 
+        self,
+        constraints: List[ConstraintSpec],
         project_id: uuid.UUID
     ) -> List[uuid.UUID]:
-        """Find recipes in the project that match the given constraints."""
+        """Find recipes in the project that match the given constraints using SQL filtering."""
         # Create cache key from constraints
         cache_key = self._make_cache_key("recipes", project_id, constraints)
-        
+
         # L1: Check local cache if enabled
         if self.settings.l1_caching and cache_key in self.l1_cache:
             return self.l1_cache[cache_key]
-        
+
         # L2: Check Redis cache if enabled
         if self.settings.l2_caching:
             cached = self.cache_service.get(cache_key)
@@ -87,24 +95,98 @@ class ConstraintResolutionService:
                 if self.settings.l1_caching:
                     self.l1_cache[cache_key] = result
                 return result
-        
-        # Compute result
-        recipes = self.entity_repo.list_by_project(project_id, kind="recipe")
-        matching_recipes = []
-        
-        for recipe in recipes:
-            recipe_params = self.entity_param_repo.list_by_entity(recipe.id)
-            if self._entity_matches_constraints(recipe, recipe_params, constraints):
-                matching_recipes.append(recipe.id)
-        
+
+        # Build SQL query with constraint filtering
+        query = (
+            self.db.query(Entity.id)
+            .join(ProjectTemplateEntityType)
+            .filter(Entity.project_id == project_id)
+            .filter(ProjectTemplateEntityType.kind == "recipe")
+        )
+
+        # Add EXISTS clauses for each constraint
+        for constraint in constraints:
+            query = query.filter(self._build_constraint_exists_clause(constraint))
+
+        # Execute query
+        matching_recipes = [row[0] for row in query.all()]
+
         # Cache result if enabled
         if self.settings.l1_caching:
             self.l1_cache[cache_key] = matching_recipes
         if self.settings.l2_caching:
             serialized = [str(id) for id in matching_recipes]
             self.cache_service.set(cache_key, serialized, self.settings.cache_relationship_ttl)
-        
+
         return matching_recipes
+
+    def _build_constraint_exists_clause(self, constraint: ConstraintSpec):
+        """Build an EXISTS clause for a single constraint."""
+        # Special handling for __system__ domain
+        if constraint.domain == "__system__":
+            if constraint.key == "id":
+                if constraint.operator == "=" and constraint.value_string:
+                    return Entity.id == uuid.UUID(constraint.value_string)
+                else:
+                    return False  # Invalid __system__ constraint
+            return False  # Unsupported __system__ key
+
+        # Build EXISTS subquery for entity_parameters using select()
+        from sqlalchemy import select
+
+        subquery = select(EntityParameter.id).where(EntityParameter.entity_id == Entity.id)
+
+        # Handle wildcard domain
+        if constraint.domain != "*":
+            subquery = subquery.where(EntityParameter.domain == constraint.domain)
+
+        # Handle wildcard key
+        if constraint.key != "*":
+            subquery = subquery.where(EntityParameter.key == constraint.key)
+
+        # Handle exists operator
+        if constraint.operator == "exists":
+            return exists(subquery)
+
+        # Get constraint value
+        constraint_value = self._get_constraint_value(constraint)
+        if constraint_value is None:
+            return False  # Invalid constraint
+
+        # Add value comparison based on type
+        if constraint.value_string is not None:
+            subquery = self._add_value_comparison(
+                subquery, EntityParameter.value_string, constraint.operator, constraint_value
+            )
+        elif constraint.value_number is not None:
+            subquery = self._add_value_comparison(
+                subquery, EntityParameter.value_number, constraint.operator, constraint_value
+            )
+        elif constraint.value_boolean is not None:
+            subquery = self._add_value_comparison(
+                subquery, EntityParameter.value_boolean, constraint.operator, constraint_value
+            )
+
+        return exists(subquery)
+
+    def _add_value_comparison(self, query, column, operator: str, value):
+        """Add value comparison to query based on operator."""
+        if operator == "=":
+            return query.where(column == value)
+        elif operator == "<":
+            return query.where(column < value)
+        elif operator == "<=":
+            return query.where(column <= value)
+        elif operator == ">":
+            return query.where(column > value)
+        elif operator == ">=":
+            return query.where(column >= value)
+        elif operator == "in":
+            if isinstance(value, list):
+                return query.where(column.in_(value))
+            else:
+                return query.where(False)  # Invalid IN constraint
+        return query.where(False)  # Unsupported operator
 
     def _material_matches_constraints(
         self, 
