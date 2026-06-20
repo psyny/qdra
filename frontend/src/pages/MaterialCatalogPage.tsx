@@ -235,8 +235,8 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     );
   }
 
-  // Show group selection if multiple configs and none selected
-  if (materialCatalogView && materialCatalogView.configs.length > 1 && !selectedConfig) {
+  // Show group selection if configs exist and none selected
+  if (materialCatalogView && materialCatalogView.configs.length > 0 && !selectedConfig) {
     return (
       <div>
         <h2 className="card-title">Material Catalog</h2>

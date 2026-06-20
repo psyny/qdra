@@ -122,7 +122,13 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         if (!selectedConfig?.entity_type_id) {
           throw new Error('No entity type selected');
         }
-        const newEntity = await createEntity(projectId, { entity_type_id: selectedConfig.entity_type_id });
+        // Get entity type name for the group field
+        const entityType = template?.entity_types.find(et => et.id === selectedConfig.entity_type_id);
+        const groupName = entityType?.name || '';
+        const newEntity = await createEntity(projectId, { 
+          entity_type_id: selectedConfig.entity_type_id,
+          group: groupName
+        });
         
         // Add parameters
         for (const p of parameters) {

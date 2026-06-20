@@ -21,6 +21,7 @@ export type Entity = {
   id: string;
   project_id: string;
   entity_type_id: string;
+  group: string;
   kind: string;
   created_at: string;
   updated_at: string;
@@ -29,6 +30,7 @@ export type Entity = {
 
 export type CreateEntityRequest = {
   entity_type_id: string;
+  group: string;
   parameters?: Array<{
     domain: string;
     key: string;
