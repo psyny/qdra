@@ -58,6 +58,21 @@ export function MaterialForm({
     setParameters(updated);
   };
 
+  const sortedParameters = [...parameters].sort((a, b) => {
+    // First by sort_order (ascending)
+    if (a.sort_order !== b.sort_order) {
+      return a.sort_order - b.sort_order;
+    }
+    // Then by required (required first)
+    if (a.required !== b.required) {
+      return a.required ? -1 : 1;
+    }
+    // Then by alphabetical (label or key)
+    const labelA = (a.label || a.key).toLowerCase();
+    const labelB = (b.label || b.key).toLowerCase();
+    return labelA.localeCompare(labelB);
+  });
+
   return (
     <form onSubmit={handleSubmit}>
       {errorMessage && <p className="form-error">{errorMessage}</p>}
@@ -65,7 +80,7 @@ export function MaterialForm({
 
       <div className="card mb-6">
         <h3 className="card-title mb-4">Material Parameters</h3>
-        {parameters.map((param, index) => (
+        {sortedParameters.map((param, index) => (
           <div key={`${param.domain}:${param.key}`} className="form-field mb-4">
             {param.value_type === 'boolean' ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px' }}>

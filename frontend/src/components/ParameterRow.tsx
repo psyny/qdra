@@ -5,6 +5,10 @@ export type DraftParameter = {
   key: string;
   value: string | number | boolean | null;
   value_type: 'string' | 'number' | 'boolean' | 'null';
+  sort_order: number;
+  required: boolean;
+  label?: string;
+  description?: string;
 };
 
 type ParameterRowProps = {

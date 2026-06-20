@@ -136,7 +136,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
     // Find existing value if editing
     const existingParam = entityParameters.find((p: EntityParameter) => p.domain === def.domain && p.key === def.key);
     
-    let value: any = def.default_value;
+    let value: any = null;
     if (existingParam) {
       if (existingParam.value_string !== null && existingParam.value_string !== undefined) {
         value = existingParam.value_string;
@@ -144,6 +144,16 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         value = existingParam.value_number;
       } else if (existingParam.value_boolean !== null && existingParam.value_boolean !== undefined) {
         value = existingParam.value_boolean;
+      }
+    } else if (def.default_value !== null && def.default_value !== undefined) {
+      // Convert default_value to proper type
+      if (def.value_type === 'boolean') {
+        const strValue = String(def.default_value).toLowerCase();
+        value = strValue === 'true';
+      } else if (def.value_type === 'number') {
+        value = Number(def.default_value);
+      } else {
+        value = def.default_value;
       }
     }
 
@@ -154,6 +164,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
       label: def.label,
       description: def.description,
       required: def.required,
+      sort_order: def.sort_order,
       value: value,
     };
   });

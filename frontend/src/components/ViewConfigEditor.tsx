@@ -365,7 +365,7 @@ export function ViewConfigEditor({ templateId, view, onSave, onCancel }: ViewCon
                 {configForm.filter_params.length === 0 ? (
                   <p style={{ color: '#666', fontSize: '14px' }}>No filters yet. Click "Add Filter" to add one.</p>
                 ) : (
-                  <div className="template-grid">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {configForm.filter_params.map((fp, index) => {
                       const param = availableParams.find((p: ParameterDefinition) => p.domain === fp.domain && p.key === fp.key);
                       return (
@@ -531,7 +531,7 @@ export function ViewConfigEditor({ templateId, view, onSave, onCancel }: ViewCon
                 {configForm.display_slots.length === 0 ? (
                   <p style={{ color: '#666', fontSize: '14px' }}>No display slots yet. Click "Add Slot" to add one.</p>
                 ) : (
-                  <div className="template-grid">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {configForm.display_slots.map((ds, index) => {
                       const param = availableParams.find((p: ParameterDefinition) => p.domain === ds.domain && p.key === ds.key);
                       return (

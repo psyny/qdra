@@ -595,6 +595,14 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                         <option value="true">True</option>
                         <option value="false">False</option>
                       </select>
+                    ) : paramForm.value_type === 'number' ? (
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={paramForm.default_value}
+                        onChange={(e) => setParamForm({ ...paramForm, default_value: e.target.value })}
+                        step="any"
+                      />
                     ) : (
                       <input
                         type="text"
