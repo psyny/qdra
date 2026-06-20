@@ -13,47 +13,87 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Create materials
     raw_resource = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "raw_resource"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "raw_resource"},
+            {"domain": "identity", "key": "category", "value_string": "raw_resource"}
+        ]
     }).json()
     
     intermediate_1 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_1"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_1"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
     intermediate_2 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_2"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_2"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
     intermediate_3 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_3"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_3"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
     intermediate_4 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_4"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_4"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
     intermediate_5 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_5"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_5"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
     intermediate_6 = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "intermediate_6"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "intermediate_6"},
+            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+        ]
     }).json()
     
-    final_product = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "final_product"}]
+    final_product_1 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "final_product_1"},
+            {"domain": "identity", "key": "category", "value_string": "final_product"}
+        ]
+    }).json()
+    
+    final_product_2 = client.post(f"/projects/{project_id}/materials/bulk", json={
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "final_product_2"},
+            {"domain": "identity", "key": "category", "value_string": "final_product"}
+        ]
     }).json()
     
     byproduct = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "byproduct"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "byproduct"},
+            {"domain": "identity", "key": "category", "value_string": "byproduct"}
+        ]
     }).json()
     
     partial_test_producer = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "partial_test_producer"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "partial_test_producer"},
+            {"domain": "identity", "key": "category", "value_string": "partial_test_producer"}
+        ]
     }).json()
     
     partial_test_consumer = client.post(f"/projects/{project_id}/materials/bulk", json={
-        "parameters": [{"domain": "identity", "key": "name", "value_string": "partial_test_consumer"}]
+        "parameters": [
+            {"domain": "identity", "key": "name", "value_string": "partial_test_consumer"},
+            {"domain": "identity", "key": "category", "value_string": "partial_test_consumer"}
+        ]
     }).json()
     
     # Recipe 1: Extraction - produces raw_resource (no inputs) - root material case
@@ -339,7 +379,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product["id"])}
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product_1["id"])}
                             ],
                         }
                     ],
@@ -402,6 +442,49 @@ def create_medium_size_planning_dataset(client, project_id):
         },
     ).json()
     
+    # Recipe 10: Assembly_C - consumes intermediate_3 + intermediate_4, produces final_product_2
+    assembly_c = client.post(
+        f"/projects/{project_id}/recipes/bulk",
+        json={
+            "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_C"}],
+            "slots": [
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "CONSUMES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "kind": "PRODUCES",
+                    "options": [
+                        {
+                            "quantity": 1,
+                            "constraints": [
+                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product_2["id"])}
+                            ],
+                        }
+                    ],
+                },
+            ],
+        },
+    ).json()
+    
     return {
         "materials": {
             "raw_resource": raw_resource,
@@ -411,7 +494,8 @@ def create_medium_size_planning_dataset(client, project_id):
             "intermediate_4": intermediate_4,
             "intermediate_5": intermediate_5,
             "intermediate_6": intermediate_6,
-            "final_product": final_product,
+            "final_product_1": final_product_1,
+            "final_product_2": final_product_2,
             "byproduct": byproduct,
             "partial_test_producer": partial_test_producer,
             "partial_test_consumer": partial_test_consumer,
@@ -427,5 +511,6 @@ def create_medium_size_planning_dataset(client, project_id):
             "assembly_b": assembly_b,
             "partial_producer": partial_producer,
             "partial_consumer": partial_consumer,
+            "assembly_c": assembly_c,
         },
     }

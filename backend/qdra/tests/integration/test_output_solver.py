@@ -13,8 +13,6 @@ def test_final_product_unrestricted(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
 
-    print(str(materials["final_product"]["id"]))
-
     # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
         f"/projects/{project_id}/solver/output",
@@ -23,7 +21,7 @@ def test_final_product_unrestricted(client, project_ctx):
                 "quantity": 5,
                 "target_type": "material",
                 "constraints": [
-                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product"]["id"])}
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product_1"]["id"])}
                 ],
             },
             "domain_constraints": {
@@ -66,7 +64,7 @@ def test_final_product_recipe_restricted_forbiden(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
 
-    print(str(materials["final_product"]["id"]))
+    print(str(materials["final_product_1"]["id"]))
 
     # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
@@ -76,7 +74,7 @@ def test_final_product_recipe_restricted_forbiden(client, project_ctx):
                 "quantity": 5,
                 "target_type": "material",
                 "constraints": [
-                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product"]["id"])}
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product_1"]["id"])}
                 ],
             },
             "domain_constraints": {
@@ -127,7 +125,7 @@ def test_final_product_recipe_restricted_required(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
 
-    print(str(materials["final_product"]["id"]))
+    print(str(materials["final_product_1"]["id"]))
 
     # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
@@ -137,7 +135,7 @@ def test_final_product_recipe_restricted_required(client, project_ctx):
                 "quantity": 5,
                 "target_type": "material",
                 "constraints": [
-                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product"]["id"])}
+                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product_1"]["id"])}
                 ],
             },
             "domain_constraints": {
