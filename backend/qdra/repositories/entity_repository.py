@@ -139,7 +139,8 @@ class EntityRepository:
         )
 
     def delete(self, entity_id: uuid.UUID) -> bool:
-        entity = self.get_by_id(entity_id)
+        # Query directly from database to ensure entity is attached to session
+        entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
         if not entity:
             return False
         self.invalidate_entity(entity_id)
