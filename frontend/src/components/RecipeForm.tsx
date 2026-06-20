@@ -8,6 +8,19 @@ type SlotGroupConfig = {
   max_slots: number;
 };
 
+type ConstraintSpec = {
+  domain: string;
+  key: string;
+  operator: string;
+  value_string?: string | null;
+  value_number?: number | null;
+  value_boolean?: boolean | null;
+};
+
+type SlotConstraints = {
+  [key: string]: ConstraintSpec[][]; // kind -> slotIndex -> OR groups -> AND constraints
+};
+
 type RecipeFormProps = {
   initialParameters?: DraftParameter[];
   isSubmitting?: boolean;
@@ -42,6 +55,13 @@ export function RecipeForm({
     requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
     consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
     produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+  });
+
+  // State to track constraints for each slot
+  const [slotConstraints, setSlotConstraints] = useState<SlotConstraints>({
+    requires: [],
+    consumes: [],
+    produces: [],
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -103,6 +123,12 @@ export function RecipeForm({
     const maxSlots = config.max_slots === null ? Infinity : config.max_slots;
     if (currentCount < maxSlots) {
       setSlotCounts(prev => ({ ...prev, [kind]: currentCount + 1 }));
+      // Initialize empty constraints for the new slot
+      setSlotConstraints(prev => {
+        const newConstraints = { ...prev };
+        newConstraints[kind] = [...newConstraints[kind], []];
+        return newConstraints;
+      });
     }
   };
 
@@ -114,7 +140,88 @@ export function RecipeForm({
     const currentCount = slotCounts[kind];
     if (currentCount > config.min_slots) {
       setSlotCounts(prev => ({ ...prev, [kind]: currentCount - 1 }));
+      // Remove constraints for this slot
+      setSlotConstraints(prev => {
+        const newConstraints = { ...prev };
+        newConstraints[kind] = newConstraints[kind].filter((_, i) => i !== index);
+        return newConstraints;
+      });
     }
+  };
+
+  // Helper to add an OR group to a slot
+  const addOrGroup = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      if (!newConstraints[kind][slotIndex]) {
+        newConstraints[kind][slotIndex] = [];
+      }
+      // Create a new array to avoid mutation issues
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], []];
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove an OR group from a slot
+  const removeOrGroup = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind][slotIndex] = newConstraints[kind][slotIndex].filter((_, i) => i !== orGroupIndex);
+      return newConstraints;
+    });
+  };
+
+  // Helper to add a constraint to an OR group
+  const addConstraint = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      // Create new arrays to avoid mutation issues
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = [
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        {
+          domain: '',
+          key: '',
+          operator: '=',
+          value_string: null,
+        }
+      ];
+      return newConstraints;
+    });
+  };
+
+  // Helper to update a constraint
+  const updateConstraint = (
+    kind: 'requires' | 'consumes' | 'produces',
+    slotIndex: number,
+    orGroupIndex: number,
+    constraintIndex: number,
+    field: keyof ConstraintSpec,
+    value: any
+  ) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind][slotIndex][orGroupIndex][constraintIndex][field] = value;
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove a constraint
+  const removeConstraint = (
+    kind: 'requires' | 'consumes' | 'produces',
+    slotIndex: number,
+    orGroupIndex: number,
+    constraintIndex: number
+  ) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind][slotIndex][orGroupIndex] = newConstraints[kind][slotIndex][orGroupIndex].filter(
+        (_, i) => i !== constraintIndex
+      );
+      return newConstraints;
+    });
   };
 
   // Helper to render empty slots for a category
@@ -126,20 +233,147 @@ export function RecipeForm({
 
     return Array.from({ length: count }).map((_, index) => {
       const canRemove = count > config.min_slots;
+      const slotOrGroups = slotConstraints[kind][index] || [];
+      
       return (
-        <div key={`${kind}-${index}`} className="form-field mb-4" style={{ padding: '12px', border: '1px dashed #ccc', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ color: '#999', fontStyle: 'italic', margin: 0 }}>
-            {kind.charAt(0).toUpperCase() + kind.slice(1)} slot {index + 1} (empty)
-          </p>
-          <button
-            type="button"
-            onClick={() => removeSlot(kind, index)}
-            disabled={!canRemove || isSubmitting}
-            className="button button--danger"
-            style={{ padding: '2px 6px', fontSize: '10px' }}
-          >
-            Remove
-          </button>
+        <div key={`${kind}-${index}`} className="form-field mb-4" style={{ padding: '12px', border: '1px dashed #ccc', borderRadius: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <p style={{ color: '#999', fontStyle: 'italic', margin: 0 }}>
+              {kind.charAt(0).toUpperCase() + kind.slice(1)} slot {index + 1}
+            </p>
+            <button
+              type="button"
+              onClick={() => removeSlot(kind, index)}
+              disabled={!canRemove || isSubmitting}
+              className="button button--danger"
+              style={{ padding: '2px 6px', fontSize: '10px' }}
+            >
+              Remove
+            </button>
+          </div>
+          
+          {/* Constraint Builder */}
+          <div style={{ marginTop: '8px' }}>
+            <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+              Options:
+            </div>
+            
+            {slotOrGroups.map((orGroup, orGroupIndex) => (
+              <div key={orGroupIndex} style={{ 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                padding: '8px', 
+                marginBottom: '8px',
+                backgroundColor: '#f9f9f9'
+              }}>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: '4px' 
+                }}>
+                  <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>
+                    Option {orGroupIndex + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeOrGroup(kind, index, orGroupIndex)}
+                    disabled={isSubmitting}
+                    style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                {orGroup.map((constraint, constraintIndex) => (
+                  <div key={constraintIndex} style={{ 
+                    display: 'flex', 
+                    gap: '4px', 
+                    alignItems: 'center',
+                    marginBottom: '4px',
+                    padding: '4px',
+                    backgroundColor: '#fff',
+                    border: '1px solid #eee',
+                    borderRadius: '3px'
+                  }}>
+                    <select
+                      value={constraint.domain || ''}
+                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', e.target.value)}
+                      disabled={isSubmitting}
+                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
+                    >
+                      <option value="">Domain</option>
+                      {parameters.map((param) => (
+                        <option key={param.domain} value={param.domain}>{param.domain}</option>
+                      ))}
+                    </select>
+                    
+                    <select
+                      value={constraint.key || ''}
+                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', e.target.value)}
+                      disabled={isSubmitting}
+                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
+                    >
+                      <option value="">Key</option>
+                      {parameters.map((param) => (
+                        <option key={param.key} value={param.key}>{param.key}</option>
+                      ))}
+                    </select>
+                    
+                    <select
+                      value={constraint.operator || '='}
+                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'operator', e.target.value)}
+                      disabled={isSubmitting}
+                      style={{ padding: '2px', fontSize: '11px', width: '50px' }}
+                    >
+                      <option value="=">=</option>
+                      <option value="<">&lt;</option>
+                      <option value="<=">&le;</option>
+                      <option value=">">&gt;</option>
+                      <option value=">=">&ge;</option>
+                      <option value="in">in</option>
+                    </select>
+                    
+                    <input
+                      type="text"
+                      value={constraint.value_string || ''}
+                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                      disabled={isSubmitting}
+                      placeholder="Value"
+                      style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                    />
+                    
+                    <button
+                      type="button"
+                      onClick={() => removeConstraint(kind, index, orGroupIndex, constraintIndex)}
+                      disabled={isSubmitting}
+                      style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={() => addConstraint(kind, index, orGroupIndex)}
+                  disabled={isSubmitting}
+                  style={{ padding: '2px 6px', fontSize: '10px', border: '1px solid #ccc', background: '#fff' }}
+                >
+                  + Add Parameter Requirement
+                </button>
+              </div>
+            ))}
+            
+            <button
+              type="button"
+              onClick={() => addOrGroup(kind, index)}
+              disabled={isSubmitting}
+              style={{ padding: '2px 6px', fontSize: '10px', border: '1px solid #ccc', background: '#fff' }}
+            >
+              + Add Option
+            </button>
+          </div>
         </div>
       );
     });
