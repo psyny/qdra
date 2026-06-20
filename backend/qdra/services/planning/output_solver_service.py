@@ -181,15 +181,13 @@ class OutputSolverService:
                     user_var_material_ids[var_def.name] = var_material_ids
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
-        # Load recipe params if needed for score rules, recipe target matching, forbidden_recipe_matching, OR required_recipe_matching
-        if request.target.target_type == "recipe" or (request.score_rules and any(
-            v.variable_type == "recipe" for v in request.score_rules.user_variables
-        )) or request.domain_constraints.forbidden_recipe_matching or request.domain_constraints.required_recipe_matching:
+        # Load recipe params only if needed for score rules (recipe-type user variables)
+        if request.score_rules and any(v.variable_type == "recipe" for v in request.score_rules.user_variables):
             recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         # Initialize state based on target type (material or recipe)
         if request.target.target_type == "recipe":
-            initial_states = self._initialize_recipe_target(request, recipe_params)
+            initial_states = self._initialize_recipe_target(request)
         else:
             initial_states = self._initialize_material_target(request)
 
@@ -504,7 +502,7 @@ class OutputSolverService:
         
         return states
 
-    def _initialize_recipe_target(self, request: SolverRequest, recipe_params: Dict) -> List["_State"]:
+    def _initialize_recipe_target(self, request: SolverRequest) -> List["_State"]:
         """Initialize state for a recipe target. Returns a list of states, one per matching recipe."""
         # Find recipes matching the constraints using the resolution service
         matching_recipes = self._find_recipes_by_constraints(request.target.constraints, request.project_id)
