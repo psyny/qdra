@@ -193,6 +193,15 @@ class RecipeEvaluationService:
         Check if a material matches all constraints in an option.
         """
         for constraint in constraints:
+            # Special handling for material_id constraint
+            if constraint.domain == "identity" and constraint.key == "material_id":
+                if constraint.operator == "=" and constraint.value_string:
+                    if str(material.id) != constraint.value_string:
+                        return False
+                else:
+                    return False
+                continue
+            
             # Find matching parameter
             material_params = material_params_map.get(material.id, [])
             matched = False
@@ -206,3 +215,68 @@ class RecipeEvaluationService:
                 return False
         
         return True
+
+    def find_materials_for_recipe_slots(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
+        """
+        Find all materials in the project that match each slot's constraints.
+        
+        Returns a dict with slot types (consumes, produces, requires) as keys,
+        each containing a list of slots with their matching material IDs.
+        """
+        recipe = self.entity_repo.get_by_id(recipe_id)
+        if not recipe:
+            return {"consumes": [], "produces": [], "requires": []}
+
+        # Load all materials in the project
+        materials = self.entity_repo.list_by_project(project_id, kind="material")
+        material_params_map = {}
+        for material in materials:
+            material_params_map[material.id] = (
+                self.entity_parameter_repo.list_by_entity(material.id)
+            )
+
+        # Load recipe structure
+        slots = self.slot_repo.list_by_recipe_entity(recipe_id)
+        
+        result = {
+            "consumes": [],
+            "produces": [],
+            "requires": []
+        }
+
+        # Group slots by kind and find matching materials
+        for slot in slots:
+            options = self.option_repo.list_by_slot(slot.id)
+            slot_data = {
+                "slot_id": str(slot.id),
+                "kind": slot.kind if isinstance(slot.kind, str) else slot.kind.value,
+                "options": []
+            }
+
+            for option in options:
+                constraints = self.constraint_repo.list_by_option(option.id)
+                matching_materials = []
+
+                for material in materials:
+                    if self._material_matches_constraints(
+                        material=material,
+                        constraints=constraints,
+                        material_params_map=material_params_map
+                    ):
+                        matching_materials.append(str(material.id))
+
+                slot_data["options"].append({
+                    "option_id": str(option.id),
+                    "quantity": option.quantity,
+                    "matching_material_ids": matching_materials
+                })
+
+            # Add to appropriate slot type list
+            if slot.kind == SlotKind.CONSUMES:
+                result["consumes"].append(slot_data)
+            elif slot.kind == SlotKind.PRODUCES:
+                result["produces"].append(slot_data)
+            elif slot.kind == SlotKind.REQUIRES:
+                result["requires"].append(slot_data)
+
+        return result

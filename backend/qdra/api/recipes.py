@@ -99,6 +99,24 @@ class RecipeResponse(BaseModel):
     image: Optional[Dict[str, Any]] = None
 
 
+class OptionMaterialsResponse(BaseModel):
+    option_id: str
+    quantity: float
+    matching_material_ids: List[str]
+
+
+class SlotMaterialsResponse(BaseModel):
+    slot_id: str
+    kind: str
+    options: List[OptionMaterialsResponse]
+
+
+class RecipeSlotMaterialsResponse(BaseModel):
+    consumes: List[SlotMaterialsResponse]
+    produces: List[SlotMaterialsResponse]
+    requires: List[SlotMaterialsResponse]
+
+
 class SlotCreate(BaseModel):
     kind: str
     sort_order: int = 0
@@ -348,6 +366,21 @@ def evaluate_recipe(
             )
             for a in result.allocations
         ],
+    )
+
+
+@router.get("/projects/{project_id}/recipes/{recipe_id}/materials", response_model=RecipeSlotMaterialsResponse)
+def get_recipe_materials(
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    service = RecipeEvaluationService(db)
+    result = service.find_materials_for_recipe_slots(recipe_id, project_id)
+    return RecipeSlotMaterialsResponse(
+        consumes=[SlotMaterialsResponse(**slot) for slot in result["consumes"]],
+        produces=[SlotMaterialsResponse(**slot) for slot in result["produces"]],
+        requires=[SlotMaterialsResponse(**slot) for slot in result["requires"]],
     )
 
 
