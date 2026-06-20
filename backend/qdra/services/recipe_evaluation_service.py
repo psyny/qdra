@@ -14,6 +14,11 @@ from repositories.option_repository import OptionRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from qdra.infrastructure.cache.cache_service import CacheService
+from qdra.infrastructure.cache.relationship_cache import (
+    get_material_recipes_cache,
+    get_recipe_materials_cache,
+    get_cache_service,
+)
 
 from services.constraint_matcher import ConstraintMatcher
 
@@ -28,6 +33,8 @@ class RecipeEvaluationService:
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
+        from qdra.infrastructure.config.settings import settings
+        self.settings = settings
 
     def evaluate_recipe(
         self, recipe_id: uuid.UUID, material_ids: List[uuid.UUID]
@@ -224,6 +231,23 @@ class RecipeEvaluationService:
         Returns a dict with slot types (consumes, produces, requires) as keys,
         each containing a list of slots with their matching material IDs.
         """
+        cache_key = f"recipe_materials:{project_id}:{recipe_id}"
+        l1_cache = get_recipe_materials_cache()
+        cache_service = get_cache_service()
+        
+        # L1: Check local cache if enabled
+        if self.settings.l1_caching and cache_key in l1_cache:
+            return l1_cache[cache_key]
+        
+        # L2: Check Redis cache if enabled
+        if self.settings.l2_caching:
+            cached = cache_service.get(cache_key)
+            if cached:
+                if self.settings.l1_caching:
+                    l1_cache[cache_key] = cached
+                return cached
+        
+        # Compute result
         recipe = self.entity_repo.get_by_id(recipe_id)
         if not recipe:
             return {"consumes": [], "produces": [], "requires": []}
@@ -280,6 +304,12 @@ class RecipeEvaluationService:
             elif slot.kind == SlotKind.REQUIRES:
                 result["requires"].append(slot_data)
 
+        # Cache result if enabled
+        if self.settings.l1_caching:
+            l1_cache[cache_key] = result
+        if self.settings.l2_caching:
+            cache_service.set(cache_key, result, self.settings.cache_relationship_ttl)
+        
         return result
 
     def find_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
@@ -289,6 +319,23 @@ class RecipeEvaluationService:
         Returns a dict with slot types (consumes, produces, requires) as keys,
         each containing a list of recipes with their matching slots.
         """
+        cache_key = f"material_recipes:{project_id}:{material_id}"
+        l1_cache = get_material_recipes_cache()
+        cache_service = get_cache_service()
+        
+        # L1: Check local cache if enabled
+        if self.settings.l1_caching and cache_key in l1_cache:
+            return l1_cache[cache_key]
+        
+        # L2: Check Redis cache if enabled
+        if self.settings.l2_caching:
+            cached = cache_service.get(cache_key)
+            if cached:
+                if self.settings.l1_caching:
+                    l1_cache[cache_key] = cached
+                return cached
+        
+        # Compute result
         # Load all recipes in the project
         recipes = self.entity_repo.list_by_project(project_id, kind="recipe")
         
@@ -345,5 +392,11 @@ class RecipeEvaluationService:
                     result["produces"].append(recipe_matches.copy())
                 if "requires" in slot_kinds:
                     result["requires"].append(recipe_matches.copy())
+        
+        # Cache result if enabled
+        if self.settings.l1_caching:
+            l1_cache[cache_key] = result
+        if self.settings.l2_caching:
+            cache_service.set(cache_key, result, self.settings.cache_relationship_ttl)
         
         return result

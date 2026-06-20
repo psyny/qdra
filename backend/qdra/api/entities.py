@@ -161,11 +161,10 @@ async def update_entity(
     from repositories.entity_repository import EntityRepository
     from qdra.infrastructure.cache.cache_service import CacheService
     from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
     
     service = EntityService(db)
     entity_repo = EntityRepository(db, CacheService())
-    cache_service = CacheService()
     
     try:
         # Verify entity exists
@@ -196,8 +195,7 @@ async def update_entity(
             if settings.l1_caching:
                 clear_all_caches()
             if settings.l2_caching:
-                cache_service.delete_pattern(f"material_recipes:{project_id}:*")
-                cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
+                clear_pattern(str(project_id))
         
         return await service.get_entity(entity_id)
     except ValueError as e:
@@ -210,20 +208,17 @@ def delete_entity(
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    from qdra.infrastructure.cache.cache_service import CacheService
     from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
     
     service = EntityService(db)
-    cache_service = CacheService()
     try:
         service.delete_entity(entity_id)
         # Invalidate all relationship caches for this project
         if settings.l1_caching:
             clear_all_caches()
         if settings.l2_caching:
-            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
-            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
+            clear_pattern(str(project_id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

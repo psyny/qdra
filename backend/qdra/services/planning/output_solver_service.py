@@ -76,6 +76,7 @@ class OutputSolverService:
         self.entity_param_repo = EntityParameterRepository(db)
         self.project_repo = ProjectRepository(db)
         self.recipe_eval_service = RecipeEvaluationService(db)
+        # Entity parameters cache (only cache not moved to service level)
         self.cache = TTLCache(maxsize=10000, ttl=60*5)
 
     def _cache_get_or_set(self, key: str, loader):
@@ -90,20 +91,12 @@ class OutputSolverService:
         )
 
     def _get_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
-        """Get recipes that can consume/produce/require this material, with caching."""
-        cache_key = f"material_recipes_{project_id}_{material_id}"
-        return self._cache_get_or_set(
-            cache_key,
-            lambda: self.recipe_eval_service.find_recipes_for_material(material_id, project_id),
-        )
+        """Get recipes that can consume/produce/require this material (cached at service level)."""
+        return self.recipe_eval_service.find_recipes_for_material(material_id, project_id)
 
     def _get_materials_for_recipe(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
-        """Get materials that match each slot of this recipe, with caching."""
-        cache_key = f"recipe_materials_{project_id}_{recipe_id}"
-        return self._cache_get_or_set(
-            cache_key,
-            lambda: self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id),
-        )
+        """Get materials that match each slot of this recipe (cached at service level)."""
+        return self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
 
     def _find_materials_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
         """Find materials in the project that match the given constraints."""
