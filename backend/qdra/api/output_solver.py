@@ -102,7 +102,7 @@ class MaterialNodeModel(BaseModel):
     id: str
     kind: str
     type: str
-    material_constraints: List[ConstraintSpecModel]
+    material_id: Optional[str] = None
     produced_qty: float
     consumed_qty: float
     tags: List[str] = []
@@ -270,14 +270,7 @@ def solve_output(
                     "id": n.id,
                     "kind": n.kind,
                     "type": n.type.value,
-                    "material_constraints": [
-                        {
-                            "domain": c.domain, "key": c.key, "operator": c.operator,
-                            "value_string": c.value_string, "value_number": c.value_number,
-                            "value_boolean": c.value_boolean, "is_wildcard": c.is_wildcard,
-                        }
-                        for c in n.material_constraints
-                    ],
+                    "material_id": str(n.material_id) if n.material_id else None,
                     "produced_qty": n.produced_qty,
                     "consumed_qty": n.consumed_qty,
                     "tags": n.tags,

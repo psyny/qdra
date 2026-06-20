@@ -17,7 +17,7 @@ Represents a single occurrence of a material at a specific point in the plan. Be
 | Field | Description |
 |---|---|
 | `id` | Unique node identifier |
-| `material_constraints` | Constraint set identifying the material |
+| `material_id` | UUID identifying the specific material |
 | `produced_qty` | How much of this material has been produced at this node |
 | `consumed_qty` | How much of this material has been consumed at this node |
 | `type` | See types below |
@@ -111,7 +111,7 @@ Tags are derived from graph structure, not set during the algorithm.
 
 ### Input
 
-- `targets`: list of `(material_constraints, quantity)` — what the user wants to produce
+- `targets`: list of `(material_id, quantity)` — what the user wants to produce
 - `recipes`: the full library of available recipes
 - `domain_constraints`: rules about what the plan is allowed to do (see below)
 - `search_parameters`: limits on search depth and breadth
@@ -211,7 +211,7 @@ If the chain of nested recipe expansions exceeds this depth, the branch fails. T
 To avoid emitting the same plan multiple times (which can happen when DFS explores redundant branches), each completed plan is fingerprinted using a canonical representation of its edges:
 
 ```
-fingerprint = sorted list of (recipe_id, material_constraints_key, qty, edge_type)
+fingerprint = sorted list of (recipe_id, material_id, qty, edge_type)
 ```
 
 A plan is only added to the result set if its fingerprint has not been seen before.
@@ -259,7 +259,7 @@ For each **Node A** in the sorted list:
 
 1. **Snapshot** `initial_consumed_qty = NodeA.consumed_qty` before any modification.
 2. **Find Node C** — a material node of type `"o"` satisfying all of:
-   - Same `material_constraints_key` as Node A
+   - Same `material_id` as Node A
    - `surplus = produced_qty − consumed_qty >= initial_consumed_qty`
    - Not already a direct source of Node A (no existing material edge C → A)
 3. If no Node C qualifies, skip Node A.
@@ -309,7 +309,7 @@ For each **Node A** in the sorted list:
 
 1. **Snapshot** `initial_consumed_qty = NodeA.consumed_qty` before any modification.
 2. **Find all Node C candidates** — material nodes of type `"o"` satisfying all of:
-   - Same `material_constraints_key` as Node A
+   - Same `material_id` as Node A
    - `surplus = produced_qty − consumed_qty > 0`
    - Not already a direct source of Node A
 3. **Partition candidates into two groups**:

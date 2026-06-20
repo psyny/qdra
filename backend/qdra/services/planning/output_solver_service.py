@@ -175,6 +175,16 @@ class OutputSolverService:
         
         return False
 
+    def _preload_constraint_materials(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Set[uuid.UUID]:
+        """Pre-load all material IDs matching the given constraint rules."""
+        matching_ids = set()
+        
+        for rule in constraint_rules:
+            material_ids = self._find_materials_by_constraints(rule.constraints, project_id)
+            matching_ids.update(material_ids)
+        
+        return matching_ids
+
     def solve(self, request: SolverRequest) -> SolverResponse:
         if not self.project_repo.get_by_id(request.project_id):
             return SolverResponse(success=False)
@@ -187,6 +197,27 @@ class OutputSolverService:
                 validate_formula(fdef.formula, all_names)
 
         recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
+
+        # Pre-load material ID sets for constraint rules
+        forbidden_materials_ids = self._preload_constraint_materials(
+            request.project_id, request.domain_constraints.forbidden_materials_matching
+        )
+        required_materials_ids = self._preload_constraint_materials(
+            request.project_id, request.domain_constraints.required_materials_matching
+        )
+        do_not_expand_materials_ids = self._preload_constraint_materials(
+            request.project_id, request.domain_constraints.do_not_expand_materials_matching
+        )
+
+        # Pre-load material ID sets for user variable constraints
+        user_var_material_ids: Dict[str, Set[uuid.UUID]] = {}
+        if request.score_rules:
+            for var_def in request.score_rules.user_variables:
+                if var_def.variable_type == "material":
+                    # Convert constraint options to ConstraintRule format for pre-loading
+                    constraint_rules = [ConstraintRule(constraints=option) for option in var_def.constraints]
+                    var_material_ids = self._preload_constraint_materials(request.project_id, constraint_rules)
+                    user_var_material_ids[var_def.name] = var_material_ids
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
         # Load recipe params if needed for score rules, recipe target matching, forbidden_recipe_matching, OR required_recipe_matching
@@ -207,7 +238,8 @@ class OutputSolverService:
         
         # Explore from each initial state (for material targets, there may be multiple matching materials)
         for initial in initial_states:
-            self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats)
+            self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
 
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
@@ -316,7 +348,8 @@ class OutputSolverService:
 
             node.tags = list(tags)
 
-    def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats):
+    def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
+                 forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids):
         if len(plans) >= request.search_parameters.max_solutions_returned:
             discarded_stats.max_solutions_returned += 1
             return
@@ -330,11 +363,11 @@ class OutputSolverService:
                 break
 
         if current_id is None:
-            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level, request.domain_constraints)
+            self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level,
+                           request.domain_constraints, required_materials_ids, user_var_material_ids)
             return
 
         current = state.material_nodes[current_id]
-        sig = _sig(current.material_constraints)
 
         # Loop detection: only prevent if the same NODE is in the current path, not just same signature
         # This allows diamond dependencies (same material needed by different branches)
@@ -352,15 +385,19 @@ class OutputSolverService:
         if surplus_id is not None:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
-            self._explore(branch, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(branch, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
             return
 
-        if self._matches_rule(current.material_constraints, request.domain_constraints.do_not_expand_materials_matching):
+        # Check if material is in do_not_expand set
+        if current.material_id and current.material_id in do_not_expand_materials_ids:
             discarded_stats.do_not_expand_materials += 1
-            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
             return
 
-        if self._matches_rule(current.material_constraints, request.domain_constraints.forbidden_materials_matching):
+        # Check if material is in forbidden set
+        if current.material_id and current.material_id in forbidden_materials_ids:
             discarded_stats.forbidden_materials += 1
             return
 
@@ -368,7 +405,8 @@ class OutputSolverService:
         if current.material_id is None:
             # Material not yet resolved - can't find producers
             discarded_stats.no_producers_found += 1
-            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
             return
 
         producers = self._find_producers(
@@ -378,7 +416,8 @@ class OutputSolverService:
 
         if not producers:
             discarded_stats.no_producers_found += 1
-            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
             return
 
         producers = producers[: request.search_parameters.max_branch_width]
@@ -391,7 +430,8 @@ class OutputSolverService:
             branch = state.clone()
             self._apply_recipe(branch, current_id, recipe_id, produces_option, request)
             branch.recipe_depth += 1
-            self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats)
+            self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
 
     def _apply_recipe(self, state, need_id, recipe_id, produces_option, request):
         need = state.material_nodes[need_id]
@@ -421,7 +461,6 @@ class OutputSolverService:
                     onode = MaterialNode(
                         id=oid, 
                         material_id=material_id,
-                        material_constraints=[],  # Constraints no longer needed once material_id is resolved
                         produced_qty=opt["quantity"] * exec_count,
                         consumed_qty=0.0, 
                         type=MaterialNodeType.OUTPUT,
@@ -447,7 +486,6 @@ class OutputSolverService:
                     state.material_nodes[iid] = MaterialNode(
                         id=iid, 
                         material_id=material_id,
-                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.INPUT, 
@@ -466,7 +504,6 @@ class OutputSolverService:
                     state.material_nodes[qid] = MaterialNode(
                         id=qid, 
                         material_id=material_id,
-                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.REQUIRES, 
@@ -492,7 +529,6 @@ class OutputSolverService:
             target_node = MaterialNode(
                 id=f"T_{i:04d}",
                 material_id=material_id,
-                material_constraints=request.target.constraints,
                 produced_qty=0.0,
                 consumed_qty=request.target.quantity,
                 type=MaterialNodeType.TARGET,
@@ -550,7 +586,6 @@ class OutputSolverService:
                     onode = MaterialNode(
                         id=oid, 
                         material_id=material_id,
-                        material_constraints=[],
                         produced_qty=opt["quantity"] * exec_count,
                         consumed_qty=0.0, 
                         type=MaterialNodeType.TARGET,
@@ -569,7 +604,6 @@ class OutputSolverService:
                     state.material_nodes[iid] = MaterialNode(
                         id=iid, 
                         material_id=material_id,
-                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.INPUT,
@@ -588,7 +622,6 @@ class OutputSolverService:
                     state.material_nodes[qid] = MaterialNode(
                         id=qid, 
                         material_id=material_id,
-                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.REQUIRES,
@@ -621,7 +654,7 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None, required_materials_ids=None, user_var_material_ids=None):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
@@ -637,13 +670,13 @@ class OutputSolverService:
 
         # Check required materials and recipes before adding the plan
         if domain_constraints:
-            if not self._check_required_materials(state, domain_constraints.required_materials_matching):
+            if not self._check_required_materials(state, required_materials_ids):
                 return
             if not self._check_required_recipes(state, domain_constraints.required_recipe_matching, recipe_params):
                 return
 
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
-        score = self._compute_score(state, score_rules, recipe_params)
+        score = self._compute_score(state, score_rules, recipe_params, user_var_material_ids)
 
         plans.append(SolvedPlan(
             plan_id="",
@@ -1000,25 +1033,16 @@ class OutputSolverService:
     def _matches_rule(self, constraints, rules) -> bool:
         return any(self._constraints_match(constraints, r.constraints) for r in rules)
 
-    def _check_required_materials(self, state, required_materials_matching) -> bool:
-        """Check if the plan contains all materials matching the required constraints."""
-        if not required_materials_matching:
+    def _check_required_materials(self, state, required_materials_ids) -> bool:
+        """Check if the plan contains all required materials by ID."""
+        if not required_materials_ids:
             return True
         
-        # Get all material constraints from the plan
-        material_constraints_list = [node.material_constraints for node in state.material_nodes.values()]
+        # Get all material IDs from the plan
+        plan_material_ids = {node.material_id for node in state.material_nodes.values() if node.material_id}
         
-        # Check if each required rule matches at least one material in the plan
-        for rule in required_materials_matching:
-            required_match = False
-            for material_constraints in material_constraints_list:
-                if self._constraints_match(material_constraints, rule.constraints):
-                    required_match = True
-                    break
-            if not required_match:
-                return False
-        
-        return True
+        # Check if all required material IDs are present in the plan
+        return required_materials_ids.issubset(plan_material_ids)
 
     def _check_required_recipes(self, state, required_recipe_matching, recipe_params) -> bool:
         """Check if the plan contains all recipes matching the required constraints."""
@@ -1043,7 +1067,7 @@ class OutputSolverService:
         return True
 
     def _compute_score(
-        self, state: "_State", score_rules, recipe_params: Dict
+        self, state: "_State", score_rules, recipe_params: Dict, user_var_material_ids: Dict[str, Set[uuid.UUID]]
     ) -> Dict[str, float]:
         """Compute all scores for a finished plan state."""
         scores: Dict[str, float] = {}
@@ -1089,7 +1113,7 @@ class OutputSolverService:
         if score_rules:
             var_values: Dict[str, float] = dict(scores)
             for var_def in score_rules.user_variables:
-                value = self._compute_user_variable(state, var_def, recipe_params)
+                value = self._compute_user_variable(state, var_def, recipe_params, user_var_material_ids)
                 var_values[var_def.name] = value
                 scores[var_def.name] = value
             for fdef in score_rules.score_formulas:
@@ -1098,21 +1122,20 @@ class OutputSolverService:
         return scores
 
     def _compute_user_variable(
-        self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict
+        self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict, user_var_material_ids: Dict[str, Set[uuid.UUID]]
     ) -> float:
         total = 0.0
         if var_def.variable_type == "material":
+            # Get pre-loaded material IDs for this variable
+            var_material_ids = user_var_material_ids.get(var_def.name, set())
+            
             for node in state.material_nodes.values():
-                # Load material constraints from DB using material_id
-                if node.material_id:
+                # Check if material_id matches the pre-loaded set
+                if node.material_id and node.material_id in var_material_ids:
+                    # Load material parameters from DB to extract parameter value
                     material_params = self.entity_param_repo.list_by_entity(node.material_id)
-                    material_constraints = self._params_to_constraints(material_params)
-                else:
-                    material_constraints = node.material_constraints
-                
-                if self._node_matches_var_constraints(material_constraints, var_def.constraints):
-                    param_value = self._extract_param_value(
-                        material_constraints, var_def.parameter_domain, var_def.parameter_key
+                    param_value = self._extract_param_value_from_params(
+                        material_params, var_def.parameter_domain, var_def.parameter_key
                     )
                     total += param_value * node.produced_qty
         else:  # "recipe"
@@ -1164,6 +1187,17 @@ class OutputSolverService:
         return False
 
     @staticmethod
+    def _extract_param_value_from_params(params: List, domain: str, key: str) -> float:
+        """Extract a numeric value from entity parameters for aggregation."""
+        for param in params:
+            if param.domain == domain and param.key == key:
+                if param.value_number is not None:
+                    return param.value_number
+                if param.value_string is not None:
+                    return 1.0  # count strings
+        return 0.0
+
+    @staticmethod
     def _extract_param_value(
         constraints: List[ConstraintSpec], domain: str, key: str
     ) -> float:
@@ -1196,12 +1230,8 @@ class OutputSolverService:
                 if isinstance(node, RecipeExecNode):
                     recipe_ids.add(node.recipe_id)
                 else:
-                    for c in node.material_constraints:
-                        if c.domain == "identity" and c.key == "material_id" and c.value_string:
-                            try:
-                                material_ids.add(uuid.UUID(c.value_string))
-                            except ValueError:
-                                pass
+                    if node.material_id:
+                        material_ids.add(node.material_id)
 
         materials: Dict[uuid.UUID, EntityData] = {}
         recipes: Dict[uuid.UUID, EntityData] = {}
@@ -1311,20 +1341,18 @@ class OutputSolverService:
                     node_id_to_label[nid] = label
                 else:
                     label = nid
-                    if material_label_param:
+                    if material_label_param and n.get("material_id"):
                         domain, key = material_label_param
-                        for c in n.get("material_constraints", []):
-                            if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
-                                material_id = c.get("value_string")
-                                if material_id and "materials" in entities:
-                                    mat_data = entities["materials"].get(material_id)
-                                    if mat_data and "parameters" in mat_data:
-                                        for p in mat_data["parameters"]:
-                                            if p.get("domain") == domain and p.get("key") == key:
-                                                val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                                if val is not None:
-                                                    label = str(val)
-                                                    break
+                        material_id = str(n.get("material_id"))
+                        if material_id and "materials" in entities:
+                            mat_data = entities["materials"].get(material_id)
+                            if mat_data and "parameters" in mat_data:
+                                for p in mat_data["parameters"]:
+                                    if p.get("domain") == domain and p.get("key") == key:
+                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                        if val is not None:
+                                            label = str(val)
+                                            break
                     node_id_to_label[nid] = label
 
             # Print nodes
@@ -1389,20 +1417,18 @@ class OutputSolverService:
                 else:
                     # For material nodes, use entities to get label
                     label = nid
-                    if material_label_param:
+                    if material_label_param and n.get("material_id"):
                         domain, key = material_label_param
-                        for c in n.get("material_constraints", []):
-                            if c.get("domain") == "identity" and c.get("key") == "material_id" and c.get("value_string"):
-                                material_id = c.get("value_string")
-                                if material_id and "materials" in entities:
-                                    mat_data = entities["materials"].get(material_id)
-                                    if mat_data and "parameters" in mat_data:
-                                        for p in mat_data["parameters"]:
-                                            if p.get("domain") == domain and p.get("key") == key:
-                                                val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                                if val is not None:
-                                                    label = str(val)
-                                                    break
+                        material_id = str(n.get("material_id"))
+                        if material_id and "materials" in entities:
+                            mat_data = entities["materials"].get(material_id)
+                            if mat_data and "parameters" in mat_data:
+                                for p in mat_data["parameters"]:
+                                    if p.get("domain") == domain and p.get("key") == key:
+                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
+                                        if val is not None:
+                                            label = str(val)
+                                            break
                     simplified_node_id_to_label[nid] = label
 
             print(f"\n// Graphviz for Plan {i} (simplify_level={simplify_level})")
@@ -1486,15 +1512,11 @@ class OutputSolverService:
             if node.get("kind") == "recipe_execution":
                 recipe_nodes.append(node)
             else:
-                # Extract material_id from constraints
-                material_id = None
-                for c in node.get("material_constraints", []):
-                    if c.get("domain") == "identity" and c.get("key") == "material_id":
-                        material_id = c.get("value_string")
-                        break
+                # Extract material_id directly
+                material_id = node.get("material_id")
                 if material_id:
                     material_nodes.append(node)
-                    node_id_to_material_id[node["id"]] = material_id
+                    node_id_to_material_id[node["id"]] = str(material_id)
 
         # Build adjacency list for material nodes (which material nodes are connected to which)
         material_id_to_node_ids = {}
@@ -1572,7 +1594,7 @@ class OutputSolverService:
                 "id": collapsed_id,
                 "kind": "material",
                 "type": first_node.get("type"),
-                "material_constraints": first_node.get("material_constraints"),
+                "material_id": first_node.get("material_id"),
                 "produced_qty": 0,  # Will recalculate
                 "consumed_qty": 0,  # Will recalculate
                 "tags": list(merged_tags),
@@ -1649,17 +1671,14 @@ class OutputSolverService:
             if node.get("kind") == "recipe_execution":
                 recipe_nodes.append(node)
             else:
-                # Extract material_id from constraints
-                material_id = None
-                for c in node.get("material_constraints", []):
-                    if c.get("domain") == "identity" and c.get("key") == "material_id":
-                        material_id = c.get("value_string")
-                        break
+                # Extract material_id directly
+                material_id = node.get("material_id")
                 if material_id:
-                    if material_id not in material_id_to_nodes:
-                        material_id_to_nodes[material_id] = []
-                    material_id_to_nodes[material_id].append(node)
-                    node_id_to_material_id[node["id"]] = material_id
+                    material_id_str = str(material_id)
+                    if material_id_str not in material_id_to_nodes:
+                        material_id_to_nodes[material_id_str] = []
+                    material_id_to_nodes[material_id_str].append(node)
+                    node_id_to_material_id[node["id"]] = material_id_str
 
         # Create collapsed material nodes
         collapsed_nodes = []
@@ -1676,13 +1695,13 @@ class OutputSolverService:
             collapsed_id = f"C_{material_id[:8]}"
             material_id_to_collapsed_id[material_id] = collapsed_id
 
-            # Create collapsed node with first node's constraints
+            # Create collapsed node with first node's material_id
             first_node = mat_nodes[0]
             collapsed_node = {
                 "id": collapsed_id,
                 "kind": "material",
                 "type": first_node.get("type"),
-                "material_constraints": first_node.get("material_constraints"),
+                "material_id": first_node.get("material_id"),
                 "produced_qty": 0,  # Will recalculate
                 "consumed_qty": 0,  # Will recalculate
                 "tags": list(merged_tags),
