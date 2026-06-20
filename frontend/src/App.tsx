@@ -5,7 +5,8 @@ import { ProjectHomePage } from './pages/ProjectHomePage';
 import { ProjectWorkspaceWrapper } from './components/ProjectWorkspaceWrapper';
 import { MaterialCatalogPage } from './pages/MaterialCatalogPage';
 import { MaterialEditorPage } from './pages/MaterialEditorPage';
-import { RecipesPlaceholderPage } from './pages/RecipesPlaceholderPage';
+import { RecipeCatalogPage } from './pages/RecipeCatalogPage';
+import { RecipeEditorPage } from './pages/RecipeEditorPage';
 import { PlanningPlaceholderPage } from './pages/PlanningPlaceholderPage';
 import { TemplateListPage } from './pages/TemplateListPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
@@ -57,7 +58,23 @@ function App() {
           path="/projects/:projectId/recipes"
           element={
             <ProjectWorkspaceWrapper>
-              {(project) => <RecipesPlaceholderPage />}
+              {(project) => <RecipeCatalogPage projectId={project.id} />}
+            </ProjectWorkspaceWrapper>
+          }
+        />
+        <Route
+          path="/projects/:projectId/recipes/new"
+          element={
+            <ProjectWorkspaceWrapper>
+              {(project) => <RecipeEditorPage projectId={project.id} />}
+            </ProjectWorkspaceWrapper>
+          }
+        />
+        <Route
+          path="/projects/:projectId/recipes/:recipeId/edit"
+          element={
+            <ProjectWorkspaceWrapper>
+              {(project) => <RecipeEditorPage projectId={project.id} />}
             </ProjectWorkspaceWrapper>
           }
         />
