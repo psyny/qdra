@@ -27,6 +27,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [parameterDefinitions, setParameterDefinitions] = useState<ParameterDefinition[]>([]);
   const [slotGroups, setSlotGroups] = useState<SlotGroupConfig[]>([]);
+  const [materialEntityTypes, setMaterialEntityTypes] = useState<any[]>([]);
   const [entity, setEntity] = useState<Entity | null>(null);
   const [entityParameters, setEntityParameters] = useState<EntityParameter[]>([]);
   const [imageSizePx, setImageSizePx] = useState(256);
@@ -45,6 +46,18 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         // Load project to get image_size_px
         const projectData = await getProject(projectId);
         setImageSizePx(projectData.image_size_px || 256);
+
+        // Extract material entity types (all entity types except the recipe type)
+        const materialTypes = templateData.entity_types.filter((et: any) => {
+          // Filter out recipe types (those used in recipe_catalog view)
+          const recipeView = templateData.views.find((v: any) => v.view_key === 'recipe_catalog');
+          if (recipeView) {
+            const recipeConfigIds = recipeView.configs.map((c: any) => c.entity_type_id);
+            return !recipeConfigIds.includes(et.id);
+          }
+          return true;
+        });
+        setMaterialEntityTypes(materialTypes);
 
         if (configId) {
           // Find the config in template
@@ -207,6 +220,8 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         targetImageSize={imageSizePx}
         currentImage={entity?.image?.url || null}
         slotGroups={slotGroups}
+        materialEntityTypes={materialEntityTypes}
+        template={template}
       />
     </div>
   );

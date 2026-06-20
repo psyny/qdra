@@ -48,6 +48,7 @@ class EntityService:
         self,
         project_id: uuid.UUID,
         entity_type_id: uuid.UUID,
+        group: str = "",
     ) -> Entity:
         project = self.project_repository.get_by_id(project_id)
         if not project:
@@ -60,6 +61,7 @@ class EntityService:
         return self.entity_repository.create(
             project_id=project_id,
             entity_type_id=entity_type_id,
+            group=group,
         )
 
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
@@ -80,6 +82,7 @@ class EntityService:
             "id": entity.id,
             "project_id": entity.project_id,
             "entity_type_id": entity.entity_type_id,
+            "group": entity.group,
             "kind": kind,
             "created_at": entity.created_at,
             "updated_at": updated_at,
@@ -124,6 +127,7 @@ class EntityService:
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
+                "group": entity.group,
                 "kind": entity_kind,
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
@@ -239,6 +243,7 @@ class EntityService:
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
+                "group": entity.group,
                 "kind": entity_kind,
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,

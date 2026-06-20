@@ -22,11 +22,13 @@ class EntityRepository:
         self,
         project_id: uuid.UUID,
         entity_type_id: uuid.UUID,
+        group: str = "",
     ) -> Entity:
         from datetime import datetime
         entity = Entity(
             project_id=project_id,
             entity_type_id=entity_type_id,
+            group=group,
         )
         self.db.add(entity)
         self.db.commit()
@@ -84,6 +86,7 @@ class EntityRepository:
             "id": str(entity.id),
             "project_id": str(entity.project_id),
             "entity_type_id": str(entity.entity_type_id),
+            "group": entity.group,
             "created_at": entity.created_at.isoformat() if entity.created_at else None,
             "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
         }
@@ -95,6 +98,7 @@ class EntityRepository:
                 id=uuid.UUID(data["id"]),
                 project_id=uuid.UUID(data["project_id"]),
                 entity_type_id=uuid.UUID(data["entity_type_id"]),
+                group=data.get("group", ""),
                 created_at=data.get("created_at"),
                 updated_at=data.get("updated_at"),
             )

@@ -26,6 +26,7 @@ class ParameterValueModel(BaseModel):
 
 class CreateEntityRequest(BaseModel):
     entity_type_id: uuid.UUID
+    group: str = ""
     parameters: Optional[List[ParameterValueModel]] = None
 
 
@@ -51,6 +52,7 @@ class EntityResponse(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
+    group: str
     kind: str
     created_at: datetime
     updated_at: datetime
@@ -74,6 +76,7 @@ async def create_entity(
         entity = service.create_entity(
             project_id=project_id,
             entity_type_id=request.entity_type_id,
+            group=request.group,
         )
         if request.parameters:
             for param in request.parameters:
@@ -103,6 +106,7 @@ async def bulk_create_entities(
             entity = service.create_entity(
                 project_id=project_id,
                 entity_type_id=item.entity_type_id,
+                group=item.group,
             )
             if item.parameters:
                 for param in item.parameters:

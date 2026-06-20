@@ -129,6 +129,11 @@ class ConstraintResolutionService:
                     return Entity.id == uuid.UUID(constraint.value_string)
                 else:
                     return False  # Invalid __system__ constraint
+            elif constraint.key == "group":
+                if constraint.operator == "=" and constraint.value_string is not None:
+                    return Entity.group == constraint.value_string
+                else:
+                    return False  # Invalid __system__ constraint
             return False  # Unsupported __system__ key
 
         # Build EXISTS subquery for entity_parameters using select()
@@ -205,6 +210,13 @@ class ConstraintResolutionService:
                     else:
                         return False
                     continue
+                elif constraint.key == "group":
+                    if constraint.operator == "=" and constraint.value_string is not None:
+                        if material.group != constraint.value_string:
+                            return False
+                    else:
+                        return False
+                    continue
             
             # Find matching parameter
             matched = False
@@ -231,6 +243,13 @@ class ConstraintResolutionService:
                 if constraint.key == "id":
                     if constraint.operator == "=" and constraint.value_string:
                         if str(entity.id) != constraint.value_string:
+                            return False
+                    else:
+                        return False
+                    continue
+                elif constraint.key == "group":
+                    if constraint.operator == "=" and constraint.value_string is not None:
+                        if entity.group != constraint.value_string:
                             return False
                     else:
                         return False

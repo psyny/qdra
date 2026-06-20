@@ -15,6 +15,7 @@ type ConstraintSpec = {
   value_string?: string | null;
   value_number?: number | null;
   value_boolean?: boolean | null;
+  entity_type_id?: string | null; // Track selected entity type separately
 };
 
 type SlotConstraints = {
@@ -32,6 +33,8 @@ type RecipeFormProps = {
   targetImageSize?: number;
   currentImage?: string | null;
   slotGroups?: SlotGroupConfig[];
+  materialEntityTypes?: any[];
+  template?: any;
 };
 
 export function RecipeForm({
@@ -45,6 +48,8 @@ export function RecipeForm({
   targetImageSize = 256,
   currentImage,
   slotGroups = [],
+  materialEntityTypes = [],
+  template,
 }: RecipeFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -179,11 +184,18 @@ export function RecipeForm({
       // Create new arrays to avoid mutation issues
       newConstraints[kind] = [...newConstraints[kind]];
       newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      
+      // Auto-fill with first type and first parameter
+      const firstType = materialEntityTypes[0];
+      const firstTypeParams = firstType ? getParametersForEntityType(firstType.id) : [];
+      const firstParam = firstTypeParams[0];
+      
       newConstraints[kind][slotIndex][orGroupIndex] = [
         ...newConstraints[kind][slotIndex][orGroupIndex],
         {
-          domain: '',
-          key: '',
+          entity_type_id: firstType?.id || null,
+          domain: firstParam?.domain || '',
+          key: firstParam?.key || '',
           operator: '=',
           value_string: null,
         }
@@ -222,6 +234,13 @@ export function RecipeForm({
       );
       return newConstraints;
     });
+  };
+
+  // Helper to get parameter definitions for a given entity type
+  const getParametersForEntityType = (entityTypeId: string) => {
+    if (!template) return [];
+    const entityType = template.entity_types?.find((et: any) => et.id === entityTypeId);
+    return entityType?.parameter_definitions || [];
   };
 
   // Helper to render empty slots for a category
@@ -285,7 +304,11 @@ export function RecipeForm({
                   </button>
                 </div>
                 
-                {orGroup.map((constraint, constraintIndex) => (
+                {orGroup.map((constraint, constraintIndex) => {
+                  const selectedTypeId = constraint.entity_type_id || '';
+                  const parametersForType = getParametersForEntityType(selectedTypeId);
+                  
+                  return (
                   <div key={constraintIndex} style={{ 
                     display: 'flex', 
                     gap: '4px', 
@@ -297,26 +320,48 @@ export function RecipeForm({
                     borderRadius: '3px'
                   }}>
                     <select
-                      value={constraint.domain || ''}
-                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', e.target.value)}
+                      value={selectedTypeId}
+                      onChange={(e) => {
+                        const selectedType = materialEntityTypes.find((et: any) => et.id === e.target.value);
+                        if (selectedType) {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'entity_type_id', selectedType.id);
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', 'entity_type');
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', selectedType.id);
+                        } else {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'entity_type_id', null);
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', '');
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', '');
+                        }
+                      }}
                       disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
+                      style={{ padding: '2px', fontSize: '11px', width: '100px' }}
                     >
-                      <option value="">Domain</option>
-                      {parameters.map((param) => (
-                        <option key={param.domain} value={param.domain}>{param.domain}</option>
+                      <option value="">Type</option>
+                      {materialEntityTypes.map((et: any) => (
+                        <option key={et.id} value={et.id}>{et.name || et.id}</option>
                       ))}
                     </select>
                     
                     <select
-                      value={constraint.key || ''}
-                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', e.target.value)}
-                      disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
+                      value={constraint.domain !== 'entity_type' && constraint.domain ? `${constraint.domain}:${constraint.key}` : ''}
+                      onChange={(e) => {
+                        const [domain, key] = e.target.value.split(':');
+                        if (domain && key) {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', domain);
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', key);
+                        } else {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', '');
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', '');
+                        }
+                      }}
+                      disabled={isSubmitting || !selectedTypeId}
+                      style={{ padding: '2px', fontSize: '11px', width: '120px' }}
                     >
-                      <option value="">Key</option>
-                      {parameters.map((param) => (
-                        <option key={param.key} value={param.key}>{param.key}</option>
+                      <option value="">Parameter</option>
+                      {parametersForType.map((param: any) => (
+                        <option key={`${param.domain}:${param.key}`} value={`${param.domain}:${param.key}`}>
+                          {param.domain}:{param.key}
+                        </option>
                       ))}
                     </select>
                     
@@ -352,7 +397,8 @@ export function RecipeForm({
                       ×
                     </button>
                   </div>
-                ))}
+                  );
+                })}
                 
                 <button
                   type="button"
