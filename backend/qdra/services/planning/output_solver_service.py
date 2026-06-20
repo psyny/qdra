@@ -104,6 +104,10 @@ class OutputSolverService:
         """Find materials in the project that match the given constraints (delegated to service)."""
         return self.constraint_resolution_service.find_materials_by_constraints(constraints, project_id)
 
+    def _find_recipes_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
+        """Find recipes in the project that match the given constraints (delegated to service)."""
+        return self.constraint_resolution_service.find_recipes_by_constraints(constraints, project_id)
+
     def _preload_constraint_materials(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Set[uuid.UUID]:
         """Pre-load all material IDs matching the given constraint rules."""
         matching_ids = set()
@@ -113,6 +117,26 @@ class OutputSolverService:
             matching_ids.update(material_ids)
         
         return matching_ids
+
+    def _preload_constraint_recipes(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Set[uuid.UUID]:
+        """Pre-load all recipe IDs matching the given constraint rules (returns union for forbidden)."""
+        matching_ids = set()
+        
+        for rule in constraint_rules:
+            recipe_ids = self._find_recipes_by_constraints(rule.constraints, project_id)
+            matching_ids.update(recipe_ids)
+        
+        return matching_ids
+
+    def _preload_constraint_recipes_by_rule(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Dict[int, Set[uuid.UUID]]:
+        """Pre-load recipe IDs per rule for required recipes (returns dict mapping rule index to IDs)."""
+        matching_by_rule = {}
+        
+        for i, rule in enumerate(constraint_rules):
+            recipe_ids = self._find_recipes_by_constraints(rule.constraints, project_id)
+            matching_by_rule[i] = set(recipe_ids)
+        
+        return matching_by_rule
 
     def solve(self, request: SolverRequest) -> SolverResponse:
         if not self.project_repo.get_by_id(request.project_id):
@@ -138,6 +162,14 @@ class OutputSolverService:
             request.project_id, request.domain_constraints.do_not_expand_materials_matching
         )
 
+        # Pre-load recipe ID sets for constraint rules
+        forbidden_recipes_ids = self._preload_constraint_recipes(
+            request.project_id, request.domain_constraints.forbidden_recipe_matching
+        )
+        required_recipes_by_rule = self._preload_constraint_recipes_by_rule(
+            request.project_id, request.domain_constraints.required_recipe_matching
+        )
+
         # Pre-load material ID sets for user variable constraints
         user_var_material_ids: Dict[str, Set[uuid.UUID]] = {}
         if request.score_rules:
@@ -157,7 +189,7 @@ class OutputSolverService:
 
         # Initialize state based on target type (material or recipe)
         if request.target.target_type == "recipe":
-            initial_states = [self._initialize_recipe_target(request, recipe_params)]
+            initial_states = self._initialize_recipe_target(request, recipe_params)
         else:
             initial_states = self._initialize_material_target(request)
 
@@ -165,10 +197,11 @@ class OutputSolverService:
         seen_fps: Set[str] = set()
         discarded_stats = DiscardedPlansStats()
         
-        # Explore from each initial state (for material targets, there may be multiple matching materials)
+        # Explore from each initial state (for material targets, there may be multiple matching materials; for recipe targets, there may be multiple matching recipes)
         for initial in initial_states:
             self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
 
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
@@ -234,7 +267,8 @@ class OutputSolverService:
         self._apply_node_tags(material_nodes, recipe_nodes, plan.material_edges, plan.recipe_edges)
 
     def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                 forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids):
+                 forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                 forbidden_recipes_ids, required_recipes_by_rule):
         if len(plans) >= request.search_parameters.max_solutions_returned:
             discarded_stats.max_solutions_returned += 1
             return
@@ -249,7 +283,7 @@ class OutputSolverService:
 
         if current_id is None:
             self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level,
-                           request.domain_constraints, required_materials_ids, user_var_material_ids)
+                           request.domain_constraints, required_materials_ids, user_var_material_ids, required_recipes_by_rule)
             return
 
         current = state.material_nodes[current_id]
@@ -271,14 +305,16 @@ class OutputSolverService:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
             self._explore(branch, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
             return
 
         # Check if material is in do_not_expand set
         if current.material_id and current.material_id in do_not_expand_materials_ids:
             discarded_stats.do_not_expand_materials += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
             return
 
         # Check if material is in forbidden set
@@ -291,18 +327,20 @@ class OutputSolverService:
             # Material not yet resolved - can't find producers
             discarded_stats.no_producers_found += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
             return
 
         producers = self._find_producers(
             current.material_id, request.project_id,
-            request.domain_constraints.forbidden_recipe_matching, recipe_params,
+            forbidden_recipes_ids,
         )
 
         if not producers:
             discarded_stats.no_producers_found += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
             return
 
         producers = producers[: request.search_parameters.max_branch_width]
@@ -316,7 +354,8 @@ class OutputSolverService:
             self._apply_recipe(branch, current_id, recipe_id, produces_option, request)
             branch.recipe_depth += 1
             self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_recipes_ids, required_recipes_by_rule)
 
     def _add_recipe_material_nodes(
         self,
@@ -465,45 +504,47 @@ class OutputSolverService:
         
         return states
 
-    def _initialize_recipe_target(self, request: SolverRequest, recipe_params: Dict) -> _State:
-        """Initialize state for a recipe target. Add recipe node, mark outputs as type 't', inputs normally."""
-        # Find recipe matching the constraints
-        recipe_id = None
-        for rid, params in recipe_params.items():
-            if self._constraints_match(request.target.constraints, params):
-                recipe_id = uuid.UUID(rid)
-                break
+    def _initialize_recipe_target(self, request: SolverRequest, recipe_params: Dict) -> List["_State"]:
+        """Initialize state for a recipe target. Returns a list of states, one per matching recipe."""
+        # Find recipes matching the constraints using the resolution service
+        matching_recipes = self._find_recipes_by_constraints(request.target.constraints, request.project_id)
         
-        if recipe_id is None:
-            raise ValueError(f"No recipe found matching constraints: {request.target.constraints}")
+        if not matching_recipes:
+            # No recipes match - return empty list (will result in no solutions)
+            return []
         
-        # Use quantity directly as execution count (can be fractional if allowed)
-        exec_count = request.target.quantity
+        # Create a state for each matching recipe
+        states = []
+        for i, recipe_id in enumerate(matching_recipes):
+            # Use quantity directly as execution count (can be fractional if allowed)
+            exec_count = request.target.quantity
+            
+            state = _State(
+                material_nodes={},
+                recipe_nodes={},
+                material_edges=[],
+                recipe_edges=[],
+                needs_queue=deque(),
+                _counter=1,
+            )
+            
+            # Create recipe execution node
+            rn_id = state.next_id("R")
+            state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=0)
+            
+            recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
+            new_inputs = self._add_recipe_material_nodes(
+                state=state,
+                recipe_node_id=rn_id,
+                recipe_materials=recipe_materials,
+                exec_count=exec_count,
+                rank=0,
+                output_type=MaterialNodeType.TARGET,
+            )
+            state.needs_queue = deque(new_inputs)
+            states.append(state)
         
-        state = _State(
-            material_nodes={},
-            recipe_nodes={},
-            material_edges=[],
-            recipe_edges=[],
-            needs_queue=deque(),
-            _counter=1,
-        )
-        
-        # Create recipe execution node
-        rn_id = state.next_id("R")
-        state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=0)
-        
-        recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
-        new_inputs = self._add_recipe_material_nodes(
-            state=state,
-            recipe_node_id=rn_id,
-            recipe_materials=recipe_materials,
-            exec_count=exec_count,
-            rank=0,
-            output_type=MaterialNodeType.TARGET,
-        )
-        state.needs_queue = deque(new_inputs)
-        return state
+        return states
 
     def _find_surplus(self, state, need):
         need_amt = need.consumed_qty - need.produced_qty
@@ -526,7 +567,7 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None, required_materials_ids=None, user_var_material_ids=None):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None, required_materials_ids=None, user_var_material_ids=None, required_recipes_by_rule=None):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
@@ -544,7 +585,7 @@ class OutputSolverService:
         if domain_constraints:
             if not self._check_required_materials(state, required_materials_ids):
                 return
-            if not self._check_required_recipes(state, domain_constraints.required_recipe_matching, recipe_params):
+            if not self._check_required_recipes(state, required_recipes_by_rule, recipe_params):
                 return
 
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
@@ -869,7 +910,7 @@ class OutputSolverService:
             parts.append(f"{rid}:{material_id}:{e.qty}:{e.type.value}")
         return "|".join(sorted(parts))
 
-    def _find_producers(self, material_id: uuid.UUID, project_id: uuid.UUID, forbidden_recipe_matching: List[ConstraintRule], recipe_params: Dict) -> List[Tuple]:
+    def _find_producers(self, material_id: uuid.UUID, project_id: uuid.UUID, forbidden_recipes_ids: Set[uuid.UUID]) -> List[Tuple]:
         """Find recipes that can produce the given material."""
         # Get recipes that can produce this material
         recipes_data = self._get_recipes_for_material(material_id, project_id)
@@ -878,8 +919,8 @@ class OutputSolverService:
         for recipe_info in recipes_data["produces"]:
             recipe_id = uuid.UUID(recipe_info["recipe_id"])
             
-            # Check if recipe is forbidden by matching its parameters
-            if str(recipe_id) in recipe_params and self._matches_rule(recipe_params[str(recipe_id)], forbidden_recipe_matching):
+            # Check if recipe is forbidden
+            if recipe_id in forbidden_recipes_ids:
                 continue
             
             # Add the recipe with its slot information
@@ -924,16 +965,10 @@ class OutputSolverService:
         # Get all recipe IDs used in the plan
         recipe_ids = set(node.recipe_id for node in state.recipe_nodes.values())
         
-        # Check if each required rule matches at least one recipe in the plan
-        for rule in required_recipe_matching:
-            required_match = False
-            for recipe_id in recipe_ids:
-                rid_str = str(recipe_id)
-                if rid_str in recipe_params:
-                    if self._constraints_match(recipe_params[rid_str], rule.constraints):
-                        required_match = True
-                        break
-            if not required_match:
+        # Check if each required rule has at least one matching recipe in the plan
+        for rule_index, required_recipe_ids in required_recipe_matching.items():
+            # Check if the plan contains at least one recipe from this required set
+            if not recipe_ids.intersection(required_recipe_ids):
                 return False
         
         return True
