@@ -11,13 +11,15 @@ type SlotGroupConfig = {
 };
 
 type ConstraintSpec = {
-  domain: string;
-  key: string;
+  origin: 'system' | 'parameter';
+  system_key?: string | null; // For system origin (domain __system__)
+  entity_type_id?: string | null; // For parameter origin (group)
+  domain?: string | null; // For parameter origin
+  key?: string | null; // For parameter origin
   operator: string;
   value_string?: string | null;
   value_number?: number | null;
   value_boolean?: boolean | null;
-  entity_type_id?: string | null; // Track selected entity type separately
 };
 
 type SlotConstraints = {
@@ -200,15 +202,11 @@ export function RecipeForm({
       newConstraints[kind] = [...newConstraints[kind]];
       newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
 
-      // Auto-fill with first type and first parameter
-      const firstType = materialEntityTypes[0];
-      const firstTypeParams = firstType ? getParametersForEntityType(firstType.id) : [];
-      const firstParam = firstTypeParams[0];
-
       const newConstraint = {
-        entity_type_id: firstType?.id || null,
-        domain: firstParam?.domain || '',
-        key: firstParam?.key || '',
+        origin: 'parameter' as const,
+        entity_type_id: materialEntityTypes[0]?.id || null,
+        domain: null,
+        key: null,
         operator: '=',
         value_string: null,
       };
@@ -217,12 +215,6 @@ export function RecipeForm({
         ...newConstraints[kind][slotIndex][orGroupIndex],
         newConstraint
       ];
-
-      // Fetch existing values for the initial selection
-      if (firstType?.id && firstParam?.domain && firstParam?.key && firstParam.domain !== 'entity_type') {
-        const groupName = firstType.name || '';
-        fetchExistingValues(firstType.id, groupName, firstParam.domain, firstParam.key);
-      }
 
       return newConstraints;
     });
@@ -244,11 +236,31 @@ export function RecipeForm({
       // Fetch existing values when entity_type_id, domain, or key changes
       const constraint = newConstraints[kind][slotIndex][orGroupIndex][constraintIndex];
       if (field === 'entity_type_id' || field === 'domain' || field === 'key') {
-        if (constraint.entity_type_id && constraint.domain && constraint.key && constraint.domain !== 'entity_type') {
+        if (constraint.origin === 'parameter' && constraint.entity_type_id && constraint.domain && constraint.key && constraint.domain !== 'entity_type') {
           // Get the group name from the entity type
           const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
           const groupName = entityType?.name || '';
           fetchExistingValues(constraint.entity_type_id, groupName, constraint.domain, constraint.key);
+        }
+      }
+
+      // When system.group changes, refetch parameter values for other constraints in same OR group
+      if (field === 'system_key' || field === 'value_string') {
+        if (constraint.origin === 'system' && constraint.system_key === 'group' && constraint.value_string) {
+          // Get all groups from system.group constraints in this OR group
+          const orGroupConstraints = newConstraints[kind][slotIndex][orGroupIndex];
+          const groupsFromSystem = orGroupConstraints
+            .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
+            .map((c: any) => c.value_string);
+          
+          // Refetch parameter values for all parameter constraints in this OR group
+          orGroupConstraints.forEach((c: any) => {
+            if (c.origin === 'parameter' && c.domain && c.key) {
+              if (projectId) {
+                fetchExistingValuesForGroups(c.domain, c.key, groupsFromSystem);
+              }
+            }
+          });
         }
       }
 
@@ -281,7 +293,7 @@ export function RecipeForm({
 
   // Helper to fetch existing parameter values for a constraint
   const fetchExistingValues = async (entityTypeId: string, group: string, domain: string, key: string) => {
-    if (!projectId || !entityTypeId || !group || !domain || !key) return [];
+    if (!projectId || !entityTypeId || !domain || !key) return [];
 
     const cacheKey = `${entityTypeId}:${group}:${domain}:${key}`;
     if (existingValues[cacheKey]) {
@@ -289,11 +301,34 @@ export function RecipeForm({
     }
 
     try {
-      const values = await getDistinctParameterValues(projectId, entityTypeId, group, domain, key);
+      // Send empty groups array to get all parameter values
+      const values = await getDistinctParameterValues(projectId, entityTypeId, []);
       setExistingValues(prev => ({ ...prev, [cacheKey]: values }));
       return values;
     } catch (err) {
       console.error('Failed to fetch existing values:', err);
+      return [];
+    }
+  };
+
+  // Helper to fetch parameter values for specific groups
+  const fetchExistingValuesForGroups = async (domain: string, key: string, groups: string[]) => {
+    if (!projectId || !domain || !key) return [];
+
+    const cacheKey = `${domain}:${key}:${groups.join(',')}`;
+    if (existingValues[cacheKey]) {
+      return existingValues[cacheKey];
+    }
+
+    try {
+      // Use first entity_type_id since we're fetching across all types
+      const firstEntityTypeId = materialEntityTypes[0]?.id || '';
+      // Send groups array to get parameter values for those groups
+      const values = await getDistinctParameterValues(projectId, firstEntityTypeId, groups);
+      setExistingValues(prev => ({ ...prev, [cacheKey]: values }));
+      return values;
+    } catch (err) {
+      console.error('Failed to fetch existing values for groups:', err);
       return [];
     }
   };
@@ -360,11 +395,6 @@ export function RecipeForm({
                 </div>
                 
                 {orGroup.map((constraint, constraintIndex) => {
-                  const selectedTypeId = constraint.entity_type_id || '';
-                  const parametersForType = getParametersForEntityType(selectedTypeId);
-                  const selectedParam = parametersForType.find((p: any) => p.domain === constraint.domain && p.key === constraint.key);
-                  const paramValueType = selectedParam?.value_type || 'string';
-
                   return (
                   <div key={constraintIndex} style={{
                     display: 'flex',
@@ -376,52 +406,70 @@ export function RecipeForm({
                     border: '1px solid #eee',
                     borderRadius: '3px'
                   }}>
+                    {/* Box 1: Type selector */}
                     <select
-                      value={selectedTypeId}
+                      value={constraint.origin || 'parameter'}
                       onChange={(e) => {
-                        const selectedType = materialEntityTypes.find((et: any) => et.id === e.target.value);
-                        if (selectedType) {
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'entity_type_id', selectedType.id);
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', 'entity_type');
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', selectedType.id);
-                        } else {
+                        const newOrigin = e.target.value as 'system' | 'parameter';
+                        updateConstraint(kind, index, orGroupIndex, constraintIndex, 'origin', newOrigin);
+                        // Reset fields when origin changes
+                        if (newOrigin === 'system') {
                           updateConstraint(kind, index, orGroupIndex, constraintIndex, 'entity_type_id', null);
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', '');
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', '');
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', null);
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', null);
+                        } else {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'system_key', null);
                         }
                       }}
                       disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '100px' }}
+                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
                     >
-                      <option value="">Group</option>
-                      {materialEntityTypes.map((et: any) => (
-                        <option key={et.id} value={et.id}>{et.name || et.id}</option>
-                      ))}
+                      <option value="parameter">Parameter</option>
+                      <option value="system">System</option>
                     </select>
-                    
+
+                    {/* Box 2: Key selector */}
                     <select
-                      value={constraint.domain !== 'entity_type' && constraint.domain ? `${constraint.domain}:${constraint.key}` : ''}
+                      value={constraint.origin === 'system' ? (constraint.system_key || '') : (constraint.domain && constraint.key ? `${constraint.domain}:${constraint.key}` : '')}
                       onChange={(e) => {
-                        const [domain, key] = e.target.value.split(':');
-                        if (domain && key) {
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', domain);
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', key);
+                        if (constraint.origin === 'system') {
+                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'system_key', e.target.value);
                         } else {
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', '');
-                          updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', '');
+                          const [domain, key] = e.target.value.split(':');
+                          if (domain && key) {
+                            updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', domain);
+                            updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', key);
+                          } else {
+                            updateConstraint(kind, index, orGroupIndex, constraintIndex, 'domain', null);
+                            updateConstraint(kind, index, orGroupIndex, constraintIndex, 'key', null);
+                          }
                         }
                       }}
-                      disabled={isSubmitting || !selectedTypeId}
-                      style={{ padding: '2px', fontSize: '11px', width: '120px' }}
+                      disabled={isSubmitting}
+                      style={{ padding: '2px', fontSize: '11px', width: '200px' }}
                     >
-                      <option value="">Parameter</option>
-                      {parametersForType.map((param: any) => (
-                        <option key={`${param.domain}:${param.key}`} value={`${param.domain}:${param.key}`}>
-                          {param.domain}:{param.key}
-                        </option>
-                      ))}
+                      <option value="">Key</option>
+                      {constraint.origin === 'system' ? (
+                        <>
+                          <option value="id">id</option>
+                          <option value="group">group</option>
+                        </>
+                      ) : (
+                        materialEntityTypes.flatMap((et: any) => 
+                          getParametersForEntityType(et.id).map((param: any) => ({
+                            domain: param.domain,
+                            key: param.key,
+                            label: `${param.domain}:${param.key}`
+                          }))
+                        ).map((param: any, idx: number) => (
+                          <option key={`${param.domain}:${param.key}:${idx}`} value={`${param.domain}:${param.key}`}>
+                            {param.label}
+                          </option>
+                        ))
+                      )}
                     </select>
-                    
+
+                    {/* Box 3: Operator selector */}
                     <select
                       value={constraint.operator || '='}
                       onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'operator', e.target.value)}
@@ -436,44 +484,40 @@ export function RecipeForm({
                       <option value="in">in</option>
                     </select>
 
-                    {paramValueType === 'string' ? (
-                      <Combobox
-                        value={constraint.value_string || ''}
-                        onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
-                        options={(() => {
-                          const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
-                          const groupName = entityType?.name || '';
-                          return existingValues[`${constraint.entity_type_id}:${groupName}:${constraint.domain}:${constraint.key}`] || [];
-                        })()}
-                        disabled={isSubmitting}
-                        placeholder="Value"
-                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                      />
-                    ) : paramValueType === 'number' ? (
-                      <input
-                        type="number"
-                        value={constraint.value_number || ''}
-                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
-                        disabled={isSubmitting}
-                        placeholder="Value"
-                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                      />
-                    ) : paramValueType === 'boolean' ? (
-                      <select
-                        value={constraint.value_boolean !== null ? String(constraint.value_boolean) : ''}
-                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true')}
-                        disabled={isSubmitting}
-                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                      >
-                        <option value="">Select...</option>
-                        <option value="true">True</option>
-                        <option value="false">False</option>
-                      </select>
-                    ) : (
+                    {/* Box 4: Value input */}
+                    {constraint.origin === 'system' ? (
                       <input
                         type="text"
                         value={constraint.value_string || ''}
                         onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                        disabled={isSubmitting}
+                        placeholder="Value"
+                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                      />
+                    ) : (
+                      <Combobox
+                        value={constraint.value_string || ''}
+                        onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
+                        options={(() => {
+                          // Check for system.group constraints in the same OR group
+                          const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
+                          const groupsFromSystem = orGroupConstraints
+                            .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
+                            .map((c: any) => c.value_string);
+                          
+                          // Use these groups to fetch parameter values
+                          const cacheKey = `${constraint.domain}:${constraint.key}:${groupsFromSystem.join(',')}`;
+                          if (existingValues[cacheKey]) {
+                            return existingValues[cacheKey];
+                          }
+                          
+                          // Trigger fetch if not cached
+                          if (constraint.domain && constraint.key && projectId) {
+                            fetchExistingValuesForGroups(constraint.domain, constraint.key, groupsFromSystem);
+                          }
+                          
+                          return existingValues[cacheKey] || [];
+                        })()}
                         disabled={isSubmitting}
                         placeholder="Value"
                         style={{ padding: '2px', fontSize: '11px', flex: 1 }}

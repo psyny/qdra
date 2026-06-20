@@ -88,13 +88,15 @@ export async function deleteEntityParameter(
 export async function getDistinctParameterValues(
   projectId: string,
   entityTypeId: string,
-  group: string,
-  domain: string,
-  key: string,
+  groups: string[] = [],
 ): Promise<string[]> {
-  const url = `${API_URL}/api/projects/${projectId}/entity-types/${entityTypeId}/parameter-values?group=${encodeURIComponent(group)}&domain=${encodeURIComponent(domain)}&key=${encodeURIComponent(key)}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Failed to fetch distinct parameter values');
+  const url = `${API_URL}/api/projects/${projectId}/entity-types/${entityTypeId}/parameter-definitions`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ groups }),
+  });
+  if (!response.ok) throw new Error('Failed to fetch parameter definitions');
   return response.json();
 }
 

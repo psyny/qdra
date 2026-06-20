@@ -24,6 +24,10 @@ class ParameterValueModel(BaseModel):
     value_boolean: Optional[bool] = None
 
 
+class GroupsRequest(BaseModel):
+    groups: List[str] = []
+
+
 class CreateEntityRequest(BaseModel):
     entity_type_id: uuid.UUID
     group: str = ""
@@ -300,21 +304,59 @@ def delete_entity_parameter(
         raise HTTPException(status_code=404, detail="Parameter not found")
 
 
-@router.get(
-    "/projects/{project_id}/entity-types/{entity_type_id}/parameter-values",
+@router.post(
+    "/projects/{project_id}/entity-types/{entity_type_id}/parameter-definitions",
     response_model=List[str],
 )
-def get_distinct_parameter_values(
+def get_parameter_definitions(
     project_id: uuid.UUID,
     entity_type_id: uuid.UUID,
-    group: str,
-    domain: str,
-    key: str,
+    request: GroupsRequest = GroupsRequest(),
     db: Session = Depends(get_db),
 ):
-    """Get all distinct string values for a given entity type, group, domain, and key."""
+    """Get parameter definitions (domain:key pairs) for a given entity type and groups."""
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import get_cached_data, set_cached_data
+    
+    groups = request.groups
+    
+    # Check cache first
+    cache_key = f"param_defs:{entity_type_id}:{','.join(sorted(groups))}"
+    if settings.l1_caching:
+        cached = get_cached_data(cache_key)
+        if cached is not None:
+            return cached
+    
     service = EntityService(db)
     try:
-        return service.get_distinct_parameter_values(entity_type_id, group, domain, key)
+        # Get the project template
+        project = service.project_repository.get_by_id(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        template = service.template_repository.get_by_id(project.project_template_id)
+        if not template:
+            raise HTTPException(status_code=404, detail="Template not found")
+        
+        # Get the entity type
+        entity_type = service.template_repository.get_entity_type_by_id(entity_type_id)
+        if not entity_type:
+            raise HTTPException(status_code=404, detail="Entity type not found")
+        
+        # Get parameter definitions for the entity type
+        param_defs = service.template_repository.list_parameter_definitions_by_entity_type(entity_type_id)
+        
+        # Filter by groups if provided
+        if groups:
+            param_defs = [p for p in param_defs if p.group in groups]
+        
+        # Return as domain:key strings
+        result = [f"{p.domain}:{p.key}" for p in param_defs]
+        
+        # Cache the result
+        if settings.l1_caching:
+            set_cached_data(cache_key, result)
+        
+        return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

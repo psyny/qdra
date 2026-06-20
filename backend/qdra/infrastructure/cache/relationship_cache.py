@@ -1,4 +1,5 @@
 """Shared relationship cache for material-recipe operations at service level."""
+from typing import Any
 from cachetools import TTLCache
 from qdra.infrastructure.config.settings import settings
 from qdra.infrastructure.cache.cache_service import CacheService
@@ -40,6 +41,18 @@ def clear_all_caches():
         _material_recipes_cache.clear()
     if _recipe_materials_cache is not None:
         _recipe_materials_cache.clear()
+
+
+def get_cached_data(key: str):
+    """Get data from L1 cache (material_recipes_cache as default)."""
+    cache = get_material_recipes_cache()
+    return cache.get(key)
+
+
+def set_cached_data(key: str, value: Any, ttl: int = None):
+    """Set data in L1 cache (material_recipes_cache as default)."""
+    cache = get_material_recipes_cache()
+    cache[key] = value
 
 
 def clear_pattern(project_id: str):
