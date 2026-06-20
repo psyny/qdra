@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from repositories.image_asset_repository import ImageAssetRepository
 from repositories.entity_repository import EntityRepository
+from repositories.project_repository import ProjectRepository
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
@@ -20,6 +21,7 @@ class ImageService:
         self.db = db
         self.image_asset_repo = ImageAssetRepository(db)
         self.entity_repo = EntityRepository(db, CacheService())
+        self.project_repo = ProjectRepository(db)
         self.storage_provider = self._get_storage_provider()
     
     def _get_storage_provider(self) -> ImageStorageProvider:
@@ -157,7 +159,9 @@ class ImageService:
             raise ValueError("Entity not found")
         
         # Validate dimensions match project image size
-        project = entity.project
+        project = self.project_repo.get_by_id(entity.project_id)
+        if not project:
+            raise ValueError("Project not found")
         if width != project.image_size_px or height != project.image_size_px:
             raise ValueError(f"Image dimensions must be {project.image_size_px}x{project.image_size_px}")
         
