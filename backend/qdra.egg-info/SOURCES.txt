@@ -95,6 +95,7 @@ qdra/tests/e2e/__init__.py
 qdra/tests/integration/__init__.py
 qdra/tests/integration/conftest.py
 qdra/tests/integration/datasets.py
+qdra/tests/integration/test_constraint_resolution.py
 qdra/tests/integration/test_entity_requirements.py
 qdra/tests/integration/test_infrastructure.py
 qdra/tests/integration/test_materials.py
