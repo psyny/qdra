@@ -5,6 +5,7 @@ import uuid
 from typing import List, Dict, Optional, Set, Tuple, FrozenSet
 from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
+from cachetools import TTLCache
 
 from models.slot import SlotKind
 from models.entity import Entity
@@ -14,6 +15,7 @@ from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
+from services.recipe_evaluation_service import RecipeEvaluationService
 
 from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,
@@ -92,6 +94,86 @@ class OutputSolverService:
         self.option_repo = OptionRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
         self.project_repo = ProjectRepository(db)
+        self.recipe_eval_service = RecipeEvaluationService(db)
+        self.cache = TTLCache(maxsize=10000, ttl=300)
+
+    def _get_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
+        """Get recipes that can consume/produce/require this material, with caching."""
+        cache_key = f"material_recipes_{material_id}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        result = self.recipe_eval_service.find_recipes_for_material(material_id, project_id)
+        self.cache[cache_key] = result
+        return result
+
+    def _get_materials_for_recipe(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
+        """Get materials that match each slot of this recipe, with caching."""
+        cache_key = f"recipe_materials_{recipe_id}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        result = self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
+        self.cache[cache_key] = result
+        return result
+
+    def _find_materials_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
+        """Find materials in the project that match the given constraints."""
+        materials = self.entity_repo.list_by_project(project_id, kind="material")
+        matching_materials = []
+        
+        for material in materials:
+            material_params = self.entity_param_repo.list_by_entity(material.id)
+            if self._material_matches_constraints(material, material_params, constraints):
+                matching_materials.append(material.id)
+        
+        return matching_materials
+
+    def _material_matches_constraints(self, material: Entity, material_params: List, constraints: List[ConstraintSpec]) -> bool:
+        """Check if a material matches all constraints."""
+        for constraint in constraints:
+            # Special handling for material_id constraint
+            if constraint.domain == "identity" and constraint.key == "material_id":
+                if constraint.operator == "=" and constraint.value_string:
+                    if str(material.id) != constraint.value_string:
+                        return False
+                else:
+                    return False
+                continue
+            
+            # Find matching parameter
+            matched = False
+            for param in material_params:
+                if self._param_matches_constraint(param, constraint):
+                    matched = True
+                    break
+            
+            if not matched:
+                return False
+        
+        return True
+
+    def _param_matches_constraint(self, param, constraint: ConstraintSpec) -> bool:
+        """Check if a parameter matches a constraint."""
+        if param.domain != constraint.domain or param.key != constraint.key:
+            return False
+        
+        if constraint.operator == "=":
+            if constraint.value_string is not None:
+                return param.value_string == constraint.value_string
+            elif constraint.value_number is not None:
+                return param.value_number == constraint.value_number
+            elif constraint.value_boolean is not None:
+                return param.value_boolean == constraint.value_boolean
+        elif constraint.operator == "!=":
+            if constraint.value_string is not None:
+                return param.value_string != constraint.value_string
+            elif constraint.value_number is not None:
+                return param.value_number != constraint.value_number
+            elif constraint.value_boolean is not None:
+                return param.value_boolean != constraint.value_boolean
+        
+        return False
 
     def solve(self, request: SolverRequest) -> SolverResponse:
         if not self.project_repo.get_by_id(request.project_id):
@@ -105,7 +187,6 @@ class OutputSolverService:
                 validate_formula(fdef.formula, all_names)
 
         recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
-        recipe_structures = {r.id: self._load_recipe_structure(r.id) for r in recipes}
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
         # Load recipe params if needed for score rules, recipe target matching, forbidden_recipe_matching, OR required_recipe_matching
@@ -116,14 +197,17 @@ class OutputSolverService:
 
         # Initialize state based on target type (material or recipe)
         if request.target.target_type == "recipe":
-            initial = self._initialize_recipe_target(request, recipe_structures, recipe_params)
+            initial_states = [self._initialize_recipe_target(request, recipe_params)]
         else:
-            initial = self._initialize_material_target(request)
+            initial_states = self._initialize_material_target(request)
 
         plans: List[SolvedPlan] = []
         seen_fps: Set[str] = set()
         discarded_stats = DiscardedPlansStats()
-        self._explore(initial, recipe_structures, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats)
+        
+        # Explore from each initial state (for material targets, there may be multiple matching materials)
+        for initial in initial_states:
+            self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats)
 
         for i, plan in enumerate(plans):
             plan.plan_id = f"plan_{i:03d}"
@@ -232,7 +316,7 @@ class OutputSolverService:
 
             node.tags = list(tags)
 
-    def _explore(self, state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats):
+    def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats):
         if len(plans) >= request.search_parameters.max_solutions_returned:
             discarded_stats.max_solutions_returned += 1
             return
@@ -268,26 +352,33 @@ class OutputSolverService:
         if surplus_id is not None:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
-            self._explore(branch, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(branch, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.do_not_expand_materials_matching):
             discarded_stats.do_not_expand_materials += 1
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         if self._matches_rule(current.material_constraints, request.domain_constraints.forbidden_materials_matching):
             discarded_stats.forbidden_materials += 1
             return
 
+        # Find producers for this material
+        if current.material_id is None:
+            # Material not yet resolved - can't find producers
+            discarded_stats.no_producers_found += 1
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            return
+
         producers = self._find_producers(
-            current.material_constraints, recipe_structures,
+            current.material_id, request.project_id,
             request.domain_constraints.forbidden_recipe_matching, recipe_params,
         )
 
         if not producers:
             discarded_stats.no_producers_found += 1
-            self._explore(state, recipe_structures, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
+            self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats)
             return
 
         producers = producers[: request.search_parameters.max_branch_width]
@@ -298,11 +389,11 @@ class OutputSolverService:
                 discarded_stats.max_solutions_returned += 1
                 return
             branch = state.clone()
-            self._apply_recipe(branch, current_id, recipe_id, produces_option, recipe_structures, request)
+            self._apply_recipe(branch, current_id, recipe_id, produces_option, request)
             branch.recipe_depth += 1
-            self._explore(branch, recipe_structures, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats)
+            self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats)
 
-    def _apply_recipe(self, state, need_id, recipe_id, produces_option, recipe_structures, request):
+    def _apply_recipe(self, state, need_id, recipe_id, produces_option, request):
         need = state.material_nodes[need_id]
         per_exec = produces_option["quantity"]
         
@@ -315,64 +406,110 @@ class OutputSolverService:
         rn_id = state.next_id("R")
         state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=need_rank)
 
-        slots = sorted(recipe_structures[recipe_id]["slots"], key=lambda s: _SLOT_ORDER.get(s["kind"], 9))
+        # Get materials for this recipe from the endpoint
+        recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
         new_inputs: List[str] = []
 
-        for slot in slots:
-            if slot["kind"] == SlotKind.PRODUCES:
-                for opt in slot["options"]:
+        # Process produces slots - create one node per slot, using the first matching material
+        # (In a more sophisticated version, we could branch on material options)
+        for slot in recipe_materials["produces"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    # Use the first matching material (could be improved to branch on options)
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     oid = state.next_id("O")
                     onode = MaterialNode(
-                        id=oid, material_constraints=opt["constraints"],
+                        id=oid, 
+                        material_id=material_id,
+                        material_constraints=[],  # Constraints no longer needed once material_id is resolved
                         produced_qty=opt["quantity"] * exec_count,
-                        consumed_qty=0.0, type=MaterialNodeType.OUTPUT,
+                        consumed_qty=0.0, 
+                        type=MaterialNodeType.OUTPUT,
                         rank=need_rank,
                     )
                     state.material_nodes[oid] = onode
                     state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
-                    if self._constraints_match(need.material_constraints, opt["constraints"]):
+                    
+                    # Connect to need if this material matches the need's material_id
+                    if need.material_id and material_id == need.material_id:
                         qty = need.consumed_qty - need.produced_qty
                         state.material_edges.append(MaterialEdge(from_node_id=oid, to_node_id=need_id, qty=qty))
                         onode.consumed_qty += qty
                         state.material_nodes[need_id].produced_qty += qty
 
-            elif slot["kind"] == SlotKind.CONSUMES:
-                for opt in slot["options"]:
+        # Process consumes slots - create one node per slot
+        for slot in recipe_materials["consumes"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     scaled = opt["quantity"] * exec_count
                     iid = state.next_id("I")
-                    state.material_nodes[iid] = MaterialNode(id=iid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.INPUT, rank=need_rank + 1)
+                    state.material_nodes[iid] = MaterialNode(
+                        id=iid, 
+                        material_id=material_id,
+                        material_constraints=[],
+                        produced_qty=0.0, 
+                        consumed_qty=scaled, 
+                        type=MaterialNodeType.INPUT, 
+                        rank=need_rank + 1
+                    )
                     state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
                     new_inputs.append(iid)
 
-            elif slot["kind"] == SlotKind.REQUIRES:
-                for opt in slot["options"]:
+        # Process requires slots - create one node per slot
+        for slot in recipe_materials["requires"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     scaled = opt["quantity"] * exec_count
                     qid = state.next_id("Rq")
-                    state.material_nodes[qid] = MaterialNode(id=qid, material_constraints=opt["constraints"], produced_qty=0.0, consumed_qty=scaled, type=MaterialNodeType.REQUIRES, rank=need_rank + 1)
+                    state.material_nodes[qid] = MaterialNode(
+                        id=qid, 
+                        material_id=material_id,
+                        material_constraints=[],
+                        produced_qty=0.0, 
+                        consumed_qty=scaled, 
+                        type=MaterialNodeType.REQUIRES, 
+                        rank=need_rank + 1
+                    )
                     state.recipe_edges.append(RecipeEdge(from_node_id=qid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.REQUIRES))
                     new_inputs.append(qid)
 
         state.needs_queue = new_inputs + state.needs_queue
 
-    def _initialize_material_target(self, request: SolverRequest) -> _State:
-        """Initialize state for a material target."""
-        target_node = MaterialNode(
-            id="T_0001",
-            material_constraints=request.target.constraints,
-            produced_qty=0.0,
-            consumed_qty=request.target.quantity,
-            type=MaterialNodeType.TARGET,
-        )
-        return _State(
-            material_nodes={"T_0001": target_node},
-            recipe_nodes={},
-            material_edges=[],
-            recipe_edges=[],
-            needs_queue=["T_0001"],
-            _counter=1,
-        )
+    def _initialize_material_target(self, request: SolverRequest) -> List["_State"]:
+        """Initialize state for a material target. Returns a list of states, one per matching material."""
+        # Find materials in the DB that match the target constraints
+        matching_materials = self._find_materials_by_constraints(request.target.constraints, request.project_id)
+        
+        if not matching_materials:
+            # No materials match - return empty list (will result in no solutions)
+            return []
+        
+        # Create a state for each matching material
+        states = []
+        for i, material_id in enumerate(matching_materials):
+            target_node = MaterialNode(
+                id=f"T_{i:04d}",
+                material_id=material_id,
+                material_constraints=request.target.constraints,
+                produced_qty=0.0,
+                consumed_qty=request.target.quantity,
+                type=MaterialNodeType.TARGET,
+            )
+            state = _State(
+                material_nodes={target_node.id: target_node},
+                recipe_nodes={},
+                material_edges=[],
+                recipe_edges=[],
+                needs_queue=[target_node.id],
+                _counter=1,
+            )
+            states.append(state)
+        
+        return states
 
-    def _initialize_recipe_target(self, request: SolverRequest, recipe_structures: Dict, recipe_params: Dict) -> _State:
+    def _initialize_recipe_target(self, request: SolverRequest, recipe_params: Dict) -> _State:
         """Initialize state for a recipe target. Add recipe node, mark outputs as type 't', inputs normally."""
         # Find recipe matching the constraints
         recipe_id = None
@@ -400,19 +537,20 @@ class OutputSolverService:
         rn_id = state.next_id("R")
         state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=0)
         
-        # Load recipe structure
-        structure = recipe_structures[recipe_id]
-        slots = sorted(structure["slots"], key=lambda s: _SLOT_ORDER.get(s["kind"], 9))
+        # Get materials for this recipe from the endpoint
+        recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
         new_inputs: List[str] = []
         
-        for slot in slots:
-            if slot["kind"] == SlotKind.PRODUCES:
-                # Mark outputs as type 't' (target) since we want them
-                for opt in slot["options"]:
+        # Process produces slots - mark outputs as type 't' (target)
+        for slot in recipe_materials["produces"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     oid = state.next_id("O")
                     onode = MaterialNode(
                         id=oid, 
-                        material_constraints=opt["constraints"],
+                        material_id=material_id,
+                        material_constraints=[],
                         produced_qty=opt["quantity"] * exec_count,
                         consumed_qty=0.0, 
                         type=MaterialNodeType.TARGET,
@@ -421,14 +559,17 @@ class OutputSolverService:
                     state.material_nodes[oid] = onode
                     state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
                     
-            elif slot["kind"] == SlotKind.CONSUMES:
-                # Inputs are normal type 'i'
-                for opt in slot["options"]:
+        # Process consumes slots - inputs are normal type 'i'
+        for slot in recipe_materials["consumes"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     scaled = opt["quantity"] * exec_count
                     iid = state.next_id("I")
                     state.material_nodes[iid] = MaterialNode(
                         id=iid, 
-                        material_constraints=opt["constraints"], 
+                        material_id=material_id,
+                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.INPUT,
@@ -437,14 +578,17 @@ class OutputSolverService:
                     state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
                     new_inputs.append(iid)
                     
-            elif slot["kind"] == SlotKind.REQUIRES:
-                # Requires are normal type 'r'
-                for opt in slot["options"]:
+        # Process requires slots - requires are normal type 'r'
+        for slot in recipe_materials["requires"]:
+            for opt in slot["options"]:
+                if opt["matching_material_ids"]:
+                    material_id = uuid.UUID(opt["matching_material_ids"][0])
                     scaled = opt["quantity"] * exec_count
                     qid = state.next_id("Rq")
                     state.material_nodes[qid] = MaterialNode(
                         id=qid, 
-                        material_constraints=opt["constraints"], 
+                        material_id=material_id,
+                        material_constraints=[],
                         produced_qty=0.0, 
                         consumed_qty=scaled, 
                         type=MaterialNodeType.REQUIRES,
@@ -463,7 +607,8 @@ class OutputSolverService:
             if nid == need.id or node.type != MaterialNodeType.OUTPUT or node.type == MaterialNodeType.TARGET:
                 continue
             if node.produced_qty - node.consumed_qty >= need_amt:
-                if self._constraints_match(need.material_constraints, node.material_constraints):
+                # Compare material_ids instead of constraints
+                if need.material_id and node.material_id and need.material_id == node.material_id:
                     return nid
         return None
 
@@ -536,7 +681,7 @@ class OutputSolverService:
                 continue
 
             initial_qty = node_a.consumed_qty
-            node_a_sig = _sig(node_a.material_constraints)
+            node_a_material_id = node_a.material_id
             existing_sources = {me.from_node_id for me in opt.material_edges if me.to_node_id == node_a_id}
 
             best_c: Optional[Tuple[float, str]] = None
@@ -545,7 +690,8 @@ class OutputSolverService:
                     continue
                 if nid in existing_sources:
                     continue
-                if _sig(node.material_constraints) != node_a_sig:
+                # Compare material_ids instead of constraint signatures
+                if node.material_id != node_a_material_id:
                     continue
                 surplus = node.produced_qty - node.consumed_qty
                 if surplus >= initial_qty - 1e-9:
@@ -611,7 +757,7 @@ class OutputSolverService:
                 continue
 
             initial_qty = node_a.consumed_qty
-            node_a_sig = _sig(node_a.material_constraints)
+            node_a_material_id = node_a.material_id
             existing_sources = {me.from_node_id for me in opt.material_edges if me.to_node_id == node_a_id}
 
             c1: List[Tuple[float, str]] = []
@@ -621,7 +767,8 @@ class OutputSolverService:
                     continue
                 if nid in existing_sources:
                     continue
-                if _sig(node.material_constraints) != node_a_sig:
+                # Compare material_ids instead of constraint signatures
+                if node.material_id != node_a_material_id:
                     continue
                 surplus = node.produced_qty - node.consumed_qty
                 if surplus >= initial_qty - 1e-9:
@@ -810,25 +957,32 @@ class OutputSolverService:
         for e in state.recipe_edges:
             if e.type == RecipeEdgeType.PRODUCES:
                 rid = str(state.recipe_nodes[e.from_node_id].recipe_id)
-                mkey = _sig(state.material_nodes[e.to_node_id].material_constraints)
+                material_id = str(state.material_nodes[e.to_node_id].material_id) if state.material_nodes[e.to_node_id].material_id else "None"
             else:
                 rid = str(state.recipe_nodes[e.to_node_id].recipe_id)
-                mkey = _sig(state.material_nodes[e.from_node_id].material_constraints)
-            parts.append(f"{rid}:{mkey}:{e.qty}:{e.type.value}")
+                material_id = str(state.material_nodes[e.from_node_id].material_id) if state.material_nodes[e.from_node_id].material_id else "None"
+            parts.append(f"{rid}:{material_id}:{e.qty}:{e.type.value}")
         return "|".join(sorted(parts))
 
-    def _find_producers(self, constraints, recipe_structures, forbidden_recipe_matching, recipe_params) -> List[Tuple]:
+    def _find_producers(self, material_id: uuid.UUID, project_id: uuid.UUID, forbidden_recipe_matching: List[ConstraintRule], recipe_params: Dict) -> List[Tuple]:
+        """Find recipes that can produce the given material."""
+        # Get recipes that can produce this material
+        recipes_data = self._get_recipes_for_material(material_id, project_id)
+        
         producers = []
-        for rid, structure in recipe_structures.items():
+        for recipe_info in recipes_data["produces"]:
+            recipe_id = uuid.UUID(recipe_info["recipe_id"])
+            
             # Check if recipe is forbidden by matching its parameters
-            if str(rid) in recipe_params and self._matches_rule(recipe_params[str(rid)], forbidden_recipe_matching):
+            if str(recipe_id) in recipe_params and self._matches_rule(recipe_params[str(recipe_id)], forbidden_recipe_matching):
                 continue
-            for slot in structure["slots"]:
-                if slot["kind"] == SlotKind.PRODUCES:
-                    for opt in slot["options"]:
-                        if self._constraints_match(constraints, opt["constraints"]):
-                            producers.append((rid, opt))
-                            break
+            
+            # Add the recipe with its slot information
+            for slot in recipe_info["slots"]:
+                if slot["kind"] == "produces":
+                    producers.append((recipe_id, {"quantity": slot["quantity"], "slot_id": slot["slot_id"]}))
+                    break
+        
         producers.sort(key=lambda x: str(x[0]))
         return producers
 
@@ -949,9 +1103,16 @@ class OutputSolverService:
         total = 0.0
         if var_def.variable_type == "material":
             for node in state.material_nodes.values():
-                if self._node_matches_var_constraints(node.material_constraints, var_def.constraints):
+                # Load material constraints from DB using material_id
+                if node.material_id:
+                    material_params = self.entity_param_repo.list_by_entity(node.material_id)
+                    material_constraints = self._params_to_constraints(material_params)
+                else:
+                    material_constraints = node.material_constraints
+                
+                if self._node_matches_var_constraints(material_constraints, var_def.constraints):
                     param_value = self._extract_param_value(
-                        node.material_constraints, var_def.parameter_domain, var_def.parameter_key
+                        material_constraints, var_def.parameter_domain, var_def.parameter_key
                     )
                     total += param_value * node.produced_qty
         else:  # "recipe"
@@ -963,6 +1124,22 @@ class OutputSolverService:
                     )
                     total += param_value * rn.execution_count
         return total
+
+    def _params_to_constraints(self, params: List) -> List[ConstraintSpec]:
+        """Convert entity parameters to constraint specs."""
+        constraints = []
+        for param in params:
+            constraint = ConstraintSpec(
+                domain=param.domain,
+                key=param.key,
+                operator="=",
+                value_string=param.value_string,
+                value_number=param.value_number,
+                value_boolean=param.value_boolean,
+                is_wildcard=False,
+            )
+            constraints.append(constraint)
+        return constraints
 
     @staticmethod
     def _node_matches_var_constraints(

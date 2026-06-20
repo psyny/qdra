@@ -54,7 +54,8 @@ class ConstraintRule:
 @dataclass
 class MaterialNode:
     id: str
-    material_constraints: List[ConstraintSpec]
+    material_id: Optional[uuid.UUID] = None
+    material_constraints: List[ConstraintSpec] = field(default_factory=list)
     produced_qty: float = 0.0
     consumed_qty: float = 0.0
     type: MaterialNodeType = MaterialNodeType.INPUT

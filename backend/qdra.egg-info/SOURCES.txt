@@ -12,7 +12,10 @@ qdra/alembic/versions/001_entity_abstraction_baseline.py
 qdra/alembic/versions/20260617_1748_2f09fb9ab52f_cleanup_remove_redundant_columns.py
 qdra/alembic/versions/20260618_add_image_size_px_to_projects.py
 qdra/alembic/versions/20260618_add_recipe_slot_definitions.py
+qdra/alembic/versions/20260618_add_status_to_image_assets.py
 qdra/alembic/versions/20260618_add_view_unique_constraint.py
+qdra/alembic/versions/20260618_drop_is_primary_column.py
+qdra/alembic/versions/20260618_fix_status_constraint.py
 qdra/alembic/versions/20260618_param_validation.py
 qdra/alembic/versions/20260618_template_views_editor.py
 qdra/api/__init__.py
@@ -36,7 +39,6 @@ qdra/domain/graph_snapshot/__init__.py
 qdra/domain/jobs/__init__.py
 qdra/domain/metadata/__init__.py
 qdra/domain/planning/__init__.py
-qdra/domain/planning/output_planner.py
 qdra/domain/planning/output_solver_domain.py
 qdra/domain/validation/__init__.py
 qdra/infrastructure/__init__.py
@@ -86,11 +88,7 @@ qdra/services/recipe_evaluation_service.py
 qdra/services/recipe_execution_service.py
 qdra/services/recipe_service.py
 qdra/services/planning/__init__.py
-qdra/services/planning/output_planner_service.py
 qdra/services/planning/output_solver_service.py
-qdra/services/planning/plan_ranking_service.py
-qdra/services/planning/plan_summary_service.py
-qdra/services/planning/planner_memoization_cache.py
 qdra/tests/__init__.py
 qdra/tests/conftest.py
 qdra/tests/test_entities.py
@@ -103,6 +101,8 @@ qdra/tests/test_slot_definitions.py
 qdra/tests/e2e/__init__.py
 qdra/tests/integration/__init__.py
 qdra/tests/integration/conftest.py
+qdra/tests/integration/datasets.py
+qdra/tests/integration/test_entity_requirements.py
 qdra/tests/integration/test_infrastructure.py
 qdra/tests/integration/test_materials.py
 qdra/tests/integration/test_output_solver.py
@@ -110,5 +110,6 @@ qdra/tests/integration/test_recipe_evaluation.py
 qdra/tests/integration/test_recipe_execution.py
 qdra/tests/integration/test_recipes.py
 qdra/tests/integration/test_template_export_import.py
+qdra/tests/integration/utils.py
 qdra/tests/unit/__init__.py
 qdra/tests/unit/test_constraint_matcher.py
