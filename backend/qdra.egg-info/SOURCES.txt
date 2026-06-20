@@ -60,11 +60,9 @@ qdra/models/entity.py
 qdra/models/entity_parameter.py
 qdra/models/image_asset.py
 qdra/models/option.py
-qdra/models/parameter.py
 qdra/models/parameter_constraint.py
 qdra/models/project.py
 qdra/models/project_template.py
-qdra/models/recipe_parameter.py
 qdra/models/slot.py
 qdra/repositories/__init__.py
 qdra/repositories/entity_parameter_repository.py
@@ -72,10 +70,8 @@ qdra/repositories/entity_repository.py
 qdra/repositories/image_asset_repository.py
 qdra/repositories/option_repository.py
 qdra/repositories/parameter_constraint_repository.py
-qdra/repositories/parameter_repository.py
 qdra/repositories/project_repository.py
 qdra/repositories/project_template_repository.py
-qdra/repositories/recipe_parameter_repository.py
 qdra/repositories/slot_repository.py
 qdra/services/__init__.py
 qdra/services/constraint_matcher.py

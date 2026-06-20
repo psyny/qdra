@@ -930,20 +930,6 @@ class OutputSolverService:
         producers.sort(key=lambda x: str(x[0]))
         return producers
 
-    def _constraints_match(self, target, candidate) -> bool:
-        for tc in target:
-            if not any(
-                tc.domain == cc.domain and tc.key == cc.key and
-                tc.operator == cc.operator and tc.value_string == cc.value_string and
-                tc.value_number == cc.value_number and tc.value_boolean == cc.value_boolean
-                for cc in candidate
-            ):
-                return False
-        return True
-
-    def _matches_rule(self, constraints, rules) -> bool:
-        return any(self._constraints_match(constraints, r.constraints) for r in rules)
-
     def _check_required_materials(self, state, required_materials_ids) -> bool:
         """Check if the plan contains all required materials by ID."""
         if not required_materials_ids:
@@ -1052,22 +1038,6 @@ class OutputSolverService:
                     )
                     total += param_value * rn.execution_count
         return total
-
-    def _params_to_constraints(self, params: List) -> List[ConstraintSpec]:
-        """Convert entity parameters to constraint specs."""
-        constraints = []
-        for param in params:
-            constraint = ConstraintSpec(
-                domain=param.domain,
-                key=param.key,
-                operator="=",
-                value_string=param.value_string,
-                value_number=param.value_number,
-                value_boolean=param.value_boolean,
-                is_wildcard=False,
-            )
-            constraints.append(constraint)
-        return constraints
 
     @staticmethod
     def _node_matches_var_constraints(
