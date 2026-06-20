@@ -252,13 +252,21 @@
 
 .form-field {
   margin-bottom: 16px;
+  text-align: left;
 }
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.8;
   margin-bottom: 8px;
 }
 

@@ -67,45 +67,57 @@ export function MaterialForm({
         <h3 className="card-title mb-4">Material Parameters</h3>
         {parameters.map((param, index) => (
           <div key={`${param.domain}:${param.key}`} className="form-field mb-4">
-            <label htmlFor={`param-${index}`} className="form-label">
-              {param.label || param.key}
-              {param.required && ' *'}
-            </label>
-            {param.description && (
-              <p className="form-hint">{param.description}</p>
-            )}
-            {param.value_type === 'boolean' && (
-              <select
-                id={`param-${index}`}
-                value={param.value ? 'true' : 'false'}
-                onChange={(e) => updateParameter(index, e.target.value === 'true')}
-                disabled={isSubmitting}
-                className="form-input"
-              >
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </select>
-            )}
-            {param.value_type === 'number' && (
-              <input
-                id={`param-${index}`}
-                type="number"
-                value={param.value ?? ''}
-                onChange={(e) => updateParameter(index, e.target.value ? Number(e.target.value) : null)}
-                disabled={isSubmitting}
-                className="form-input"
-                step="any"
-              />
-            )}
-            {param.value_type === 'string' && (
-              <input
-                id={`param-${index}`}
-                type="text"
-                value={param.value ?? ''}
-                onChange={(e) => updateParameter(index, e.target.value)}
-                disabled={isSubmitting}
-                className="form-input"
-              />
+            {param.value_type === 'boolean' ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px' }}>
+                <input
+                  id={`param-${index}`}
+                  type="checkbox"
+                  checked={param.value === true}
+                  onChange={(e) => updateParameter(index, e.target.checked)}
+                  disabled={isSubmitting}
+                  style={{ width: '19px', height: '19px' }}
+                />
+                <div>
+                  <label htmlFor={`param-${index}`} className="form-label" style={{ marginBottom: param.description ? '4px' : '0' }}>
+                    {param.label || param.key}
+                    {param.required && ' *'}
+                  </label>
+                  {param.description && (
+                    <p className="form-hint">{param.description}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <label htmlFor={`param-${index}`} className="form-label">
+                  {param.label || param.key}
+                  {param.required && ' *'}
+                </label>
+                {param.description && (
+                  <p className="form-hint">{param.description}</p>
+                )}
+                {param.value_type === 'number' && (
+                  <input
+                    id={`param-${index}`}
+                    type="number"
+                    value={param.value ?? ''}
+                    onChange={(e) => updateParameter(index, e.target.value ? Number(e.target.value) : null)}
+                    disabled={isSubmitting}
+                    className="form-input"
+                    step="any"
+                  />
+                )}
+                {param.value_type === 'string' && (
+                  <input
+                    id={`param-${index}`}
+                    type="text"
+                    value={param.value ?? ''}
+                    onChange={(e) => updateParameter(index, e.target.value)}
+                    disabled={isSubmitting}
+                    className="form-input"
+                  />
+                )}
+              </>
             )}
           </div>
         ))}

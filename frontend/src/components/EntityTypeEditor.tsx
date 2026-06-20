@@ -511,6 +511,16 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                     </select>
                   </div>
                   <div className="form-field">
+                    <label className="form-label">Order</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={paramForm.sort_order}
+                      onChange={(e) => setParamForm({ ...paramForm, sort_order: parseInt(e.target.value) || 0 })}
+                      min="0"
+                    />
+                  </div>
+                  <div className="form-field">
                     <label className="form-label">Label</label>
                     <input
                       type="text"
@@ -575,12 +585,24 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                   </div>
                   <div className="form-field">
                     <label className="form-label">Default Value</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={paramForm.default_value}
-                      onChange={(e) => setParamForm({ ...paramForm, default_value: e.target.value })}
-                    />
+                    {paramForm.value_type === 'boolean' ? (
+                      <select
+                        className="form-input"
+                        value={paramForm.default_value}
+                        onChange={(e) => setParamForm({ ...paramForm, default_value: e.target.value })}
+                      >
+                        <option value="">No default</option>
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={paramForm.default_value}
+                        onChange={(e) => setParamForm({ ...paramForm, default_value: e.target.value })}
+                      />
+                    )}
                   </div>
                   {paramForm.value_type !== 'boolean' && (
                     <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
@@ -666,6 +688,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Domain</th>
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Key</th>
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Type</th>
+                      <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Order</th>
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Label</th>
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Required</th>
                       <th style={{ textAlign: 'left', padding: '8px', fontSize: '12px' }}>Actions</th>
@@ -677,6 +700,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.domain}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.key}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.value_type}</td>
+                        <td style={{ padding: '8px', fontSize: '13px' }}>{param.sort_order}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.label || '-'}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>{param.required ? 'Yes' : 'No'}</td>
                         <td style={{ padding: '8px', fontSize: '13px' }}>
