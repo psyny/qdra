@@ -114,14 +114,15 @@ class ConstraintResolutionService:
     ) -> bool:
         """Check if a material matches all constraints."""
         for constraint in constraints:
-            # Special handling for material_id constraint
-            if constraint.domain == "identity" and constraint.key == "material_id":
-                if constraint.operator == "=" and constraint.value_string:
-                    if str(material.id) != constraint.value_string:
+            # Special handling for __system__ domain
+            if constraint.domain == "__system__":
+                if constraint.key == "id":
+                    if constraint.operator == "=" and constraint.value_string:
+                        if str(material.id) != constraint.value_string:
+                            return False
+                    else:
                         return False
-                else:
-                    return False
-                continue
+                    continue
             
             # Find matching parameter
             matched = False
@@ -143,14 +144,15 @@ class ConstraintResolutionService:
     ) -> bool:
         """Check if an entity (material or recipe) matches all constraints."""
         for constraint in constraints:
-            # Special handling for entity_id constraint
-            if constraint.domain == "identity" and constraint.key == "entity_id":
-                if constraint.operator == "=" and constraint.value_string:
-                    if str(entity.id) != constraint.value_string:
+            # Special handling for __system__ domain
+            if constraint.domain == "__system__":
+                if constraint.key == "id":
+                    if constraint.operator == "=" and constraint.value_string:
+                        if str(entity.id) != constraint.value_string:
+                            return False
+                    else:
                         return False
-                else:
-                    return False
-                continue
+                    continue
             
             # Find matching parameter
             matched = False

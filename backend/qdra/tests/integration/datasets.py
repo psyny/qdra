@@ -108,7 +108,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(raw_resource["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(raw_resource["id"])}
                             ],
                         }
                     ],
@@ -130,7 +130,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(raw_resource["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(raw_resource["id"])}
                             ],
                         }
                     ],
@@ -141,7 +141,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_1["id"])}
                             ],
                         }
                     ],
@@ -152,7 +152,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(byproduct["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(byproduct["id"])}
                             ],
                         }
                     ],
@@ -174,7 +174,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_1["id"])}
                             ],
                         }
                     ],
@@ -185,7 +185,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1.5,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_2["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_2["id"])}
                             ],
                         }
                     ],
@@ -207,7 +207,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_1["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_1["id"])}
                             ],
                         }
                     ],
@@ -218,7 +218,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_3["id"])}
                             ],
                         }
                     ],
@@ -229,7 +229,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_4["id"])}
                             ],
                         }
                     ],
@@ -251,7 +251,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_4["id"])}
                             ],
                         }
                     ],
@@ -262,7 +262,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_2["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_2["id"])}
                             ],
                         }
                     ],
@@ -273,7 +273,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_5["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_5["id"])}
                             ],
                         }
                     ],
@@ -294,7 +294,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_3["id"])}
                             ],
                         }
                     ],
@@ -305,7 +305,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_6["id"])}
                             ],
                         }
                     ],
@@ -325,7 +325,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_3["id"])}
                             ],
                         }
                     ],
@@ -336,7 +336,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1.5,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_6["id"])}
                             ],
                         }
                     ],
@@ -357,7 +357,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_6["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_6["id"])}
                             ],
                         }
                     ],
@@ -368,7 +368,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_5["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_5["id"])}
                             ],
                         }
                     ],
@@ -379,7 +379,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product_1["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(final_product_1["id"])}
                             ],
                         }
                     ],
@@ -400,7 +400,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 10,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_producer["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(partial_test_producer["id"])}
                             ],
                         }
                     ],
@@ -422,7 +422,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 3,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_producer["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(partial_test_producer["id"])}
                             ],
                         }
                     ],
@@ -433,7 +433,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(partial_test_consumer["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(partial_test_consumer["id"])}
                             ],
                         }
                     ],
@@ -454,7 +454,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_3["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_3["id"])}
                             ],
                         }
                     ],
@@ -465,7 +465,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(intermediate_4["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(intermediate_4["id"])}
                             ],
                         }
                     ],
@@ -476,7 +476,7 @@ def create_medium_size_planning_dataset(client, project_id):
                         {
                             "quantity": 1,
                             "constraints": [
-                                {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(final_product_2["id"])}
+                                {"domain": "__system__", "key": "id", "operator": "=", "value_string": str(final_product_2["id"])}
                             ],
                         }
                     ],

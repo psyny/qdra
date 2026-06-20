@@ -18,6 +18,19 @@ router = APIRouter()
 # Validation Functions
 # ---------------------------------------------------------------------------
 
+def validate_domain_name(domain: str) -> None:
+    """
+    Validate that domain name does not start with underscore.
+    Domain names starting with '_' are reserved for system use.
+    Raises HTTPException if validation fails.
+    """
+    if domain.startswith("_"):
+        raise HTTPException(
+            status_code=400,
+            detail="Domain names starting with '_' are reserved for system use"
+        )
+
+
 def validate_parameter_definition(
     value_type: str,
     validation_min: Optional[float] = None,
@@ -583,6 +596,9 @@ def create_parameter_definition(
     if data.value_type not in ("string", "number", "boolean"):
         raise HTTPException(status_code=400, detail="value_type must be one of: string, number, boolean")
     
+    # Validate domain name
+    validate_domain_name(data.domain)
+    
     # Validate and normalize validation fields
     validation_min, validation_max, validation_regex = validate_parameter_definition(
         data.value_type,
@@ -651,6 +667,10 @@ def update_parameter_definition(
     
     # Use the value_type from the update if provided, otherwise use existing
     value_type = data.value_type if data.value_type is not None else existing_param_def.value_type
+    
+    # Validate domain name if being updated
+    if data.domain is not None:
+        validate_domain_name(data.domain)
     
     # Validate and normalize validation fields
     validation_min, validation_max, validation_regex = validate_parameter_definition(

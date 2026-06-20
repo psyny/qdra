@@ -201,14 +201,15 @@ class RecipeEvaluationService:
         Check if a material matches all constraints in an option.
         """
         for constraint in constraints:
-            # Special handling for material_id constraint
-            if constraint.domain == "identity" and constraint.key == "material_id":
-                if constraint.operator == "=" and constraint.value_string:
-                    if str(material.id) != constraint.value_string:
+            # Special handling for __system__ domain
+            if constraint.domain == "__system__":
+                if constraint.key == "id":
+                    if constraint.operator == "=" and constraint.value_string:
+                        if str(material.id) != constraint.value_string:
+                            return False
+                    else:
                         return False
-                else:
-                    return False
-                continue
+                    continue
             
             # Find matching parameter
             material_params = material_params_map.get(material.id, [])
