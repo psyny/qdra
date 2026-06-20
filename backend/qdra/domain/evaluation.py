@@ -1,7 +1,6 @@
 import uuid
 from dataclasses import dataclass
 from typing import List, Optional, Dict
-from models.material import Material
 
 
 @dataclass
