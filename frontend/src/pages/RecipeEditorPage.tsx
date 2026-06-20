@@ -228,6 +228,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         slotGroups={slotGroups}
         materialEntityTypes={materialEntityTypes}
         template={template}
+        projectId={projectId}
       />
     </div>
   );

@@ -298,3 +298,23 @@ def delete_entity_parameter(
     deleted = service.delete_parameter(parameter_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Parameter not found")
+
+
+@router.get(
+    "/projects/{project_id}/entity-types/{entity_type_id}/parameter-values",
+    response_model=List[str],
+)
+def get_distinct_parameter_values(
+    project_id: uuid.UUID,
+    entity_type_id: uuid.UUID,
+    group: str,
+    domain: str,
+    key: str,
+    db: Session = Depends(get_db),
+):
+    """Get all distinct string values for a given entity type, group, domain, and key."""
+    service = EntityService(db)
+    try:
+        return service.get_distinct_parameter_values(entity_type_id, group, domain, key)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

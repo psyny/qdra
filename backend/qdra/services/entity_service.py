@@ -207,6 +207,23 @@ class EntityService:
             raise ValueError(f"Entity '{entity_id}' not found")
         return self.entity_parameter_repository.list_by_entity(entity_id)
 
+    def get_distinct_parameter_values(
+        self,
+        entity_type_id: uuid.UUID,
+        group: str,
+        domain: str,
+        key: str,
+    ) -> List[str]:
+        """Get all distinct string values for a given entity type, group, domain, and key."""
+        entity_type = self.template_repository.get_entity_type_by_id(entity_type_id)
+        if not entity_type:
+            raise ValueError(f"EntityType '{entity_type_id}' not found")
+
+        result = self.entity_parameter_repository.list_distinct_values_by_entity_type_domain_key(
+            entity_type_id, group, domain, key
+        )
+        return [row[0] for row in result]
+
     async def list_entities_by_view_config(
         self,
         project_id: uuid.UUID,

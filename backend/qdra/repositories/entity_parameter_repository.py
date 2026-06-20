@@ -137,3 +137,26 @@ class EntityParameterRepository:
         self.db.delete(parameter)
         self.db.commit()
         return True
+
+    def list_distinct_values_by_entity_type_domain_key(
+        self,
+        entity_type_id: uuid.UUID,
+        group: str,
+        domain: str,
+        key: str,
+    ) -> List[str]:
+        """Get all distinct string values for a given entity type, group, domain, and key."""
+        return (
+            self.db.query(EntityParameter.value_string)
+            .join(Entity, EntityParameter.entity_id == Entity.id)
+            .filter(
+                Entity.entity_type_id == entity_type_id,
+                Entity.group == group,
+                EntityParameter.domain == domain,
+                EntityParameter.key == key,
+                EntityParameter.value_string.isnot(None),
+                EntityParameter.value_string != "",
+            )
+            .distinct()
+            .all()
+        )

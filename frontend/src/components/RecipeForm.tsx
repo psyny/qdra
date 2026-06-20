@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DraftParameter } from './ParameterRow';
 import { ImageUpload } from './ImageUpload';
+import { Combobox } from './Combobox';
+import { getDistinctParameterValues } from '../api/entities';
 
 type SlotGroupConfig = {
   kind: 'requires' | 'consumes' | 'produces';
@@ -35,6 +37,7 @@ type RecipeFormProps = {
   slotGroups?: SlotGroupConfig[];
   materialEntityTypes?: any[];
   template?: any;
+  projectId?: string;
 };
 
 export function RecipeForm({
@@ -50,6 +53,7 @@ export function RecipeForm({
   slotGroups = [],
   materialEntityTypes = [],
   template,
+  projectId,
 }: RecipeFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -68,6 +72,9 @@ export function RecipeForm({
     consumes: [],
     produces: [],
   });
+
+  // State to track existing parameter values for each constraint
+  const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,22 +191,31 @@ export function RecipeForm({
       // Create new arrays to avoid mutation issues
       newConstraints[kind] = [...newConstraints[kind]];
       newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
-      
+
       // Auto-fill with first type and first parameter
       const firstType = materialEntityTypes[0];
       const firstTypeParams = firstType ? getParametersForEntityType(firstType.id) : [];
       const firstParam = firstTypeParams[0];
-      
+
+      const newConstraint = {
+        entity_type_id: firstType?.id || null,
+        domain: firstParam?.domain || '',
+        key: firstParam?.key || '',
+        operator: '=',
+        value_string: null,
+      };
+
       newConstraints[kind][slotIndex][orGroupIndex] = [
         ...newConstraints[kind][slotIndex][orGroupIndex],
-        {
-          entity_type_id: firstType?.id || null,
-          domain: firstParam?.domain || '',
-          key: firstParam?.key || '',
-          operator: '=',
-          value_string: null,
-        }
+        newConstraint
       ];
+
+      // Fetch existing values for the initial selection
+      if (firstType?.id && firstParam?.domain && firstParam?.key && firstParam.domain !== 'entity_type') {
+        const groupName = firstType.name || '';
+        fetchExistingValues(firstType.id, groupName, firstParam.domain, firstParam.key);
+      }
+
       return newConstraints;
     });
   };
@@ -216,6 +232,18 @@ export function RecipeForm({
     setSlotConstraints(prev => {
       const newConstraints = { ...prev };
       newConstraints[kind][slotIndex][orGroupIndex][constraintIndex][field] = value;
+
+      // Fetch existing values when entity_type_id, domain, or key changes
+      const constraint = newConstraints[kind][slotIndex][orGroupIndex][constraintIndex];
+      if (field === 'entity_type_id' || field === 'domain' || field === 'key') {
+        if (constraint.entity_type_id && constraint.domain && constraint.key && constraint.domain !== 'entity_type') {
+          // Get the group name from the entity type
+          const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
+          const groupName = entityType?.name || '';
+          fetchExistingValues(constraint.entity_type_id, groupName, constraint.domain, constraint.key);
+        }
+      }
+
       return newConstraints;
     });
   };
@@ -241,6 +269,25 @@ export function RecipeForm({
     if (!template) return [];
     const entityType = template.entity_types?.find((et: any) => et.id === entityTypeId);
     return entityType?.parameter_definitions || [];
+  };
+
+  // Helper to fetch existing parameter values for a constraint
+  const fetchExistingValues = async (entityTypeId: string, group: string, domain: string, key: string) => {
+    if (!projectId || !entityTypeId || !group || !domain || !key) return [];
+
+    const cacheKey = `${entityTypeId}:${group}:${domain}:${key}`;
+    if (existingValues[cacheKey]) {
+      return existingValues[cacheKey];
+    }
+
+    try {
+      const values = await getDistinctParameterValues(projectId, entityTypeId, group, domain, key);
+      setExistingValues(prev => ({ ...prev, [cacheKey]: values }));
+      return values;
+    } catch (err) {
+      console.error('Failed to fetch existing values:', err);
+      return [];
+    }
   };
 
   // Helper to render empty slots for a category
@@ -307,11 +354,13 @@ export function RecipeForm({
                 {orGroup.map((constraint, constraintIndex) => {
                   const selectedTypeId = constraint.entity_type_id || '';
                   const parametersForType = getParametersForEntityType(selectedTypeId);
-                  
+                  const selectedParam = parametersForType.find((p: any) => p.domain === constraint.domain && p.key === constraint.key);
+                  const paramValueType = selectedParam?.value_type || 'string';
+
                   return (
-                  <div key={constraintIndex} style={{ 
-                    display: 'flex', 
-                    gap: '4px', 
+                  <div key={constraintIndex} style={{
+                    display: 'flex',
+                    gap: '4px',
                     alignItems: 'center',
                     marginBottom: '4px',
                     padding: '4px',
@@ -336,7 +385,7 @@ export function RecipeForm({
                       disabled={isSubmitting}
                       style={{ padding: '2px', fontSize: '11px', width: '100px' }}
                     >
-                      <option value="">Type</option>
+                      <option value="">Group</option>
                       {materialEntityTypes.map((et: any) => (
                         <option key={et.id} value={et.id}>{et.name || et.id}</option>
                       ))}
@@ -378,15 +427,50 @@ export function RecipeForm({
                       <option value=">=">&ge;</option>
                       <option value="in">in</option>
                     </select>
-                    
-                    <input
-                      type="text"
-                      value={constraint.value_string || ''}
-                      onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
-                      disabled={isSubmitting}
-                      placeholder="Value"
-                      style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                    />
+
+                    {paramValueType === 'string' ? (
+                      <Combobox
+                        value={constraint.value_string || ''}
+                        onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
+                        options={(() => {
+                          const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
+                          const groupName = entityType?.name || '';
+                          return existingValues[`${constraint.entity_type_id}:${groupName}:${constraint.domain}:${constraint.key}`] || [];
+                        })()}
+                        disabled={isSubmitting}
+                        placeholder="Value"
+                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                      />
+                    ) : paramValueType === 'number' ? (
+                      <input
+                        type="number"
+                        value={constraint.value_number || ''}
+                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
+                        disabled={isSubmitting}
+                        placeholder="Value"
+                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                      />
+                    ) : paramValueType === 'boolean' ? (
+                      <select
+                        value={constraint.value_boolean !== null ? String(constraint.value_boolean) : ''}
+                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true')}
+                        disabled={isSubmitting}
+                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                      >
+                        <option value="">Select...</option>
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={constraint.value_string || ''}
+                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                        disabled={isSubmitting}
+                        placeholder="Value"
+                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                      />
+                    )}
                     
                     <button
                       type="button"
