@@ -2,18 +2,16 @@ import copy
 import math
 import re
 import uuid
-from typing import List, Dict, Optional, Set, Tuple, FrozenSet
-from dataclasses import dataclass, field
+from collections import deque
+from itertools import chain
+from typing import Any, Deque, Dict, Iterable, List, Optional, Set, Tuple
+from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from cachetools import TTLCache
 
-from models.slot import SlotKind
 from models.entity import Entity
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
-from repositories.slot_repository import SlotRepository
-from repositories.option_repository import OptionRepository
-from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
 from services.recipe_evaluation_service import RecipeEvaluationService
 
@@ -21,7 +19,7 @@ from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,
     MaterialNodeType, RecipeEdgeType, ConstraintSpec, ConstraintRule,
     SolvedPlan, SolverRequest, SolverResponse,
-    UserVariableDef, ScoreFormulaDef, ScoreRules, SYSTEM_VARIABLE_NAMES,
+    SYSTEM_VARIABLE_NAMES,
     Entities, EntityData, DiscardedPlansStats,
 )
 
@@ -32,7 +30,7 @@ class _State:
     recipe_nodes: Dict[str, RecipeExecNode]
     material_edges: List[MaterialEdge]
     recipe_edges: List[RecipeEdge]
-    needs_queue: List[str]
+    needs_queue: Deque[str]
     recipe_depth: int = 0
     _counter: int = 0
 
@@ -46,27 +44,12 @@ class _State:
             recipe_nodes=dict(self.recipe_nodes),
             material_edges=list(self.material_edges),
             recipe_edges=list(self.recipe_edges),
-            needs_queue=list(self.needs_queue),
+            needs_queue=deque(self.needs_queue),
             recipe_depth=self.recipe_depth,
             _counter=self._counter,
         )
 
 
-def _sig(constraints: List[ConstraintSpec]) -> str:
-    parts = []
-    for c in constraints:
-        p = f"{c.domain}.{c.key}"
-        if c.value_string is not None:
-            p += f"={c.value_string}"
-        elif c.value_number is not None:
-            p += f"={c.value_number}"
-        elif c.value_boolean is not None:
-            p += f"={c.value_boolean}"
-        parts.append(p)
-    return ",".join(sorted(parts))
-
-
-_SLOT_ORDER = {SlotKind.PRODUCES: 0, SlotKind.CONSUMES: 1, SlotKind.REQUIRES: 2}
 
 
 def validate_formula(formula: str, variable_names: Set[str]) -> None:
@@ -90,32 +73,36 @@ class OutputSolverService:
         self.db = db
         self.entity_repo = EntityRepository(db)
         self.entity_param_repo = EntityParameterRepository(db)
-        self.slot_repo = SlotRepository(db)
-        self.option_repo = OptionRepository(db)
-        self.constraint_repo = ParameterConstraintRepository(db)
         self.project_repo = ProjectRepository(db)
         self.recipe_eval_service = RecipeEvaluationService(db)
-        self.cache = TTLCache(maxsize=10000, ttl=300)
+        self.cache = TTLCache(maxsize=10000, ttl=60*5)
+
+    def _cache_get_or_set(self, key: str, loader):
+        if key not in self.cache:
+            self.cache[key] = loader()
+        return self.cache[key]
+
+    def _list_entity_params_cached(self, entity_id: uuid.UUID) -> List:
+        return self._cache_get_or_set(
+            f"entity_params_{entity_id}",
+            lambda: self.entity_param_repo.list_by_entity(entity_id),
+        )
 
     def _get_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
         """Get recipes that can consume/produce/require this material, with caching."""
-        cache_key = f"material_recipes_{material_id}"
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        result = self.recipe_eval_service.find_recipes_for_material(material_id, project_id)
-        self.cache[cache_key] = result
-        return result
+        cache_key = f"material_recipes_{project_id}_{material_id}"
+        return self._cache_get_or_set(
+            cache_key,
+            lambda: self.recipe_eval_service.find_recipes_for_material(material_id, project_id),
+        )
 
     def _get_materials_for_recipe(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
         """Get materials that match each slot of this recipe, with caching."""
-        cache_key = f"recipe_materials_{recipe_id}"
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        
-        result = self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
-        self.cache[cache_key] = result
-        return result
+        cache_key = f"recipe_materials_{project_id}_{recipe_id}"
+        return self._cache_get_or_set(
+            cache_key,
+            lambda: self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id),
+        )
 
     def _find_materials_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
         """Find materials in the project that match the given constraints."""
@@ -123,7 +110,7 @@ class OutputSolverService:
         matching_materials = []
         
         for material in materials:
-            material_params = self.entity_param_repo.list_by_entity(material.id)
+            material_params = self._list_entity_params_cached(material.id)
             if self._material_matches_constraints(material, material_params, constraints):
                 matching_materials.append(material.id)
         
@@ -248,105 +235,61 @@ class OutputSolverService:
         entities = self._collect_entities(plans, request.project_id)
         return SolverResponse(success=True, plans=plans, entities=entities, discarded_plans_stats=discarded_stats)
 
-    def _tag_state_nodes(self, state: "_State") -> None:
-        """Tag material and recipe nodes in the state based on graph topology."""
-        # Build adjacency maps
+    @staticmethod
+    def _build_adjacency(
+        material_edges: List[MaterialEdge],
+        recipe_edges: List[RecipeEdge],
+    ) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
         outgoing: Dict[str, List[str]] = {}
         incoming: Dict[str, List[str]] = {}
 
-        for e in state.material_edges:
-            if e.from_node_id not in outgoing:
-                outgoing[e.from_node_id] = []
-            outgoing[e.from_node_id].append(e.to_node_id)
+        for edge in chain(material_edges, recipe_edges):
+            outgoing.setdefault(edge.from_node_id, []).append(edge.to_node_id)
+            incoming.setdefault(edge.to_node_id, []).append(edge.from_node_id)
 
-            if e.to_node_id not in incoming:
-                incoming[e.to_node_id] = []
-            incoming[e.to_node_id].append(e.from_node_id)
+        return outgoing, incoming
 
-        for e in state.recipe_edges:
-            if e.from_node_id not in outgoing:
-                outgoing[e.from_node_id] = []
-            outgoing[e.from_node_id].append(e.to_node_id)
+    @staticmethod
+    def _apply_node_tags(
+        material_nodes: Dict[str, MaterialNode],
+        recipe_nodes: Dict[str, RecipeExecNode],
+        material_edges: List[MaterialEdge],
+        recipe_edges: List[RecipeEdge],
+    ) -> None:
+        outgoing, incoming = OutputSolverService._build_adjacency(material_edges, recipe_edges)
 
-            if e.to_node_id not in incoming:
-                incoming[e.to_node_id] = []
-            incoming[e.to_node_id].append(e.from_node_id)
-
-        # Tag material nodes
-        for node in state.material_nodes.values():
+        for node in material_nodes.values():
             tags: Set[str] = set()
-
             if node.produced_qty > node.consumed_qty:
                 tags.add("excess")
-
-            if node.id not in outgoing or not outgoing[node.id]:
+            if not outgoing.get(node.id):
                 tags.add("leaf")
-
-            if node.id not in incoming or not incoming[node.id]:
+            if not incoming.get(node.id):
                 tags.add("root")
-
             node.tags = list(tags)
 
-        # Tag recipe nodes as root if they have no incoming edges
-        for rn in state.recipe_nodes.values():
+        for node in recipe_nodes.values():
             tags: Set[str] = set()
-            if rn.id not in incoming or not incoming[rn.id]:
+            if not incoming.get(node.id):
                 tags.add("root")
+            node.tags = list(tags)
 
-            rn.tags = list(tags)
+    def _tag_state_nodes(self, state: "_State") -> None:
+        self._apply_node_tags(
+            state.material_nodes,
+            state.recipe_nodes,
+            state.material_edges,
+            state.recipe_edges,
+        )
 
     def _tag_nodes(self, plan: SolvedPlan) -> None:
-        """Tag material nodes based on graph topology and quantities."""
-        # Build adjacency maps
-        outgoing: Dict[str, List[str]] = {}
-        incoming: Dict[str, List[str]] = {}
-
-        for e in plan.material_edges:
-            if e.from_node_id not in outgoing:
-                outgoing[e.from_node_id] = []
-            outgoing[e.from_node_id].append(e.to_node_id)
-
-            if e.to_node_id not in incoming:
-                incoming[e.to_node_id] = []
-            incoming[e.to_node_id].append(e.from_node_id)
-
-        for e in plan.recipe_edges:
-            if e.from_node_id not in outgoing:
-                outgoing[e.from_node_id] = []
-            outgoing[e.from_node_id].append(e.to_node_id)
-
-            if e.to_node_id not in incoming:
-                incoming[e.to_node_id] = []
-            incoming[e.to_node_id].append(e.from_node_id)
-
-        # Tag material nodes
-        for node in plan.graph_nodes:
-            if not isinstance(node, MaterialNode):
-                continue
-
-            tags: Set[str] = set()
-
-            if node.produced_qty > node.consumed_qty:
-                tags.add("excess")
-
-            if node.id not in outgoing or not outgoing[node.id]:
-                tags.add("leaf")
-
-            if node.id not in incoming or not incoming[node.id]:
-                tags.add("root")
-
-            node.tags = list(tags)
-
-        # Tag recipe nodes as root if they have no incoming edges
-        for node in plan.graph_nodes:
-            if not isinstance(node, RecipeExecNode):
-                continue
-
-            tags: Set[str] = set()
-            if node.id not in incoming or not incoming[node.id]:
-                tags.add("root")
-
-            node.tags = list(tags)
+        material_nodes = {
+            node.id: node for node in plan.graph_nodes if isinstance(node, MaterialNode)
+        }
+        recipe_nodes = {
+            node.id: node for node in plan.graph_nodes if isinstance(node, RecipeExecNode)
+        }
+        self._apply_node_tags(material_nodes, recipe_nodes, plan.material_edges, plan.recipe_edges)
 
     def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
                  forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids):
@@ -356,7 +299,7 @@ class OutputSolverService:
 
         current_id = None
         while state.needs_queue:
-            nid = state.needs_queue.pop(0)
+            nid = state.needs_queue.popleft()
             node = state.material_nodes.get(nid)
             if node is not None and node.produced_qty < node.consumed_qty:
                 current_id = nid
@@ -433,6 +376,97 @@ class OutputSolverService:
             self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats,
                          forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids)
 
+    def _add_recipe_material_nodes(
+        self,
+        state: "_State",
+        recipe_node_id: str,
+        recipe_materials: dict,
+        exec_count: float,
+        rank: int,
+        output_type: MaterialNodeType,
+        target_need_id: Optional[str] = None,
+    ) -> List[str]:
+        """Add material nodes and recipe edges for one recipe execution.
+
+        The recipe-evaluation service returns slots grouped by kind. Current solver
+        semantics still pick the first matching material for each option, exactly as
+        before; this helper only removes the repeated produces/consumes/requires
+        construction code.
+        """
+        new_inputs: List[str] = []
+        need = state.material_nodes.get(target_need_id) if target_need_id else None
+
+        def first_matching_material_id(option: dict) -> Optional[uuid.UUID]:
+            matches = option.get("matching_material_ids") or []
+            return uuid.UUID(matches[0]) if matches else None
+
+        for slot in recipe_materials["produces"]:
+            for opt in slot["options"]:
+                material_id = first_matching_material_id(opt)
+                if material_id is None:
+                    continue
+
+                scaled_qty = opt["quantity"] * exec_count
+                output_id = state.next_id("O")
+                output_node = MaterialNode(
+                    id=output_id,
+                    material_id=material_id,
+                    produced_qty=scaled_qty,
+                    consumed_qty=0.0,
+                    type=output_type,
+                    rank=rank,
+                )
+                state.material_nodes[output_id] = output_node
+                state.recipe_edges.append(
+                    RecipeEdge(
+                        from_node_id=recipe_node_id,
+                        to_node_id=output_id,
+                        qty=scaled_qty,
+                        type=RecipeEdgeType.PRODUCES,
+                    )
+                )
+
+                if need and need.material_id and material_id == need.material_id:
+                    qty = need.consumed_qty - need.produced_qty
+                    state.material_edges.append(
+                        MaterialEdge(from_node_id=output_id, to_node_id=need.id, qty=qty)
+                    )
+                    output_node.consumed_qty += qty
+                    need.produced_qty += qty
+
+        input_specs = (
+            ("consumes", "I", MaterialNodeType.INPUT, RecipeEdgeType.CONSUMES),
+            ("requires", "Rq", MaterialNodeType.REQUIRES, RecipeEdgeType.REQUIRES),
+        )
+        for slot_kind, node_prefix, node_type, edge_type in input_specs:
+            for slot in recipe_materials[slot_kind]:
+                for opt in slot["options"]:
+                    material_id = first_matching_material_id(opt)
+                    if material_id is None:
+                        continue
+
+                    scaled_qty = opt["quantity"] * exec_count
+                    input_id = state.next_id(node_prefix)
+                    state.material_nodes[input_id] = MaterialNode(
+                        id=input_id,
+                        material_id=material_id,
+                        produced_qty=0.0,
+                        consumed_qty=scaled_qty,
+                        type=node_type,
+                        rank=rank + 1,
+                    )
+                    state.recipe_edges.append(
+                        RecipeEdge(
+                            from_node_id=input_id,
+                            to_node_id=recipe_node_id,
+                            qty=scaled_qty,
+                            type=edge_type,
+                        )
+                    )
+                    new_inputs.append(input_id)
+
+        return new_inputs
+
     def _apply_recipe(self, state, need_id, recipe_id, produces_option, request):
         need = state.material_nodes[need_id]
         per_exec = produces_option["quantity"]
@@ -446,73 +480,17 @@ class OutputSolverService:
         rn_id = state.next_id("R")
         state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=need_rank)
 
-        # Get materials for this recipe from the endpoint
         recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
-        new_inputs: List[str] = []
-
-        # Process produces slots - create one node per slot, using the first matching material
-        # (In a more sophisticated version, we could branch on material options)
-        for slot in recipe_materials["produces"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    # Use the first matching material (could be improved to branch on options)
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    oid = state.next_id("O")
-                    onode = MaterialNode(
-                        id=oid, 
-                        material_id=material_id,
-                        produced_qty=opt["quantity"] * exec_count,
-                        consumed_qty=0.0, 
-                        type=MaterialNodeType.OUTPUT,
-                        rank=need_rank,
-                    )
-                    state.material_nodes[oid] = onode
-                    state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
-                    
-                    # Connect to need if this material matches the need's material_id
-                    if need.material_id and material_id == need.material_id:
-                        qty = need.consumed_qty - need.produced_qty
-                        state.material_edges.append(MaterialEdge(from_node_id=oid, to_node_id=need_id, qty=qty))
-                        onode.consumed_qty += qty
-                        state.material_nodes[need_id].produced_qty += qty
-
-        # Process consumes slots - create one node per slot
-        for slot in recipe_materials["consumes"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    scaled = opt["quantity"] * exec_count
-                    iid = state.next_id("I")
-                    state.material_nodes[iid] = MaterialNode(
-                        id=iid, 
-                        material_id=material_id,
-                        produced_qty=0.0, 
-                        consumed_qty=scaled, 
-                        type=MaterialNodeType.INPUT, 
-                        rank=need_rank + 1
-                    )
-                    state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
-                    new_inputs.append(iid)
-
-        # Process requires slots - create one node per slot
-        for slot in recipe_materials["requires"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    scaled = opt["quantity"] * exec_count
-                    qid = state.next_id("Rq")
-                    state.material_nodes[qid] = MaterialNode(
-                        id=qid, 
-                        material_id=material_id,
-                        produced_qty=0.0, 
-                        consumed_qty=scaled, 
-                        type=MaterialNodeType.REQUIRES, 
-                        rank=need_rank + 1
-                    )
-                    state.recipe_edges.append(RecipeEdge(from_node_id=qid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.REQUIRES))
-                    new_inputs.append(qid)
-
-        state.needs_queue = new_inputs + state.needs_queue
+        new_inputs = self._add_recipe_material_nodes(
+            state=state,
+            recipe_node_id=rn_id,
+            recipe_materials=recipe_materials,
+            exec_count=exec_count,
+            rank=need_rank,
+            output_type=MaterialNodeType.OUTPUT,
+            target_need_id=need_id,
+        )
+        state.needs_queue.extendleft(reversed(new_inputs))
 
     def _initialize_material_target(self, request: SolverRequest) -> List["_State"]:
         """Initialize state for a material target. Returns a list of states, one per matching material."""
@@ -538,7 +516,7 @@ class OutputSolverService:
                 recipe_nodes={},
                 material_edges=[],
                 recipe_edges=[],
-                needs_queue=[target_node.id],
+                needs_queue=deque([target_node.id]),
                 _counter=1,
             )
             states.append(state)
@@ -565,7 +543,7 @@ class OutputSolverService:
             recipe_nodes={},
             material_edges=[],
             recipe_edges=[],
-            needs_queue=[],
+            needs_queue=deque(),
             _counter=1,
         )
         
@@ -573,64 +551,16 @@ class OutputSolverService:
         rn_id = state.next_id("R")
         state.recipe_nodes[rn_id] = RecipeExecNode(id=rn_id, recipe_id=recipe_id, execution_count=exec_count, rank=0)
         
-        # Get materials for this recipe from the endpoint
         recipe_materials = self._get_materials_for_recipe(recipe_id, request.project_id)
-        new_inputs: List[str] = []
-        
-        # Process produces slots - mark outputs as type 't' (target)
-        for slot in recipe_materials["produces"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    oid = state.next_id("O")
-                    onode = MaterialNode(
-                        id=oid, 
-                        material_id=material_id,
-                        produced_qty=opt["quantity"] * exec_count,
-                        consumed_qty=0.0, 
-                        type=MaterialNodeType.TARGET,
-                        rank=0,
-                    )
-                    state.material_nodes[oid] = onode
-                    state.recipe_edges.append(RecipeEdge(from_node_id=rn_id, to_node_id=oid, qty=opt["quantity"] * exec_count, type=RecipeEdgeType.PRODUCES))
-                    
-        # Process consumes slots - inputs are normal type 'i'
-        for slot in recipe_materials["consumes"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    scaled = opt["quantity"] * exec_count
-                    iid = state.next_id("I")
-                    state.material_nodes[iid] = MaterialNode(
-                        id=iid, 
-                        material_id=material_id,
-                        produced_qty=0.0, 
-                        consumed_qty=scaled, 
-                        type=MaterialNodeType.INPUT,
-                        rank=1,
-                    )
-                    state.recipe_edges.append(RecipeEdge(from_node_id=iid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.CONSUMES))
-                    new_inputs.append(iid)
-                    
-        # Process requires slots - requires are normal type 'r'
-        for slot in recipe_materials["requires"]:
-            for opt in slot["options"]:
-                if opt["matching_material_ids"]:
-                    material_id = uuid.UUID(opt["matching_material_ids"][0])
-                    scaled = opt["quantity"] * exec_count
-                    qid = state.next_id("Rq")
-                    state.material_nodes[qid] = MaterialNode(
-                        id=qid, 
-                        material_id=material_id,
-                        produced_qty=0.0, 
-                        consumed_qty=scaled, 
-                        type=MaterialNodeType.REQUIRES,
-                        rank=1,
-                    )
-                    state.recipe_edges.append(RecipeEdge(from_node_id=qid, to_node_id=rn_id, qty=scaled, type=RecipeEdgeType.REQUIRES))
-                    new_inputs.append(qid)
-        
-        state.needs_queue = new_inputs
+        new_inputs = self._add_recipe_material_nodes(
+            state=state,
+            recipe_node_id=rn_id,
+            recipe_materials=recipe_materials,
+            exec_count=exec_count,
+            rank=0,
+            output_type=MaterialNodeType.TARGET,
+        )
+        state.needs_queue = deque(new_inputs)
         return state
 
     def _find_surplus(self, state, need):
@@ -1133,7 +1063,7 @@ class OutputSolverService:
                 # Check if material_id matches the pre-loaded set
                 if node.material_id and node.material_id in var_material_ids:
                     # Load material parameters from DB to extract parameter value
-                    material_params = self.entity_param_repo.list_by_entity(node.material_id)
+                    material_params = self._list_entity_params_cached(node.material_id)
                     param_value = self._extract_param_value_from_params(
                         material_params, var_def.parameter_domain, var_def.parameter_key
                     )
@@ -1240,7 +1170,7 @@ class OutputSolverService:
             for mid in material_ids:
                 entity = self.entity_repo.get_by_id(mid)
                 if entity and entity.project_id == project_id:
-                    params = self.entity_param_repo.list_by_entity(mid)
+                    params = self._list_entity_params_cached(mid)
                     materials[mid] = EntityData(
                         id=entity.id, project_id=entity.project_id,
                         created_at=entity.created_at,
@@ -1251,7 +1181,7 @@ class OutputSolverService:
             for rid in recipe_ids:
                 entity = self.entity_repo.get_by_id(rid)
                 if entity and entity.project_id == project_id:
-                    params = self.entity_param_repo.list_by_entity(rid)
+                    params = self._list_entity_params_cached(rid)
                     recipes[rid] = EntityData(
                         id=entity.id, project_id=entity.project_id,
                         created_at=entity.created_at,
@@ -1266,7 +1196,7 @@ class OutputSolverService:
         """Load recipe entity parameters as ConstraintSpec lists, keyed by str(recipe_id)."""
         result: Dict[str, List[ConstraintSpec]] = {}
         for rid in recipe_ids:
-            params = self.entity_param_repo.list_by_entity(rid)
+            params = self._list_entity_params_cached(rid)
             result[str(rid)] = [
                 ConstraintSpec(
                     domain=p.domain, key=p.key, operator="=",
@@ -1277,22 +1207,6 @@ class OutputSolverService:
                 for p in params
             ]
         return result
-
-    def _load_recipe_structure(self, recipe_id: uuid.UUID) -> Dict:
-        slots = self.slot_repo.list_by_recipe_entity(recipe_id)
-        structure = {"recipe_id": recipe_id, "slots": []}
-        for slot in slots:
-            options = self.option_repo.list_by_slot(slot.id)
-            slot_data = {"id": slot.id, "kind": slot.kind, "options": []}
-            for opt in options:
-                constraints = self.constraint_repo.list_by_option(opt.id)
-                slot_data["options"].append({
-                    "id": opt.id,
-                    "quantity": opt.quantity,
-                    "constraints": [self._to_spec(c) for c in constraints],
-                })
-            structure["slots"].append(slot_data)
-        return structure
 
     def _to_spec(self, c) -> ConstraintSpec:
         # Handle both ParameterConstraint (has operator) and Parameter (no operator)
@@ -1305,187 +1219,238 @@ class OutputSolverService:
         )
 
     @staticmethod
+    def _attr(obj: Any, name: str, default: Any = None) -> Any:
+        """Read an attribute from either a domain object or a dict."""
+        if isinstance(obj, dict):
+            return obj.get(name, default)
+        return getattr(obj, name, default)
+
+    @staticmethod
+    def _value_to_label(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if value is False:
+            return "False"
+        return str(value)
+
+    @staticmethod
+    def _node_to_dict(node: Any) -> dict:
+        if isinstance(node, RecipeExecNode):
+            return {
+                "id": node.id,
+                "kind": "recipe_execution",
+                "recipe_id": node.recipe_id,
+                "execution_count": node.execution_count,
+                "rank": node.rank,
+                "tags": list(getattr(node, "tags", []) or []),
+            }
+        if isinstance(node, MaterialNode):
+            return {
+                "id": node.id,
+                "kind": "material",
+                "material_id": node.material_id,
+                "produced_qty": node.produced_qty,
+                "consumed_qty": node.consumed_qty,
+                "type": node.type,
+                "rank": node.rank,
+                "tags": list(getattr(node, "tags", []) or []),
+            }
+        return dict(node)
+
+    @staticmethod
+    def _edge_to_dict(edge: Any) -> dict:
+        if isinstance(edge, dict):
+            return edge
+        result = {
+            "from_node_id": edge.from_node_id,
+            "to_node_id": edge.to_node_id,
+            "qty": edge.qty,
+        }
+        edge_type = getattr(edge, "type", None)
+        if edge_type is not None:
+            result["edge_type"] = getattr(edge_type, "value", edge_type)
+        else:
+            result["edge_type"] = "material"
+        return result
+
+    @staticmethod
+    def _response_parts(data: Any) -> Tuple[bool, List[Any], Any]:
+        """Accept either SolverResponse/domain objects or old dict-shaped payloads."""
+        if isinstance(data, dict):
+            return bool(data.get("success")), list(data.get("plans", [])), data.get("entities", {})
+        return bool(getattr(data, "success", False)), list(getattr(data, "plans", []) or []), getattr(data, "entities", None)
+
+    @staticmethod
+    def _plan_graph(plan: Any) -> dict:
+        if isinstance(plan, dict):
+            graph = plan.get("graph")
+            if graph:
+                return graph
+            return {
+                "nodes": plan.get("graph_nodes", plan.get("nodes", [])),
+                "edges": plan.get("material_edges", []) + plan.get("recipe_edges", []) + plan.get("edges", []),
+            }
+        return {
+            "nodes": [OutputSolverService._node_to_dict(n) for n in getattr(plan, "graph_nodes", [])],
+            "edges": [
+                OutputSolverService._edge_to_dict(e)
+                for e in chain(getattr(plan, "material_edges", []) or [], getattr(plan, "recipe_edges", []) or [])
+            ],
+        }
+
+    @staticmethod
+    def _entity_bucket(entities: Any, bucket: str) -> Dict[str, Any]:
+        if not entities:
+            return {}
+        raw = entities.get(bucket, {}) if isinstance(entities, dict) else getattr(entities, bucket, {})
+        return {str(k): v for k, v in (raw or {}).items()}
+
+    @staticmethod
+    def _entity_label(entities: Any, bucket: str, entity_id: Any, label_param: Optional[Tuple[str, str]]) -> Optional[str]:
+        if not entity_id or not label_param:
+            return None
+        entity = OutputSolverService._entity_bucket(entities, bucket).get(str(entity_id))
+        if not entity:
+            return None
+        params = entity.get("parameters", []) if isinstance(entity, dict) else getattr(entity, "parameters", [])
+        domain, key = label_param
+        for p in params or []:
+            if OutputSolverService._attr(p, "domain") == domain and OutputSolverService._attr(p, "key") == key:
+                return (
+                    OutputSolverService._value_to_label(OutputSolverService._attr(p, "value_string"))
+                    or OutputSolverService._value_to_label(OutputSolverService._attr(p, "value_number"))
+                    or OutputSolverService._value_to_label(OutputSolverService._attr(p, "value_boolean"))
+                )
+        return None
+
+    @staticmethod
+    def _node_labels(
+        nodes: Iterable[dict],
+        entities: Any,
+        material_label_param: Optional[Tuple[str, str]],
+        recipe_label_param: Optional[Tuple[str, str]],
+    ) -> Dict[str, str]:
+        labels: Dict[str, str] = {}
+        for n in nodes:
+            node_id = n["id"]
+            if n.get("kind") == "recipe_execution":
+                recipe_id = n.get("recipe_id")
+                labels[node_id] = (
+                    OutputSolverService._entity_label(entities, "recipes", recipe_id, recipe_label_param)
+                    or str(recipe_id or node_id)[:8]
+                )
+            else:
+                material_id = n.get("material_id")
+                labels[node_id] = (
+                    OutputSolverService._entity_label(entities, "materials", material_id, material_label_param)
+                    or str(material_id or node_id)[:8]
+                )
+        return labels
+
+    @staticmethod
+    def _fmt_qty(value: Any) -> str:
+        if value is None:
+            return "?"
+        try:
+            value = float(value)
+            return str(int(value)) if value == int(value) else f"{value:.2f}"
+        except (TypeError, ValueError):
+            return str(value)
+
+    @staticmethod
     def print_plan_graph(
-        data: dict,
+        data: Any,
         material_label_param: Optional[Tuple[str, str]] = None,
         recipe_label_param: Optional[Tuple[str, str]] = None,
         simplify_level: int = 2,
     ) -> None:
+        """Print a human-readable solver response plus Graphviz DOT.
+
+        Works with both the current domain response returned by solve() and the older
+        dict-shaped response used by early debugging scripts.
+        """
+        success, plans, entities = OutputSolverService._response_parts(data)
         print("\n" + "=" * 60)
-        print(f"SOLVER OUTPUT  success={data.get('success')}  plans={len(data.get('plans', []))}")
-        for i, plan in enumerate(data.get("plans", []), 1):
-            print(f"\n--- Plan {i}: {plan.get('plan_id')} ---")
-            graph = plan.get("graph", {})
+        print(f"SOLVER OUTPUT  success={success}  plans={len(plans)}")
+
+        for i, plan in enumerate(plans, 1):
+            plan_id = plan.get("plan_id", "") if isinstance(plan, dict) else getattr(plan, "plan_id", "")
+            score = plan.get("score", {}) if isinstance(plan, dict) else getattr(plan, "score", {})
+            graph = OutputSolverService._plan_graph(plan)
             nodes = graph.get("nodes", [])
             edges = graph.get("edges", [])
+            node_id_to_label = OutputSolverService._node_labels(nodes, entities, material_label_param, recipe_label_param)
 
-            # Build label mappings using entities data
-            entities = data.get("entities", {})
-            node_id_to_label: Dict[str, str] = {}
-            for n in nodes:
-                nid = n["id"]
-                if n.get("kind") == "recipe_execution":
-                    label = str(n.get("recipe_id", nid))[:8]
-                    if recipe_label_param:
-                        domain, key = recipe_label_param
-                        recipe_id = n.get("recipe_id")
-                        if recipe_id and "recipes" in entities:
-                            recipe_data = entities["recipes"].get(str(recipe_id))
-                            if recipe_data and "parameters" in recipe_data:
-                                for p in recipe_data["parameters"]:
-                                    if p.get("domain") == domain and p.get("key") == key:
-                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                        if val is not None:
-                                            label = str(val)
-                                            break
-                    node_id_to_label[nid] = label
-                else:
-                    label = nid
-                    if material_label_param and n.get("material_id"):
-                        domain, key = material_label_param
-                        material_id = str(n.get("material_id"))
-                        if material_id and "materials" in entities:
-                            mat_data = entities["materials"].get(material_id)
-                            if mat_data and "parameters" in mat_data:
-                                for p in mat_data["parameters"]:
-                                    if p.get("domain") == domain and p.get("key") == key:
-                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                        if val is not None:
-                                            label = str(val)
-                                            break
-                    node_id_to_label[nid] = label
-
-            # Print nodes
+            print(f"\n--- Plan {i}: {plan_id} ---")
             print("Nodes:")
             for n in nodes:
-                label = node_id_to_label[n["id"]]
+                label = node_id_to_label.get(n["id"], n["id"])
+                tags = n.get("tags", []) or []
                 if n.get("kind") == "recipe_execution":
-                    tags = n.get("tags", [])
-                    exec_count = n.get('execution_count', 0)
-                    # Format execution count to show decimals if fractional
-                    if exec_count == int(exec_count):
-                        exec_str = str(int(exec_count))
-                    else:
-                        exec_str = f"{exec_count:.2f}"
-                    print(f"  {label}: recipe exec={exec_str} tags={tags}")
+                    print(f"  {label}: recipe exec={OutputSolverService._fmt_qty(n.get('execution_count', 0))} tags={tags}")
                 else:
-                    node_type = n.get("type", "?")
-                    prod = n.get("produced_qty", 0)
-                    cons = n.get("consumed_qty", 0)
-                    tags = n.get("tags", [])
+                    node_type = getattr(n.get("type"), "value", n.get("type", "?"))
+                    prod = OutputSolverService._fmt_qty(n.get("produced_qty", 0))
+                    cons = OutputSolverService._fmt_qty(n.get("consumed_qty", 0))
                     print(f"  {label}: material type={node_type} prod={prod} cons={cons} tags={tags}")
 
-            # Print edges
             print("Edges:")
             for e in edges:
                 from_label = node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
                 to_label = node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
-                edge_type = e.get("edge_type", "?")
-                qty = e.get("qty", 0)
-                print(f"  {from_label} --> {to_label}: type={edge_type} qty={qty}")
+                print(
+                    f"  {from_label} --> {to_label}: "
+                    f"type={e.get('edge_type', '?')} qty={OutputSolverService._fmt_qty(e.get('qty', 0))}"
+                )
 
-            # Print scores
             print("Scores:")
-            score = plan.get("score", {})
-            for name, value in score.items():
+            for name, value in (score or {}).items():
                 print(f"  {name}: {value}")
 
-            # Print graphviz dot code
             simplified_graph = OutputSolverService.simplify_graph(graph, simplify_level)
             simplified_nodes = simplified_graph["nodes"]
             simplified_edges = simplified_graph["edges"]
-
-            # Rebuild label mapping for simplified nodes
-            simplified_node_id_to_label = {}
-            for n in simplified_nodes:
-                nid = n["id"]
-                if n.get("kind") == "recipe_execution":
-                    label = str(n.get("recipe_id", nid))[:8]
-                    if recipe_label_param:
-                        domain, key = recipe_label_param
-                        recipe_id = n.get("recipe_id")
-                        if recipe_id and "recipes" in entities:
-                            recipe_data = entities["recipes"].get(str(recipe_id))
-                            if recipe_data and "parameters" in recipe_data:
-                                for p in recipe_data["parameters"]:
-                                    if p.get("domain") == domain and p.get("key") == key:
-                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                        if val is not None:
-                                            label = str(val)
-                                            break
-                    simplified_node_id_to_label[nid] = label
-                else:
-                    # For material nodes, use entities to get label
-                    label = nid
-                    if material_label_param and n.get("material_id"):
-                        domain, key = material_label_param
-                        material_id = str(n.get("material_id"))
-                        if material_id and "materials" in entities:
-                            mat_data = entities["materials"].get(material_id)
-                            if mat_data and "parameters" in mat_data:
-                                for p in mat_data["parameters"]:
-                                    if p.get("domain") == domain and p.get("key") == key:
-                                        val = p.get("value_string") or p.get("value_number") or p.get("value_boolean")
-                                        if val is not None:
-                                            label = str(val)
-                                            break
-                    simplified_node_id_to_label[nid] = label
+            simplified_labels = OutputSolverService._node_labels(
+                simplified_nodes, entities, material_label_param, recipe_label_param
+            )
 
             print(f"\n// Graphviz for Plan {i} (simplify_level={simplify_level})")
             print("digraph {")
             print("  rankdir=LR;")
 
-            # Calculate min and max edge qty for width scaling
-            # Print graphviz nodes
             for n in simplified_nodes:
-                label = simplified_node_id_to_label[n["id"]]
+                label = simplified_labels.get(n["id"], n["id"])
                 if n.get("kind") == "recipe_execution":
-                    exec_count = n.get("execution_count", 1)
-                    exec_str = f"{exec_count:.1f}" if exec_count != int(exec_count) else str(int(exec_count))
+                    exec_str = OutputSolverService._fmt_qty(n.get("execution_count", 1))
                     print(f'  "{n["id"]}" [label="{label}\\n({exec_str})", shape=circle, fillcolor="#444444", fontcolor="white", style="filled"];')
                 else:
-                    prod = n.get("produced_qty", 0)
-                    cons_qty = n.get("consumed_qty", 0)
-                    prod_str = f"{prod:.1f}" if prod != int(prod) else str(int(prod))
-                    cons_str = f"{cons_qty:.1f}" if cons_qty != int(cons_qty) else str(int(cons_qty))
-                    tags = n.get("tags", [])
-
-                    # Determine color based on tags
+                    prod = OutputSolverService._fmt_qty(n.get("produced_qty", 0))
+                    cons = OutputSolverService._fmt_qty(n.get("consumed_qty", 0))
+                    tags = set(n.get("tags", []) or [])
                     if "excess" in tags:
-                        color = "#ff6b6b"  # red
+                        color = "#ff6b6b"
                     elif "root" in tags:
-                        color = "#4dabf7"  # blue
+                        color = "#4dabf7"
                     elif "leaf" in tags:
-                        color = "#69db7c"  # green
+                        color = "#69db7c"
                     else:
-                        color = "#ffd43b"  # yellow
+                        color = "#ffd43b"
+                    print(f'  "{n["id"]}" [label="{label}\\n{cons}/{prod}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
 
-                    print(f'  "{n["id"]}" [label="{label}\\n{cons_str}/{prod_str}", shape=box, style="rounded,filled", fillcolor="{color}", fontcolor="black"];')
-
-            # Print graphviz edges
-            qtys = []
-            for e in simplified_edges:
-                qty = e.get("qty")
-                if qty != None:
-                    qtys.append(qty)
+            qtys = [e.get("qty") for e in simplified_edges if e.get("qty") is not None]
             min_qty = min(qtys, default=1)
             max_qty = max(qtys, default=1)
-
             if max_qty == 0:
                 max_qty = 1
             if min_qty == max_qty:
-                min_qty = 0  # Avoid division by zero when all qtys are equal
+                min_qty = 0
 
             for e in simplified_edges:
-                qty = e.get("qty", 0)
-                if qty == None:
-                    qty = min_qty                    
-                qty_str = f"{qty:.1f}" if qty != int(qty) else str(int(qty))
-
-                width = 1 + (((qty - min_qty) / (max_qty - min_qty)) * 4.0)
+                qty = e.get("qty", min_qty)
+                qty = min_qty if qty is None else qty
+                qty_str = OutputSolverService._fmt_qty(qty)
+                width = 1 + (((qty - min_qty) / (max_qty - min_qty)) * 4.0) if max_qty != min_qty else 1
                 width = min(max(width, 1), 5)
-                from_label = simplified_node_id_to_label.get(e.get("from_node_id"), e.get("from_node_id"))
-                to_label = simplified_node_id_to_label.get(e.get("to_node_id"), e.get("to_node_id"))
                 print(f'  "{e.get("from_node_id")}" -> "{e.get("to_node_id")}" [label="{qty_str}", penwidth={width:.1f}];')
 
             print("}")
@@ -1494,290 +1459,144 @@ class OutputSolverService:
 
     @staticmethod
     def _simplify_graph_lv0(graph: dict) -> dict:
-        """Level 0: No simplification - return graph as is."""
         return graph
 
     @staticmethod
     def _simplify_graph_lv1(graph: dict) -> dict:
-        """Level 1: Collapse material nodes by cluster (connected material nodes of same material_id)."""
+        """Collapse connected material nodes with the same material_id."""
         nodes = graph.get("nodes", [])
         edges = graph.get("edges", [])
+        material_nodes = [n for n in nodes if n.get("kind") != "recipe_execution" and n.get("material_id")]
+        recipe_nodes = [n for n in nodes if n.get("kind") == "recipe_execution"]
+        material_by_node = {n["id"]: str(n.get("material_id")) for n in material_nodes}
+        material_node_lookup = {n["id"]: n for n in material_nodes}
 
-        # Separate material and recipe nodes
-        material_nodes = []
-        recipe_nodes = []
-        node_id_to_material_id = {}
+        adjacency = {node_id: set() for node_id in material_by_node}
+        for e in edges:
+            from_id, to_id = e.get("from_node_id"), e.get("to_node_id")
+            if from_id in material_by_node and to_id in material_by_node and material_by_node[from_id] == material_by_node[to_id]:
+                adjacency[from_id].add(to_id)
+                adjacency[to_id].add(from_id)
 
-        for node in nodes:
-            if node.get("kind") == "recipe_execution":
-                recipe_nodes.append(node)
-            else:
-                # Extract material_id directly
-                material_id = node.get("material_id")
-                if material_id:
-                    material_nodes.append(node)
-                    node_id_to_material_id[node["id"]] = str(material_id)
-
-        # Build adjacency list for material nodes (which material nodes are connected to which)
-        material_id_to_node_ids = {}
-        for node in material_nodes:
-            material_id = node_id_to_material_id[node["id"]]
-            if material_id not in material_id_to_node_ids:
-                material_id_to_node_ids[material_id] = []
-            material_id_to_node_ids[material_id].append(node["id"])
-
-        # Build adjacency: which material node IDs are connected to which (only same material_id)
-        node_id_to_adjacent = {node_id: set() for node_id in node_id_to_material_id}
-        for edge in edges:
-            from_id = edge.get("from_node_id")
-            to_id = edge.get("to_node_id")
-            if from_id in node_id_to_material_id and to_id in node_id_to_material_id:
-                # Only add adjacency if both nodes have the same material_id
-                if node_id_to_material_id[from_id] == node_id_to_material_id[to_id]:
-                    node_id_to_adjacent[from_id].add(to_id)
-                    node_id_to_adjacent[to_id].add(from_id)
-
-        # Find clusters using BFS
-        visited = set()
-        clusters = []  # List of lists of node_ids
-
-        for node_id in node_id_to_material_id:
-            if node_id not in visited:
-                # Start BFS to find the cluster
-                cluster = []
-                queue = [node_id]
-                visited.add(node_id)
-                start_material_id = node_id_to_material_id[node_id]
-
-                while queue:
-                    current_id = queue.pop(0)
-                    cluster.append(current_id)
-
-                    # Add adjacent material nodes of the same material_id
-                    for adjacent_id in node_id_to_adjacent[current_id]:
-                        if adjacent_id not in visited and node_id_to_material_id[adjacent_id] == start_material_id:
-                            visited.add(adjacent_id)
-                            queue.append(adjacent_id)
-
-                clusters.append(cluster)
-
-        # Create collapsed material nodes for each cluster
-        collapsed_nodes = []
-        node_id_to_collapsed_id = {}
-        cluster_counter = 0
-
-        for cluster in clusters:
-            if len(cluster) == 1:
-                # No collapsing needed for single-node clusters
-                node_id_to_collapsed_id[cluster[0]] = cluster[0]
+        clusters: List[List[str]] = []
+        visited: Set[str] = set()
+        for node_id in material_by_node:
+            if node_id in visited:
                 continue
+            queue = deque([node_id])
+            visited.add(node_id)
+            cluster: List[str] = []
+            while queue:
+                current = queue.popleft()
+                cluster.append(current)
+                for nxt in adjacency[current]:
+                    if nxt not in visited:
+                        visited.add(nxt)
+                        queue.append(nxt)
+            clusters.append(cluster)
 
-            # Merge tags from all nodes in cluster, add "collapsed"
-            merged_tags = set()
-            first_node = None
-            material_id = None
-
-            for node_id in cluster:
-                node = next(n for n in material_nodes if n["id"] == node_id)
-                if first_node is None:
-                    first_node = node
-                    material_id = node_id_to_material_id[node_id]
-                merged_tags.update(node.get("tags", []))
-            merged_tags.add("collapsed")
-
-            # Generate unique collapsed node id per cluster (not per material_id)
-            collapsed_id = f"CL{cluster_counter}_{material_id[:8]}"
-            cluster_counter += 1
-
-            # Create collapsed node
-            collapsed_node = {
+        node_to_collapsed: Dict[str, str] = {}
+        collapsed_nodes: List[dict] = []
+        for idx, cluster in enumerate(clusters):
+            if len(cluster) == 1:
+                node_to_collapsed[cluster[0]] = cluster[0]
+                collapsed_nodes.append(material_node_lookup[cluster[0]])
+                continue
+            first = material_node_lookup[cluster[0]]
+            material_id = material_by_node[cluster[0]]
+            collapsed_id = f"CL{idx}_{material_id[:8]}"
+            tags = set(chain.from_iterable(material_node_lookup[nid].get("tags", []) or [] for nid in cluster))
+            tags.add("collapsed")
+            for nid in cluster:
+                node_to_collapsed[nid] = collapsed_id
+            collapsed_nodes.append({
                 "id": collapsed_id,
                 "kind": "material",
-                "type": first_node.get("type"),
-                "material_id": first_node.get("material_id"),
-                "produced_qty": 0,  # Will recalculate
-                "consumed_qty": 0,  # Will recalculate
-                "tags": list(merged_tags),
-            }
-            collapsed_nodes.append(collapsed_node)
-
-            # Map all cluster nodes to the collapsed ID
-            for node_id in cluster:
-                node_id_to_collapsed_id[node_id] = collapsed_id
-
-        # Add non-collapsed material nodes (single-node clusters)
-        for node in material_nodes:
-            if node["id"] not in node_id_to_collapsed_id or node_id_to_collapsed_id[node["id"]] == node["id"]:
-                # This node was not collapsed
-                collapsed_nodes.append(node)
-
-        # Build new edges (discard material-to-material edges within same cluster)
-        new_edges = []
-
-        for edge in edges:
-            from_id = edge.get("from_node_id")
-            to_id = edge.get("to_node_id")
-
-            # Map material node IDs to collapsed IDs
-            new_from_id = node_id_to_collapsed_id.get(from_id, from_id)
-            new_to_id = node_id_to_collapsed_id.get(to_id, to_id)
-
-            # Discard edges that map to the same collapsed node (material-to-material within cluster)
-            if new_from_id == new_to_id:
-                continue
-
-            new_edges.append({
-                "from_node_id": new_from_id,
-                "to_node_id": new_to_id,
-                "qty": edge.get("qty"),
-                "edge_type": edge.get("edge_type"),
+                "type": first.get("type"),
+                "material_id": first.get("material_id"),
+                "produced_qty": 0,
+                "consumed_qty": 0,
+                "tags": list(tags),
             })
 
-        # Recalculate produced/consumed for collapsed nodes
-        for collapsed_node in collapsed_nodes:
-            collapsed_id = collapsed_node["id"]
-            produced = 0
-            consumed = 0
+        new_edges = []
+        for e in edges:
+            new_from = node_to_collapsed.get(e.get("from_node_id"), e.get("from_node_id"))
+            new_to = node_to_collapsed.get(e.get("to_node_id"), e.get("to_node_id"))
+            if new_from == new_to:
+                continue
+            new_edges.append({**e, "from_node_id": new_from, "to_node_id": new_to})
 
-            for edge in new_edges:
-                if edge["to_node_id"] == collapsed_id:
-                    produced += edge.get("qty", 0)
-                if edge["from_node_id"] == collapsed_id:
-                    consumed += edge.get("qty", 0)
-
-            collapsed_node["produced_qty"] = produced
-            collapsed_node["consumed_qty"] = consumed
-
-        # Combine recipe nodes and (collapsed + non-collapsed) material nodes
-        simplified_nodes = recipe_nodes + collapsed_nodes
-
-        return {
-            "nodes": simplified_nodes,
-            "edges": new_edges,
-        }
+        OutputSolverService._recalculate_collapsed_quantities(collapsed_nodes, new_edges)
+        return {"nodes": recipe_nodes + collapsed_nodes, "edges": new_edges}
 
     @staticmethod
     def _simplify_graph_lv2(graph: dict) -> dict:
-        """Level 2: Aggressive simplification - collapse material nodes by material_id."""
+        """Collapse all material nodes by material_id."""
         nodes = graph.get("nodes", [])
         edges = graph.get("edges", [])
+        recipe_nodes = [n for n in nodes if n.get("kind") == "recipe_execution"]
+        material_nodes = [n for n in nodes if n.get("kind") != "recipe_execution" and n.get("material_id")]
+        material_by_node = {n["id"]: str(n.get("material_id")) for n in material_nodes}
 
-        # Group material nodes by material_id
-        material_id_to_nodes = {}
-        recipe_nodes = []
-        node_id_to_material_id = {}
+        grouped: Dict[str, List[dict]] = {}
+        for n in material_nodes:
+            grouped.setdefault(str(n.get("material_id")), []).append(n)
 
-        for node in nodes:
-            if node.get("kind") == "recipe_execution":
-                recipe_nodes.append(node)
-            else:
-                # Extract material_id directly
-                material_id = node.get("material_id")
-                if material_id:
-                    material_id_str = str(material_id)
-                    if material_id_str not in material_id_to_nodes:
-                        material_id_to_nodes[material_id_str] = []
-                    material_id_to_nodes[material_id_str].append(node)
-                    node_id_to_material_id[node["id"]] = material_id_str
-
-        # Create collapsed material nodes
-        collapsed_nodes = []
-        material_id_to_collapsed_id = {}
-
-        for material_id, mat_nodes in material_id_to_nodes.items():
-            # Merge tags from all nodes, add "collapsed"
-            merged_tags = set()
-            for n in mat_nodes:
-                merged_tags.update(n.get("tags", []))
-            merged_tags.add("collapsed")
-
-            # Generate collapsed node id
+        material_to_collapsed: Dict[str, str] = {}
+        collapsed_nodes: List[dict] = []
+        for material_id, group in grouped.items():
+            first = group[0]
             collapsed_id = f"C_{material_id[:8]}"
-            material_id_to_collapsed_id[material_id] = collapsed_id
-
-            # Create collapsed node with first node's material_id
-            first_node = mat_nodes[0]
-            collapsed_node = {
+            material_to_collapsed[material_id] = collapsed_id
+            tags = set(chain.from_iterable(n.get("tags", []) or [] for n in group))
+            tags.add("collapsed")
+            collapsed_nodes.append({
                 "id": collapsed_id,
                 "kind": "material",
-                "type": first_node.get("type"),
-                "material_id": first_node.get("material_id"),
-                "produced_qty": 0,  # Will recalculate
-                "consumed_qty": 0,  # Will recalculate
-                "tags": list(merged_tags),
-            }
-            collapsed_nodes.append(collapsed_node)
-
-        # Build new edges (discard material-to-material edges)
-        new_edges = []
-
-        for edge in edges:
-            from_id = edge.get("from_node_id")
-            to_id = edge.get("to_node_id")
-
-            # Check if from/to is a material node
-            from_is_material = from_id in node_id_to_material_id
-            to_is_material = to_id in node_id_to_material_id
-
-            # Discard material-to-material edges
-            if from_is_material and to_is_material:
-                continue
-
-            # Map material node IDs to collapsed IDs
-            new_from_id = from_id
-            new_to_id = to_id
-
-            if from_is_material:
-                material_id = node_id_to_material_id[from_id]
-                new_from_id = material_id_to_collapsed_id[material_id]
-
-            if to_is_material:
-                material_id = node_id_to_material_id[to_id]
-                new_to_id = material_id_to_collapsed_id[material_id]
-
-            new_edges.append({
-                "from_node_id": new_from_id,
-                "to_node_id": new_to_id,
-                "qty": edge.get("qty"),
-                "edge_type": edge.get("edge_type"),
+                "type": first.get("type"),
+                "material_id": first.get("material_id"),
+                "produced_qty": 0,
+                "consumed_qty": 0,
+                "tags": list(tags),
             })
 
-        # Recalculate produced/consumed for collapsed nodes
-        for collapsed_node in collapsed_nodes:
-            collapsed_id = collapsed_node["id"]
-            produced = 0
-            consumed = 0
+        new_edges = []
+        for e in edges:
+            from_id, to_id = e.get("from_node_id"), e.get("to_node_id")
+            from_is_material = from_id in material_by_node
+            to_is_material = to_id in material_by_node
+            if from_is_material and to_is_material:
+                continue
+            new_edges.append({
+                **e,
+                "from_node_id": material_to_collapsed[material_by_node[from_id]] if from_is_material else from_id,
+                "to_node_id": material_to_collapsed[material_by_node[to_id]] if to_is_material else to_id,
+            })
 
-            for edge in new_edges:
-                if edge["to_node_id"] == collapsed_id:
-                    produced += edge.get("qty", 0)
-                if edge["from_node_id"] == collapsed_id:
-                    consumed += edge.get("qty", 0)
+        OutputSolverService._recalculate_collapsed_quantities(collapsed_nodes, new_edges)
+        return {"nodes": recipe_nodes + collapsed_nodes, "edges": new_edges}
 
-            collapsed_node["produced_qty"] = produced
-            collapsed_node["consumed_qty"] = consumed
-
-        # Combine recipe nodes and collapsed material nodes
-        simplified_nodes = recipe_nodes + collapsed_nodes
-
-        return {
-            "nodes": simplified_nodes,
-            "edges": new_edges,
-        }
+    @staticmethod
+    def _recalculate_collapsed_quantities(nodes: List[dict], edges: List[dict]) -> None:
+        for node in nodes:
+            node_id = node["id"]
+            node["produced_qty"] = sum((e.get("qty") or 0) for e in edges if e.get("to_node_id") == node_id)
+            node["consumed_qty"] = sum((e.get("qty") or 0) for e in edges if e.get("from_node_id") == node_id)
 
     @staticmethod
     def simplify_graph(graph: dict, simplify_level: int = 2) -> dict:
-        """Simplify graph based on the specified level.
-        
-        Level 0: No simplification - return graph as is
-        Level 1: Not yet implemented - return graph as is
-        Level 2: Aggressive simplification - collapse material nodes by material_id
+        """Simplify graph for debugging/Graphviz output.
+
+        Level 0: no simplification.
+        Level 1: collapse connected material-node clusters with the same material_id.
+        Level 2: collapse all material nodes by material_id.
         """
         if simplify_level == 0:
             return OutputSolverService._simplify_graph_lv0(graph)
-        elif simplify_level == 1:
+        if simplify_level == 1:
             return OutputSolverService._simplify_graph_lv1(graph)
-        elif simplify_level == 2:
+        if simplify_level == 2:
             return OutputSolverService._simplify_graph_lv2(graph)
-        else:
-            return graph
+        return graph
+
