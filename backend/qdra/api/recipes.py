@@ -17,7 +17,7 @@ from repositories.parameter_constraint_repository import ParameterConstraintRepo
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.project_repository import ProjectRepository
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 def _resolve_entity_type_id(
@@ -432,6 +432,106 @@ def execute_recipe(
         produced_material_ids=result.produced_material_ids,
         state_before=result.state_before, state_after=result.state_after,
     )
+
+
+@router.get("/projects/{project_id}/recipes/{recipe_id}/slots", response_model=List[SlotResponse])
+def list_recipe_slots(
+    project_id: uuid.UUID, recipe_id: uuid.UUID, db: Session = Depends(get_db)
+):
+    slot_repo = SlotRepository(db)
+    return slot_repo.list_by_recipe_entity(recipe_id)
+
+
+@router.get("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options", response_model=List[OptionResponse])
+def list_recipe_options(
+    project_id: uuid.UUID, recipe_id: uuid.UUID, slot_id: uuid.UUID, db: Session = Depends(get_db)
+):
+    option_repo = OptionRepository(db)
+    return option_repo.list_by_slot(slot_id)
+
+
+@router.get(
+    "/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_id}/constraints",
+    response_model=List[ConstraintResponse],
+)
+def list_recipe_constraints(
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    option_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    constraint_repo = ParameterConstraintRepository(db)
+    return constraint_repo.list_by_option(option_id)
+
+
+@router.delete("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}", status_code=204)
+def delete_recipe_slot(
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    
+    slot_repo = SlotRepository(db)
+    if not slot_repo.delete(slot_id):
+        raise HTTPException(status_code=404, detail="Slot not found")
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        clear_pattern(str(project_id))
+
+
+@router.delete("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_id}", status_code=204)
+def delete_recipe_option(
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    option_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    
+    option_repo = OptionRepository(db)
+    option = option_repo.get_by_id(option_id)
+    if not option:
+        raise HTTPException(status_code=404, detail="Option not found")
+    db.delete(option)
+    db.commit()
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        clear_pattern(str(project_id))
+
+
+@router.delete("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_id}/constraints/{constraint_id}", status_code=204)
+def delete_recipe_constraint(
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    slot_id: uuid.UUID,
+    option_id: uuid.UUID,
+    constraint_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    
+    constraint_repo = ParameterConstraintRepository(db)
+    constraint = constraint_repo.get_by_id(constraint_id)
+    if not constraint:
+        raise HTTPException(status_code=404, detail="Constraint not found")
+    db.delete(constraint)
+    db.commit()
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        clear_pattern(str(project_id))
 
 
 @router.post("/projects/{project_id}/recipes/{recipe_id}/parameters", response_model=RecipeParameterResponse, status_code=201)

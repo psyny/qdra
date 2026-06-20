@@ -3,6 +3,17 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { getProjectTemplate, getProject } from '../api/projects';
 import { getEntity, createEntity, getEntityParameters, addEntityParameter, updateEntity } from '../api/entities';
 import { listSlotGroups } from '../api/templates';
+import {
+  createRecipeSlot,
+  createRecipeOption,
+  createRecipeConstraint,
+  getRecipeSlots,
+  getRecipeOptions,
+  getRecipeConstraints,
+  deleteRecipeSlot,
+  deleteRecipeOption,
+  deleteRecipeConstraint,
+} from '../api/entities';
 import { ProjectTemplateDetail, ViewConfig, ParameterDefinition } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { RecipeForm } from '../components/RecipeForm';
@@ -34,6 +45,8 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [initialSlotCounts, setInitialSlotCounts] = useState<Record<string, number>>({});
+  const [initialSlotConstraints, setInitialSlotConstraints] = useState<any>({});
 
   useEffect(() => {
     const loadData = async () => {
@@ -94,6 +107,32 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
           setEntity(entityData);
           const params = await getEntityParameters(projectId, recipeId);
           setEntityParameters(params);
+
+          // Load existing slot definitions
+          try {
+            const slots = await getRecipeSlots(projectId, recipeId);
+            const slotCounts: Record<string, number> = { requires: 0, consumes: 0, produces: 0 };
+            const slotConstraints: any = { requires: [], consumes: [], produces: [] };
+
+            for (const slot of slots) {
+              slotCounts[slot.kind] = (slotCounts[slot.kind] || 0) + 1;
+              const options = await getRecipeOptions(projectId, recipeId, slot.id);
+              const slotIndex = slotCounts[slot.kind] - 1;
+              slotConstraints[slot.kind][slotIndex] = [];
+
+              for (const option of options) {
+                const constraints = await getRecipeConstraints(projectId, recipeId, slot.id, option.id);
+                slotConstraints[slot.kind][slotIndex].push(constraints);
+              }
+            }
+
+            setInitialSlotCounts(slotCounts);
+            setInitialSlotConstraints(slotConstraints);
+          } catch (err) {
+            console.error('Failed to load slot definitions:', err);
+            setInitialSlotCounts({ requires: 0, consumes: 0, produces: 0 });
+            setInitialSlotConstraints({ requires: [], consumes: [], produces: [] });
+          }
         }
       } catch (err) {
         setError('Could not load data');
@@ -112,7 +151,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
     return { domain: p.domain, key: p.key, value_string: null };
   };
 
-  const handleSubmit = async (parameters: DraftParameter[], imageUrl?: string) => {
+  const handleSubmit = async (parameters: DraftParameter[], imageUrl?: string, slotData?: { slotCounts: Record<string, number>; slotConstraints: any }) => {
     setIsSubmitting(true);
     setError(null);
 
@@ -135,11 +174,22 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
           await addEntityParameter(projectId, newEntity.id, draftToApiParam(p));
         }
 
+        // Save slot definitions
+        if (slotData) {
+          await saveSlotDefinitions(projectId, newEntity.id, slotData);
+        }
+
         // If image was uploaded, it's already handled by ImageUpload component
         // The entity will have the image attached via the backend
       } else {
         // Update existing entity
         await updateEntity(projectId, recipeId, { parameters: parameters.map(draftToApiParam) });
+        
+        // Update slot definitions - delete all and recreate
+        if (slotData) {
+          await updateSlotDefinitions(projectId, recipeId, slotData);
+        }
+        
         // Image upload is handled separately by ImageUpload component
       }
       navigate(`/projects/${projectId}/recipes${configId ? `?configId=${configId}` : ''}`);
@@ -151,6 +201,53 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
 
   const handleCancel = () => {
     navigate(`/projects/${projectId}/recipes${configId ? `?configId=${configId}` : ''}`);
+  };
+
+  const saveSlotDefinitions = async (projectId: string, recipeId: string, slotData: { slotCounts: Record<string, number>; slotConstraints: any }) => {
+    const { slotCounts, slotConstraints } = slotData;
+    const kinds = ['requires', 'consumes', 'produces'] as const;
+
+    for (const kind of kinds) {
+      const count = slotCounts[kind] || 0;
+      for (let i = 0; i < count; i++) {
+        const slot = await createRecipeSlot(projectId, recipeId, kind, i);
+        const orGroups = slotConstraints[kind]?.[i] || [];
+
+        for (const orGroup of orGroups) {
+          const option = await createRecipeOption(projectId, recipeId, slot.id, 1, 0);
+          for (const constraint of orGroup) {
+            await createRecipeConstraint(projectId, recipeId, slot.id, option.id, {
+              domain: constraint.domain,
+              key: constraint.key,
+              operator: constraint.operator,
+              value_string: constraint.value_string,
+              value_number: constraint.value_number,
+              value_boolean: constraint.value_boolean,
+              is_wildcard: false,
+            });
+          }
+        }
+      }
+    }
+  };
+
+  const updateSlotDefinitions = async (projectId: string, recipeId: string, slotData: { slotCounts: Record<string, number>; slotConstraints: any }) => {
+    // Delete all existing slots
+    const existingSlots = await getRecipeSlots(projectId, recipeId);
+    for (const slot of existingSlots) {
+      const options = await getRecipeOptions(projectId, recipeId, slot.id);
+      for (const option of options) {
+        const constraints = await getRecipeConstraints(projectId, recipeId, slot.id, option.id);
+        for (const constraint of constraints) {
+          await deleteRecipeConstraint(projectId, recipeId, slot.id, option.id, constraint.id);
+        }
+        await deleteRecipeOption(projectId, recipeId, slot.id, option.id);
+      }
+      await deleteRecipeSlot(projectId, recipeId, slot.id);
+    }
+
+    // Create new slots
+    await saveSlotDefinitions(projectId, recipeId, slotData);
   };
 
   if (loading) {
@@ -229,6 +326,8 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         materialEntityTypes={materialEntityTypes}
         template={template}
         projectId={projectId}
+        initialSlotCounts={initialSlotCounts}
+        initialSlotConstraints={initialSlotConstraints}
       />
     </div>
   );

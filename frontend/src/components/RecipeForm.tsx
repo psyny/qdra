@@ -28,7 +28,7 @@ type RecipeFormProps = {
   initialParameters?: DraftParameter[];
   isSubmitting?: boolean;
   errorMessage?: string | null;
-  onSubmit: (parameters: DraftParameter[], imageUrl?: string) => void;
+  onSubmit: (parameters: DraftParameter[], imageUrl?: string, slotData?: { slotCounts: Record<string, number>; slotConstraints: SlotConstraints }) => void;
   onCancel: () => void;
   submitLabel: string;
   entityId?: string;
@@ -38,6 +38,8 @@ type RecipeFormProps = {
   materialEntityTypes?: any[];
   template?: any;
   projectId?: string;
+  initialSlotCounts?: Record<string, number>;
+  initialSlotConstraints?: SlotConstraints;
 };
 
 export function RecipeForm({
@@ -54,24 +56,30 @@ export function RecipeForm({
   materialEntityTypes = [],
   template,
   projectId,
+  initialSlotCounts,
+  initialSlotConstraints,
 }: RecipeFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(currentImage || null);
   
   // State to track current number of slots for each category
-  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({
-    requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
-    consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
-    produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
-  });
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>(
+    initialSlotCounts || {
+      requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
+      consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
+      produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+    }
+  );
 
   // State to track constraints for each slot
-  const [slotConstraints, setSlotConstraints] = useState<SlotConstraints>({
-    requires: [],
-    consumes: [],
-    produces: [],
-  });
+  const [slotConstraints, setSlotConstraints] = useState<SlotConstraints>(
+    initialSlotConstraints || {
+      requires: [],
+      consumes: [],
+      produces: [],
+    }
+  );
 
   // State to track existing parameter values for each constraint
   const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
@@ -96,7 +104,7 @@ export function RecipeForm({
       }
     }
 
-    onSubmit(parameters, imageUrl || undefined);
+    onSubmit(parameters, imageUrl || undefined, { slotCounts, slotConstraints });
   };
 
   const updateParameter = (index: number, value: any) => {
