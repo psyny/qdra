@@ -50,13 +50,11 @@ export function ViewConfigEditor({ templateId, view, onSave, onCancel }: ViewCon
     setLoading(true);
     try {
       const types = await listEntityTypes(templateId);
-      // Filter to only material entity types for selection
-      const materialTypes = types.filter((t: EntityType) => t.kind === 'material');
-      setEntityTypes(materialTypes);
+      setEntityTypes(types);
       
-      // Load parameter definitions for each material entity type
+      // Load parameter definitions for each entity type
       const paramsMap: Record<string, ParameterDefinition[]> = {};
-      for (const type of materialTypes) {
+      for (const type of types) {
         const params = await listParameterDefinitions(templateId, type.id);
         paramsMap[type.id] = params;
       }

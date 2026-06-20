@@ -262,7 +262,24 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
     );
   }
 
+  // Show message if no configs are defined
+  if (recipeCatalogView && recipeCatalogView.configs.length === 0) {
+    return (
+      <div className="card state-message">
+        <p className="state-message__text">No recipe types configured in this project template.</p>
+      </div>
+    );
+  }
+
   // Show entity list when config is selected
+  if (!selectedConfig) {
+    return (
+      <div className="card state-message">
+        <p className="state-message__text">No recipe types configured in this project template.</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="catalog-header">
