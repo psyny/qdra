@@ -10,9 +10,9 @@ def test_get_recipe_materials(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
     
-    # Get materials matching the Extraction recipe's slots
-    # Extraction produces raw_resource (no inputs)
-    response = client.get(f"/projects/{project_id}/recipes/{recipes['extraction']['id']}/materials")
+    # Get materials matching the Refining_B recipe's slots
+    # Refining_B consumes intermediate_1, produces intermediate_3 AND intermediate_4 (2 produces slots)
+    response = client.get(f"/projects/{project_id}/recipes/{recipes['refining_b']['id']}/materials")
     assert response.status_code == 200
     data = response.json()
     
@@ -21,25 +21,22 @@ def test_get_recipe_materials(client, project_ctx):
     assert "produces" in data
     assert "requires" in data
     
-    # Extraction has no consumes slots
-    assert len(data["consumes"]) == 0
-    assert len(data["requires"]) == 0    
+    # Refining_B has 1 consumes slot
+    assert len(data["consumes"]) == 1
+    consumes_slot = data["consumes"][0]
+    assert "slot_id" in consumes_slot
+    assert "kind" in consumes_slot
+    assert "options" in consumes_slot
     
-    # Check produces slots
-    assert len(data["produces"]) == 1
-    produces_slot = data["produces"][0]
-    assert "slot_id" in produces_slot
-    assert "kind" in produces_slot
-    assert "options" in produces_slot
+    # Check that intermediate_1 matches the consumes constraint
+    assert len(consumes_slot["options"]) == 1
+    option = consumes_slot["options"][0]
+    assert str(materials["intermediate_1"]["id"]) in option["matching_material_ids"]
     
-    # The produces slot should have raw_resource matching (since it produces it)
-    # But produces slots don't need matching materials - they create materials
-    # So matching_material_ids should be empty for produces slots
-    assert len(produces_slot["options"]) == 1
-    option = produces_slot["options"][0]
-    # For produces slots, we don't filter materials - the recipe creates them
-    # So this list should be empty or contain all materials
-    assert isinstance(option["matching_material_ids"], list)
+    # Refining_B has 2 produces slots (intermediate_3 and intermediate_4)
+    assert len(data["produces"]) == 2
+    produces_slot_kinds = {slot["kind"] for slot in data["produces"]}
+    assert all(kind == "produces" for kind in produces_slot_kinds)
 
     print_pretty(data)
 
@@ -53,9 +50,10 @@ def test_get_material_recipes(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
     
-    # Get recipes matching the raw_resource material
-    # raw_resource is produced by Extraction and consumed by Processing
-    response = client.get(f"/projects/{project_id}/materials/{materials['raw_resource']['id']}/recipes")
+    # Get recipes matching the intermediate_1 material
+    # intermediate_1 is consumed by Refining_A and Refining_B (2 recipes)
+    # intermediate_1 is produced by Processing (1 recipe)
+    response = client.get(f"/projects/{project_id}/materials/{materials['intermediate_1']['id']}/recipes")
     assert response.status_code == 200
     data = response.json()
     
@@ -64,18 +62,20 @@ def test_get_material_recipes(client, project_ctx):
     assert "produces" in data
     assert "requires" in data
     
-    # raw_resource should be consumed by Processing
-    assert len(data["consumes"]) >= 1
-    processing_recipe = next((r for r in data["consumes"] if r["recipe_id"] == str(recipes["processing"]["id"])), None)
-    assert processing_recipe is not None
-    assert len(processing_recipe["slots"]) >= 1
-    assert processing_recipe["slots"][0]["kind"] == "consumes"
+    # intermediate_1 should be consumed by Refining_A and Refining_B
+    assert len(data["consumes"]) == 2
+    consumes_recipe_ids = {r["recipe_id"] for r in data["consumes"]}
+    assert str(recipes["refining_a"]["id"]) in consumes_recipe_ids
+    assert str(recipes["refining_b"]["id"]) in consumes_recipe_ids
     
-    # raw_resource should be produced by Extraction
-    assert len(data["produces"]) >= 1
-    extraction_recipe = next((r for r in data["produces"] if r["recipe_id"] == str(recipes["extraction"]["id"])), None)
-    assert extraction_recipe is not None
-    assert len(extraction_recipe["slots"]) >= 1
-    assert extraction_recipe["slots"][0]["kind"] == "produces"
+    # All consumes slots should have kind "consumes"
+    for recipe in data["consumes"]:
+        for slot in recipe["slots"]:
+            assert slot["kind"] == "consumes"
+    
+    # intermediate_1 should be produced by Processing
+    assert len(data["produces"]) == 1
+    assert data["produces"][0]["recipe_id"] == str(recipes["processing"]["id"])
+    assert data["produces"][0]["slots"][0]["kind"] == "produces"
     
     print_pretty(data)
