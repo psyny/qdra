@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from services.entity_service import EntityService
+from services.recipe_evaluation_service import RecipeEvaluationService
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.project_repository import ProjectRepository
 
@@ -41,6 +42,23 @@ class MaterialResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     image: Optional[Dict[str, Any]] = None
+
+
+class RecipeSlotInfo(BaseModel):
+    slot_id: str
+    kind: str
+    quantity: float
+
+
+class MaterialRecipeInfo(BaseModel):
+    recipe_id: str
+    slots: List[RecipeSlotInfo]
+
+
+class MaterialRecipesResponse(BaseModel):
+    consumes: List[MaterialRecipeInfo]
+    produces: List[MaterialRecipeInfo]
+    requires: List[MaterialRecipeInfo]
 
 
 class ParameterCreate(BaseModel):
@@ -145,6 +163,21 @@ def delete_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Session =
         service.delete_entity(material_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/projects/{project_id}/materials/{material_id}/recipes", response_model=MaterialRecipesResponse)
+def get_material_recipes(
+    project_id: uuid.UUID,
+    material_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    service = RecipeEvaluationService(db)
+    result = service.find_recipes_for_material(material_id, project_id)
+    return MaterialRecipesResponse(
+        consumes=[MaterialRecipeInfo(**recipe) for recipe in result["consumes"]],
+        produces=[MaterialRecipeInfo(**recipe) for recipe in result["produces"]],
+        requires=[MaterialRecipeInfo(**recipe) for recipe in result["requires"]],
+    )
 
 
 @router.post("/projects/{project_id}/materials/{material_id}/parameters", response_model=ParameterResponse, status_code=201)

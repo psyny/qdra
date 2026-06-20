@@ -280,3 +280,69 @@ class RecipeEvaluationService:
                 result["requires"].append(slot_data)
 
         return result
+
+    def find_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
+        """
+        Find all recipes in the project where this material can be used (consumed, produced, or required).
+        
+        Returns a dict with slot types (consumes, produces, requires) as keys,
+        each containing a list of recipes with their matching slots.
+        """
+        # Load all recipes in the project
+        recipes = self.entity_repo.list_by_project(project_id, kind="recipe")
+        
+        result = {
+            "consumes": [],
+            "produces": [],
+            "requires": []
+        }
+        
+        for recipe in recipes:
+            # Load recipe structure
+            slots = self.slot_repo.list_by_recipe_entity(recipe.id)
+            
+            recipe_matches = {
+                "recipe_id": str(recipe.id),
+                "slots": []
+            }
+            
+            for slot in slots:
+                options = self.option_repo.list_by_slot(slot.id)
+                
+                for option in options:
+                    constraints = self.constraint_repo.list_by_option(option.id)
+                    
+                    # Check if this material matches the slot's constraints
+                    material = self.entity_repo.get_by_id(material_id)
+                    if not material:
+                        continue
+                    
+                    material_params = self.entity_parameter_repo.list_by_entity(material_id)
+                    material_params_map = {material_id: material_params}
+                    
+                    if self._material_matches_constraints(
+                        material=material,
+                        constraints=constraints,
+                        material_params_map=material_params_map
+                    ):
+                        # Material matches this slot
+                        recipe_matches["slots"].append({
+                            "slot_id": str(slot.id),
+                            "kind": slot.kind if isinstance(slot.kind, str) else slot.kind.value,
+                            "quantity": option.quantity
+                        })
+                        break  # Only add slot once per recipe
+            
+            # Add recipe to appropriate slot type list if it has matching slots
+            if recipe_matches["slots"]:
+                # Determine which slot type(s) this recipe belongs to
+                slot_kinds = {slot["kind"] for slot in recipe_matches["slots"]}
+                
+                if "consumes" in slot_kinds:
+                    result["consumes"].append(recipe_matches.copy())
+                if "produces" in slot_kinds:
+                    result["produces"].append(recipe_matches.copy())
+                if "requires" in slot_kinds:
+                    result["requires"].append(recipe_matches.copy())
+        
+        return result
