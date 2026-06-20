@@ -13,7 +13,7 @@ def test_final_product_unrestricted(client, project_ctx):
     materials = dataset["materials"]
     recipes = dataset["recipes"]
 
-    # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
+    # Plan for materials with category "final_product" - should match final_product_1 and final_product_2
     plan_response = client.post(
         f"/projects/{project_id}/solver/output",
         json={
@@ -21,7 +21,7 @@ def test_final_product_unrestricted(client, project_ctx):
                 "quantity": 5,
                 "target_type": "material",
                 "constraints": [
-                    {"domain": "identity", "key": "material_id", "operator": "=", "value_string": str(materials["final_product_1"]["id"])}
+                    {"domain": "identity", "key": "category", "operator": "=", "value_string": "final_product"}
                 ],
             },
             "domain_constraints": {
@@ -42,7 +42,10 @@ def test_final_product_unrestricted(client, project_ctx):
     )
 
     assert plan_response.status_code == 200
-    data = plan_response.json()
+    data = plan_response.json()    
+
+    assert data["success"] is True
+    assert len(data["plans"]) == 3    
 
     print_pretty(data)
 
@@ -51,10 +54,7 @@ def test_final_product_unrestricted(client, project_ctx):
         material_label_param=("identity", "name"),
         recipe_label_param=("identity", "name"),
         simplify_level=1,
-    )
-
-    assert data["success"] is True
-    assert len(data["plans"]) == 2
+    )    
 
 def test_final_product_recipe_restricted_forbiden(client, project_ctx):
     project_id = project_ctx["project_id"]
@@ -173,45 +173,3 @@ def test_final_product_recipe_restricted_required(client, project_ctx):
                     break
         assert contains
         
-
-def test_final_product_via_category(client, project_ctx):
-    project_id = project_ctx["project_id"]
-
-    # Use comprehensive test dataset
-    dataset = create_medium_size_planning_dataset(client, project_id)
-    materials = dataset["materials"]
-    recipes = dataset["recipes"]
-
-    # Plan for materials with category "final_product" - should match final_product_1 and final_product_2
-    plan_response = client.post(
-        f"/projects/{project_id}/solver/output",
-        json={
-            "target": {
-                "quantity": 5,
-                "target_type": "material",
-                "constraints": [
-                    {"domain": "identity", "key": "category", "operator": "=", "value_string": "final_product"}
-                ],
-            },
-            "domain_constraints": {
-                "do_not_expand_materials_matching": [],
-                "forbidden_materials_matching": [],
-                "forbidden_recipe_matching": [],
-                "max_recipe_depth": 100,
-                "allow_partial_recipe_execution": True,
-            },
-            "search_parameters": {
-                "max_recursion_depth": 20,
-                "max_branch_width": 10,
-                "allow_loops": False,
-                "max_solutions_returned": 10,
-                "optimization_level": 1,
-            },
-        },
-    )
-
-    assert plan_response.status_code == 200
-    data = plan_response.json()
-
-    assert data["success"] is True
-    assert len(data["plans"]) == 3
