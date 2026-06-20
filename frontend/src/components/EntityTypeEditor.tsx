@@ -325,12 +325,12 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
   return (
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h2 className="card-title">Entity Types</h2>
+        <h2 className="card-title">Entity Groups</h2>
         <button
           onClick={() => setShowCreateForm(true)}
           className="button button--primary"
         >
-          Add Entity Type
+          Add Entity Group
         </button>
       </div>
 
@@ -343,9 +343,9 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
 
       {showCreateForm && (
         <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
-          <h3 style={{ marginTop: 0 }}>Create Entity Type</h3>
+          <h3 style={{ marginTop: 0 }}>Create Entity Group</h3>
           <div className="form-field">
-            <label className="form-label">Kind *</label>
+            <label className="form-label">Type *</label>
             <select
               className="form-input"
               value={form.kind}
@@ -387,7 +387,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
       )}
 
       {entityTypes.length === 0 && !showCreateForm && (
-        <p style={{ color: '#666', fontStyle: 'italic' }}>No entity types defined yet. Click "Add Entity Type" to create one.</p>
+        <p style={{ color: '#666', fontStyle: 'italic' }}>No entity groups defined yet. Click "Add Entity Group" to create one.</p>
       )}
 
       {entityTypes.map((et) => (
@@ -396,7 +396,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
             <div>
               <h3 style={{ margin: '0 0 4px 0' }}>{et.name}</h3>
               <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-                <strong>Kind:</strong> {et.kind} | <strong>Parameters:</strong> {et.parameter_definitions?.length || 0}
+                <strong>Type:</strong> {et.kind} | <strong>Parameters:</strong> {et.parameter_definitions?.length || 0}
               </p>
               {et.description && <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px' }}>{et.description}</p>}
               {et.kind === 'recipe' && (
@@ -432,7 +432,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
 
           {editingType?.id === et.id && (
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
-              <h4 style={{ marginTop: 0 }}>Edit Entity Type</h4>
+              <h4 style={{ marginTop: 0 }}>Edit Entity Group</h4>
               <div className="form-field">
                 <label className="form-label">Name *</label>
                 <input
