@@ -42,6 +42,8 @@ qdra/domain/planning/__init__.py
 qdra/domain/planning/output_solver_domain.py
 qdra/domain/validation/__init__.py
 qdra/infrastructure/__init__.py
+qdra/infrastructure/cache/cache_service.py
+qdra/infrastructure/cache/relationship_cache.py
 qdra/infrastructure/config/__init__.py
 qdra/infrastructure/config/settings.py
 qdra/infrastructure/db/__init__.py

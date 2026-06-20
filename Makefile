@@ -118,8 +118,12 @@ be-qdra-tests-unit: ## Run backend unit tests (no external dependencies). Option
 
 # Integration tests require Docker Postgres running
 # Usage: make be-qdra-tests-integration TARGET=integration/test_output_solver.py
-be-qdra-tests-integration: ## Run backend integration tests (requires Docker). Optional: TARGET=path/to/test
+be-qdra-tests-integration: be-install ## Run backend integration tests (requires Docker). Optional: TARGET=path/to/test
 	@echo "Running integration tests..."
+	@echo "Loading environment variables from $(BE_DIR)/.env..."
+	@if [ -f $(BE_DIR)/.env ]; then \
+		set -a && . $(BE_DIR)/.env && set +a; \
+	fi
 	@echo "Checking if Postgres is accessible..."
 	@docker exec qdra-postgres-1 psql -U qdra -c "SELECT 1;" > /dev/null 2>&1 || (echo "ERROR: Postgres is not accessible. Run 'make up' to start Docker services." && exit 1)
 	@echo "Creating test database..."

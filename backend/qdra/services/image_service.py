@@ -12,13 +12,14 @@ from infrastructure.storage.local_image_storage_provider import LocalImageStorag
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.config.settings import settings
+from qdra.infrastructure.cache.cache_service import CacheService
 
 
 class ImageService:
     def __init__(self, db: Session):
         self.db = db
         self.image_asset_repo = ImageAssetRepository(db)
-        self.entity_repo = EntityRepository(db)
+        self.entity_repo = EntityRepository(db, CacheService())
         self.storage_provider = self._get_storage_provider()
     
     def _get_storage_provider(self) -> ImageStorageProvider:

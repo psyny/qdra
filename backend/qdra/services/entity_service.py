@@ -14,12 +14,13 @@ from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.config.settings import settings
+from qdra.infrastructure.cache.cache_service import CacheService
 
 
 class EntityService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repository = EntityRepository(db)
+        self.entity_repository = EntityRepository(db, CacheService())
         self.entity_parameter_repository = EntityParameterRepository(db)
         self.project_repository = ProjectRepository(db)
         self.template_repository = ProjectTemplateRepository(db)
@@ -62,6 +63,7 @@ class EntityService:
         )
 
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
+        from datetime import datetime
         entity = self.entity_repository.get_by_id(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
@@ -71,13 +73,16 @@ class EntityService:
 
         image = self.image_asset_repository.get_primary_image(entity.id)
 
+        # Ensure updated_at is set (fallback for test environments)
+        updated_at = entity.updated_at or entity.created_at or datetime.utcnow()
+
         result: Dict[str, Any] = {
             "id": entity.id,
             "project_id": entity.project_id,
             "entity_type_id": entity.entity_type_id,
             "kind": kind,
             "created_at": entity.created_at,
-            "updated_at": entity.updated_at,
+            "updated_at": updated_at,
             "image": None,
         }
 

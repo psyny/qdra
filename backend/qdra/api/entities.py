@@ -158,7 +158,15 @@ async def update_entity(
     db: Session = Depends(get_db),
 ):
     """Update an entity's parameters."""
+    from repositories.entity_repository import EntityRepository
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    entity_repo = EntityRepository(db, CacheService())
+    cache_service = CacheService()
+    
     try:
         # Verify entity exists
         await service.get_entity(entity_id)
@@ -180,6 +188,16 @@ async def update_entity(
                     value_number=param.value_number,
                     value_boolean=param.value_boolean,
                 )
+            
+            # Invalidate entity cache
+            entity_repo.invalidate_entity(entity_id)
+            
+            # Invalidate all relationship caches for this project
+            if settings.l1_caching:
+                clear_all_caches()
+            if settings.l2_caching:
+                cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+                cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
         
         return await service.get_entity(entity_id)
     except ValueError as e:
@@ -192,9 +210,20 @@ def delete_entity(
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     try:
         service.delete_entity(entity_id)
+        # Invalidate all relationship caches for this project
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

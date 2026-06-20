@@ -15,6 +15,7 @@ from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
+from qdra.infrastructure.cache.cache_service import CacheService
 
 from services.recipe_evaluation_service import RecipeEvaluationService
 
@@ -24,7 +25,7 @@ from domain.evaluation import RecipeExecutionResult, Allocation
 class RecipeExecutionService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db)
+        self.entity_repo = EntityRepository(db, CacheService())
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)

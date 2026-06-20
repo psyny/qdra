@@ -169,7 +169,8 @@ def update_project(
 @router.delete("/projects/{project_id}", status_code=204)
 def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
     """Delete a project and all its entities and images."""
-    entity_repo = EntityRepository(db)
+    from qdra.infrastructure.cache.cache_service import CacheService
+    entity_repo = EntityRepository(db, CacheService())
     image_repo = ImageAssetRepository(db)
     storage_provider = _get_storage_provider()
     

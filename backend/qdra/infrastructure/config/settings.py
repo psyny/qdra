@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     graph_job_queue: str = "graph_reasoning_jobs"
     worker_concurrency: int = 1
     
+    # Cache configuration
+    cache_entity_local_size: int = 1000
+    cache_entity_local_ttl: int = 300  # 5 minutes
+    cache_entity_redis_ttl: int = 3600  # 1 hour
+    cache_relationship_ttl: int = 600  # 10 minutes for material/recipe relationships
+    l1_caching: bool = True
+    l2_caching: bool = True
+    
     # Image storage configuration
     image_storage_backend: str = "local"
     local_storage_root: str = "./uploads"

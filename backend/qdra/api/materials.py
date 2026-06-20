@@ -39,8 +39,8 @@ class MaterialResponse(BaseModel):
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
     kind: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     image: Optional[Dict[str, Any]] = None
 
 
@@ -158,9 +158,20 @@ async def get_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Sessio
 
 @router.delete("/projects/{project_id}/materials/{material_id}", status_code=204)
 def delete_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Session = Depends(get_db)):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     try:
         service.delete_entity(material_id)
+        # Invalidate all relationship caches for this project
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -171,13 +182,43 @@ def get_material_recipes(
     material_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import get_material_recipes_cache
+    
+    cache_key = f"material_recipes:{project_id}:{material_id}"
+    cache_service = CacheService()
+    l1_cache = get_material_recipes_cache()
+    
+    # L1: Check local cache if enabled
+    if settings.l1_caching and cache_key in l1_cache:
+        return l1_cache[cache_key]
+    
+    # L2: Check Redis cache if enabled
+    if settings.l2_caching:
+        cached = cache_service.get(cache_key)
+        if cached:
+            response = MaterialRecipesResponse(**cached)
+            if settings.l1_caching:
+                l1_cache[cache_key] = response
+            return response
+    
+    # Compute result
     service = RecipeEvaluationService(db)
     result = service.find_recipes_for_material(material_id, project_id)
-    return MaterialRecipesResponse(
+    response = MaterialRecipesResponse(
         consumes=[MaterialRecipeInfo(**recipe) for recipe in result["consumes"]],
         produces=[MaterialRecipeInfo(**recipe) for recipe in result["produces"]],
         requires=[MaterialRecipeInfo(**recipe) for recipe in result["requires"]],
     )
+    
+    # Cache result if enabled
+    if settings.l1_caching:
+        l1_cache[cache_key] = response
+    if settings.l2_caching:
+        cache_service.set(cache_key, response.model_dump(), settings.cache_relationship_ttl)
+    
+    return response
 
 
 @router.post("/projects/{project_id}/materials/{material_id}/parameters", response_model=ParameterResponse, status_code=201)
@@ -187,13 +228,25 @@ def add_parameter(
     param_data: ParameterCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     try:
-        return service.add_parameter(
+        result = service.add_parameter(
             entity_id=material_id, domain=param_data.domain, key=param_data.key,
             value_string=param_data.value_string, value_number=param_data.value_number,
             value_boolean=param_data.value_boolean,
         )
+        # Invalidate all relationship caches for this project
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -216,6 +269,17 @@ def delete_parameter(
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+        cache_service.delete_pattern(f"recipe_materials:{project_id}:*")

@@ -13,6 +13,7 @@ from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
+from qdra.infrastructure.cache.cache_service import CacheService
 
 from services.constraint_matcher import ConstraintMatcher
 
@@ -22,7 +23,7 @@ from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
 class RecipeEvaluationService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db)
+        self.entity_repo = EntityRepository(db, CacheService())
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)

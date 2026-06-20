@@ -94,8 +94,8 @@ class RecipeResponse(BaseModel):
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
     kind: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     image: Optional[Dict[str, Any]] = None
 
 
@@ -274,9 +274,20 @@ async def get_recipe(
 def delete_recipe(
     project_id: uuid.UUID, recipe_id: uuid.UUID, db: Session = Depends(get_db)
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     try:
         service.delete_entity(recipe_id)
+        # Invalidate all relationship caches for this project
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -288,12 +299,23 @@ def create_slot(
     slot_data: SlotCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     slot_repo = SlotRepository(db)
+    cache_service = CacheService()
     slot = slot_repo.create(
         recipe_entity_id=recipe_id,
         kind=slot_data.kind.lower(),
         sort_order=slot_data.sort_order,
     )
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+        cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     return slot
 
 
@@ -305,12 +327,23 @@ def create_option(
     option_data: OptionCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     option_repo = OptionRepository(db)
+    cache_service = CacheService()
     option = option_repo.create(
         slot_id=slot_id,
         quantity=option_data.quantity,
         sort_order=option_data.sort_order,
     )
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+        cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     return option
 
 
@@ -327,7 +360,12 @@ def create_constraint(
     constraint_data: ConstraintCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     constraint_repo = ParameterConstraintRepository(db)
+    cache_service = CacheService()
     constraint = constraint_repo.create(
         option_id=option_id,
         domain=constraint_data.domain, key=constraint_data.key,
@@ -337,6 +375,12 @@ def create_constraint(
         value_boolean=constraint_data.value_boolean,
         is_wildcard=constraint_data.is_wildcard,
     )
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+        cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
     return constraint
 
 
@@ -375,13 +419,43 @@ def get_recipe_materials(
     recipe_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import get_recipe_materials_cache
+    
+    cache_key = f"recipe_materials:{project_id}:{recipe_id}"
+    cache_service = CacheService()
+    l1_cache = get_recipe_materials_cache()
+    
+    # L1: Check local cache if enabled
+    if settings.l1_caching and cache_key in l1_cache:
+        return l1_cache[cache_key]
+    
+    # L2: Check Redis cache if enabled
+    if settings.l2_caching:
+        cached = cache_service.get(cache_key)
+        if cached:
+            response = RecipeSlotMaterialsResponse(**cached)
+            if settings.l1_caching:
+                l1_cache[cache_key] = response
+            return response
+    
+    # Compute result
     service = RecipeEvaluationService(db)
     result = service.find_materials_for_recipe_slots(recipe_id, project_id)
-    return RecipeSlotMaterialsResponse(
+    response = RecipeSlotMaterialsResponse(
         consumes=[SlotMaterialsResponse(**slot) for slot in result["consumes"]],
         produces=[SlotMaterialsResponse(**slot) for slot in result["produces"]],
         requires=[SlotMaterialsResponse(**slot) for slot in result["requires"]],
     )
+    
+    # Cache result if enabled
+    if settings.l1_caching:
+        l1_cache[cache_key] = response
+    if settings.l2_caching:
+        cache_service.set(cache_key, response.model_dump(), settings.cache_relationship_ttl)
+    
+    return response
 
 
 @router.post("/projects/{project_id}/recipes/{recipe_id}/execute", response_model=RecipeExecutionResponse)
@@ -409,13 +483,25 @@ def add_recipe_parameter(
     param_data: RecipeParameterCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     try:
-        return service.add_parameter(
+        result = service.add_parameter(
             entity_id=recipe_id, domain=param_data.domain, key=param_data.key,
             value_string=param_data.value_string, value_number=param_data.value_number,
             value_boolean=param_data.value_boolean,
         )
+        # Invalidate all relationship caches for this project
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+            cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -438,6 +524,17 @@ def delete_recipe_parameter(
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.cache.cache_service import CacheService
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches
+    
     service = EntityService(db)
+    cache_service = CacheService()
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")
+    # Invalidate all relationship caches for this project
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        cache_service.delete_pattern(f"material_recipes:{project_id}:*")
+        cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
