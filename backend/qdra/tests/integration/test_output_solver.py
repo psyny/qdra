@@ -54,7 +54,7 @@ def test_final_product_unrestricted(client, project_ctx):
         material_label_param=("identity", "name"),
         recipe_label_param=("identity", "name"),
         simplify_level=1,
-    )    
+    )      
 
 def test_final_product_recipe_restricted_forbiden(client, project_ctx):
     project_id = project_ctx["project_id"]
@@ -173,3 +173,55 @@ def test_final_product_recipe_restricted_required(client, project_ctx):
                     break
         assert contains
         
+
+
+def test_target_recipe_unrestricted(client, project_ctx):
+    project_id = project_ctx["project_id"]
+
+    # Use comprehensive test dataset
+    dataset = create_medium_size_planning_dataset(client, project_id)
+    materials = dataset["materials"]
+    recipes = dataset["recipes"]
+
+    # Plan for recipe with name "Refining_A" - should generate 1 plan
+    plan_response = client.post(
+        f"/projects/{project_id}/solver/output",
+        json={
+            "target": {
+                "quantity": 5,
+                "target_type": "recipe",
+                "constraints": [
+                    {"domain": "identity", "key": "name", "operator": "=", "value_string": "Refining_A"}
+                ],
+            },
+            "domain_constraints": {
+                "do_not_expand_materials_matching": [],
+                "forbidden_materials_matching": [],
+                "forbidden_recipe_matching": [],
+                "max_recipe_depth": 100,
+                "allow_partial_recipe_execution": True,
+            },
+            "search_parameters": {
+                "max_recursion_depth": 20,
+                "max_branch_width": 10,
+                "allow_loops": False,
+                "max_solutions_returned": 10,
+                "optimization_level": 1,
+            },
+        },
+    )
+
+    assert plan_response.status_code == 200
+    data = plan_response.json()    
+
+    assert data["success"] is True
+    assert len(data["plans"]) == 1    
+
+    print_pretty(data)
+
+    OutputSolverService.print_plan_graph(
+        data,
+        material_label_param=("identity", "name"),
+        recipe_label_param=("identity", "name"),
+        simplify_level=1,
+    )  
