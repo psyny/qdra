@@ -14,6 +14,7 @@ from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
 from services.recipe_evaluation_service import RecipeEvaluationService
+from services.constraint_resolution_service import ConstraintResolutionService
 from qdra.infrastructure.cache.cache_service import CacheService
 
 from domain.planning.output_solver_domain import (
@@ -76,6 +77,7 @@ class OutputSolverService:
         self.entity_param_repo = EntityParameterRepository(db)
         self.project_repo = ProjectRepository(db)
         self.recipe_eval_service = RecipeEvaluationService(db)
+        self.constraint_resolution_service = ConstraintResolutionService(db)
         # Entity parameters cache (only cache not moved to service level)
         self.cache = TTLCache(maxsize=10000, ttl=60*5)
 
@@ -99,62 +101,8 @@ class OutputSolverService:
         return self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
 
     def _find_materials_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
-        """Find materials in the project that match the given constraints."""
-        materials = self.entity_repo.list_by_project(project_id, kind="material")
-        matching_materials = []
-        
-        for material in materials:
-            material_params = self._list_entity_params_cached(material.id)
-            if self._material_matches_constraints(material, material_params, constraints):
-                matching_materials.append(material.id)
-        
-        return matching_materials
-
-    def _material_matches_constraints(self, material: Entity, material_params: List, constraints: List[ConstraintSpec]) -> bool:
-        """Check if a material matches all constraints."""
-        for constraint in constraints:
-            # Special handling for material_id constraint
-            if constraint.domain == "identity" and constraint.key == "material_id":
-                if constraint.operator == "=" and constraint.value_string:
-                    if str(material.id) != constraint.value_string:
-                        return False
-                else:
-                    return False
-                continue
-            
-            # Find matching parameter
-            matched = False
-            for param in material_params:
-                if self._param_matches_constraint(param, constraint):
-                    matched = True
-                    break
-            
-            if not matched:
-                return False
-        
-        return True
-
-    def _param_matches_constraint(self, param, constraint: ConstraintSpec) -> bool:
-        """Check if a parameter matches a constraint."""
-        if param.domain != constraint.domain or param.key != constraint.key:
-            return False
-        
-        if constraint.operator == "=":
-            if constraint.value_string is not None:
-                return param.value_string == constraint.value_string
-            elif constraint.value_number is not None:
-                return param.value_number == constraint.value_number
-            elif constraint.value_boolean is not None:
-                return param.value_boolean == constraint.value_boolean
-        elif constraint.operator == "!=":
-            if constraint.value_string is not None:
-                return param.value_string != constraint.value_string
-            elif constraint.value_number is not None:
-                return param.value_number != constraint.value_number
-            elif constraint.value_boolean is not None:
-                return param.value_boolean != constraint.value_boolean
-        
-        return False
+        """Find materials in the project that match the given constraints (delegated to service)."""
+        return self.constraint_resolution_service.find_materials_by_constraints(constraints, project_id)
 
     def _preload_constraint_materials(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Set[uuid.UUID]:
         """Pre-load all material IDs matching the given constraint rules."""

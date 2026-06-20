@@ -83,6 +83,7 @@ qdra/repositories/recipe_repository.py
 qdra/repositories/slot_repository.py
 qdra/services/__init__.py
 qdra/services/constraint_matcher.py
+qdra/services/constraint_resolution_service.py
 qdra/services/entity_service.py
 qdra/services/image_service.py
 qdra/services/material_service.py

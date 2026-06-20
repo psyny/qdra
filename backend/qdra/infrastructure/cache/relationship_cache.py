@@ -48,3 +48,4 @@ def clear_pattern(project_id: str):
     if settings.l2_caching:
         cache_service.delete_pattern(f"material_recipes:{project_id}:*")
         cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
+        cache_service.delete_pattern(f"constraint_resolution:*:{project_id}:*")
