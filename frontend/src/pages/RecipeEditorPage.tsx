@@ -2,10 +2,17 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { getProjectTemplate, getProject } from '../api/projects';
 import { getEntity, createEntity, getEntityParameters, addEntityParameter, updateEntity } from '../api/entities';
+import { listSlotGroups } from '../api/templates';
 import { ProjectTemplateDetail, ViewConfig, ParameterDefinition } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { RecipeForm } from '../components/RecipeForm';
 import { DraftParameter } from '../components/ParameterRow';
+
+type SlotGroupConfig = {
+  kind: 'requires' | 'consumes' | 'produces';
+  min_slots: number;
+  max_slots: number;
+};
 
 type RecipeEditorPageProps = {
   projectId: string;
@@ -19,6 +26,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [parameterDefinitions, setParameterDefinitions] = useState<ParameterDefinition[]>([]);
+  const [slotGroups, setSlotGroups] = useState<SlotGroupConfig[]>([]);
   const [entity, setEntity] = useState<Entity | null>(null);
   const [entityParameters, setEntityParameters] = useState<EntityParameter[]>([]);
   const [imageSizePx, setImageSizePx] = useState(256);
@@ -49,6 +57,20 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
               const entityType = templateData.entity_types.find(et => et.id === config.entity_type_id);
               if (entityType) {
                 setParameterDefinitions(entityType.parameter_definitions);
+                
+                // Load slot groups for this entity type
+                try {
+                  const slotGroupsData = await listSlotGroups(config.entity_type_id);
+                  const formattedSlotGroups: SlotGroupConfig[] = slotGroupsData.map((sg: any) => ({
+                    kind: sg.kind,
+                    min_slots: sg.min_slots,
+                    max_slots: sg.max_slots,
+                  }));
+                  setSlotGroups(formattedSlotGroups);
+                } catch (err) {
+                  // If slot groups fail to load, just use empty array
+                  setSlotGroups([]);
+                }
               }
             }
           }
@@ -184,6 +206,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         entityId={recipeId || undefined}
         targetImageSize={imageSizePx}
         currentImage={entity?.image?.url || null}
+        slotGroups={slotGroups}
       />
     </div>
   );

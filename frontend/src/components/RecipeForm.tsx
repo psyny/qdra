@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { DraftParameter } from './ParameterRow';
 import { ImageUpload } from './ImageUpload';
 
+type SlotGroupConfig = {
+  kind: 'requires' | 'consumes' | 'produces';
+  min_slots: number;
+  max_slots: number;
+};
+
 type RecipeFormProps = {
   initialParameters?: DraftParameter[];
   isSubmitting?: boolean;
@@ -12,6 +18,7 @@ type RecipeFormProps = {
   entityId?: string;
   targetImageSize?: number;
   currentImage?: string | null;
+  slotGroups?: SlotGroupConfig[];
 };
 
 export function RecipeForm({
@@ -24,10 +31,18 @@ export function RecipeForm({
   entityId,
   targetImageSize = 256,
   currentImage,
+  slotGroups = [],
 }: RecipeFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(currentImage || null);
+  
+  // State to track current number of slots for each category
+  const [slotCounts, setSlotCounts] = useState<Record<string, number>>({
+    requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
+    consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
+    produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +87,90 @@ export function RecipeForm({
     const labelB = (b.label || b.key).toLowerCase();
     return labelA.localeCompare(labelB);
   });
+
+  // Helper to get slot group config for a kind
+  const getSlotGroupConfig = (kind: 'requires' | 'consumes' | 'produces') => {
+    return slotGroups.find(g => g.kind === kind);
+  };
+
+  // Helper to add a slot
+  const addSlot = (kind: 'requires' | 'consumes' | 'produces') => {
+    const config = getSlotGroupConfig(kind);
+    if (!config) return;
+    
+    const currentCount = slotCounts[kind];
+    // If max_slots is null, it means unlimited
+    const maxSlots = config.max_slots === null ? Infinity : config.max_slots;
+    if (currentCount < maxSlots) {
+      setSlotCounts(prev => ({ ...prev, [kind]: currentCount + 1 }));
+    }
+  };
+
+  // Helper to remove a specific slot by index
+  const removeSlot = (kind: 'requires' | 'consumes' | 'produces', index: number) => {
+    const config = getSlotGroupConfig(kind);
+    if (!config) return;
+    
+    const currentCount = slotCounts[kind];
+    if (currentCount > config.min_slots) {
+      setSlotCounts(prev => ({ ...prev, [kind]: currentCount - 1 }));
+    }
+  };
+
+  // Helper to render empty slots for a category
+  const renderEmptySlots = (kind: 'requires' | 'consumes' | 'produces') => {
+    const count = slotCounts[kind];
+    const config = getSlotGroupConfig(kind);
+    
+    if (!config || count === 0) return null;
+
+    return Array.from({ length: count }).map((_, index) => {
+      const canRemove = count > config.min_slots;
+      return (
+        <div key={`${kind}-${index}`} className="form-field mb-4" style={{ padding: '12px', border: '1px dashed #ccc', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ color: '#999', fontStyle: 'italic', margin: 0 }}>
+            {kind.charAt(0).toUpperCase() + kind.slice(1)} slot {index + 1} (empty)
+          </p>
+          <button
+            type="button"
+            onClick={() => removeSlot(kind, index)}
+            disabled={!canRemove || isSubmitting}
+            className="button button--danger"
+            style={{ padding: '2px 6px', fontSize: '10px' }}
+          >
+            Remove
+          </button>
+        </div>
+      );
+    });
+  };
+
+  // Helper to render slot controls for a category
+  const renderSlotControls = (kind: 'requires' | 'consumes' | 'produces') => {
+    const config = getSlotGroupConfig(kind);
+    if (!config) return null;
+
+    const currentCount = slotCounts[kind];
+    const maxSlots = config.max_slots === null ? '∞' : config.max_slots;
+    const canAdd = config.max_slots === null ? true : currentCount < config.max_slots;
+
+    return (
+      <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={() => addSlot(kind)}
+          disabled={!canAdd || isSubmitting}
+          className="button button--secondary"
+          style={{ padding: '4px 8px', fontSize: '12px' }}
+        >
+          + Add Slot
+        </button>
+        <span style={{ fontSize: '12px', color: '#666' }}>
+          ({currentCount}/{maxSlots})
+        </span>
+      </div>
+    );
+  };
 
   return (
     <form onSubmit={handleSubmit}>
@@ -151,6 +250,25 @@ export function RecipeForm({
           />
         </div>
       )}
+
+      <div className="card mb-6">
+        <h3 className="card-title mb-4">Required</h3>
+        {renderEmptySlots('requires')}
+        {renderSlotControls('requires')}
+      </div>
+
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
+        <div className="card" style={{ flex: 1 }}>
+          <h3 className="card-title mb-4">Consumes</h3>
+          {renderEmptySlots('consumes')}
+          {renderSlotControls('consumes')}
+        </div>
+        <div className="card" style={{ flex: 1 }}>
+          <h3 className="card-title mb-4">Produces</h3>
+          {renderEmptySlots('produces')}
+          {renderSlotControls('produces')}
+        </div>
+      </div>
 
       <div className="form-actions">
         <button
