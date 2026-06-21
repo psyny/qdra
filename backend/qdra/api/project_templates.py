@@ -433,6 +433,23 @@ def create_entity_type(
         description=data.description,
         sort_order=data.sort_order,
     )
+    
+    # Auto-create default slot groups for recipe entity types
+    if data.kind == "recipe":
+        for group_type in ["consumes", "requires", "produces"]:
+            try:
+                repo.create_slot_group(
+                    entity_type_id=entity_type.id,
+                    type=group_type,
+                    min_slots=0,
+                    max_slots=10,
+                    default_slots_qty=0,
+                    sort_order=0,
+                )
+            except IntegrityError:
+                # Ignore if slot group already exists (shouldn't happen for new entity type)
+                pass
+    
     # Return with empty parameter definitions
     et_response = EntityTypeResponse.model_validate(entity_type)
     et_response.parameter_definitions = []

@@ -127,34 +127,8 @@ export function SlotDefinitionsPage() {
       const data = await listSlotGroups(entityTypeId!);
       setSlotGroups(data);
       
-      // Ensure all three group types exist
-      const groupTypes = ['consumes', 'requires', 'produces'];
-      for (const type of groupTypes) {
-        if (!data.find(g => g.type === type)) {
-          // Create missing group
-          try {
-            await createSlotGroup(entityTypeId!, {
-              type,
-              min_slots: 0,
-              max_slots: 10,
-              default_slots_qty: 0,
-              sort_order: 0,
-            });
-          } catch (err: any) {
-            // Ignore conflict errors (group already exists)
-            if (err.status !== 409) {
-              throw err;
-            }
-          }
-        }
-      }
-      
-      // Reload to get all groups
-      const updatedData = await listSlotGroups(entityTypeId!);
-      setSlotGroups(updatedData);
-      
       // Load default slot and per slots for each group
-      for (const group of updatedData) {
+      for (const group of data) {
         loadDefaultSlot(group.id, group.type as 'consumes' | 'requires' | 'produces');
         loadPerSlots(group.id, group.type as 'consumes' | 'requires' | 'produces');
       }
