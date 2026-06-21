@@ -333,7 +333,7 @@ export function RecipeForm({
 
   // Helper to fetch existing parameter values for a constraint
   const fetchExistingValues = async (entityTypeId: string, group: string, domain: string, key: string) => {
-    if (!projectId || !entityTypeId || !domain || !key) return [];
+    if (!projectId || !domain || !key) return [];
 
     const cacheKey = `${entityTypeId}:${group}:${domain}:${key}`;
     if (existingValues[cacheKey]) {
@@ -342,7 +342,7 @@ export function RecipeForm({
 
     try {
       // Send empty groups array to get all parameter values
-      const values = await getDistinctParameterValues(projectId, entityTypeId, []);
+      const values = await getDistinctParameterValues(projectId, domain, key, []);
       setExistingValues(prev => ({ ...prev, [cacheKey]: values }));
       return values;
     } catch (err) {
@@ -361,10 +361,8 @@ export function RecipeForm({
     }
 
     try {
-      // Use first entity_type_id since we're fetching across all types
-      const firstEntityTypeId = materialEntityTypes[0]?.id || '';
       // Send groups array to get parameter values for those groups
-      const values = await getDistinctParameterValues(projectId, firstEntityTypeId, groups);
+      const values = await getDistinctParameterValues(projectId, domain, key, groups);
       setExistingValues(prev => ({ ...prev, [cacheKey]: values }));
       return values;
     } catch (err) {
@@ -500,8 +498,6 @@ export function RecipeForm({
                           const groupsFromSystem = orGroupConstraints
                             .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
                             .map((c: any) => c.value_string);
-
-                          console.log('getParametersForEntityType groups:', groupsFromSystem);
 
                           return getParametersForEntityType(et.id, groupsFromSystem).map((param: any) => ({
                             domain: param.domain,

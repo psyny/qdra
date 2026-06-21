@@ -28,6 +28,12 @@ class GroupsRequest(BaseModel):
     groups: List[str] = []
 
 
+class ParameterValuesRequest(BaseModel):
+    domain: str
+    key: str
+    groups: List[str] = []
+
+
 class CreateEntityRequest(BaseModel):
     entity_type_id: uuid.UUID
     group: str = ""
@@ -304,59 +310,67 @@ def delete_entity_parameter(
         raise HTTPException(status_code=404, detail="Parameter not found")
 
 
-@router.post(
-    "/projects/{project_id}/entity-types/{entity_type_id}/parameter-definitions",
-    response_model=List[str],
-)
-def get_parameter_definitions(
+@router.post("/projects/{project_id}/parameter-values")
+def get_values_for_parameter(
     project_id: uuid.UUID,
-    entity_type_id: uuid.UUID,
-    request: GroupsRequest = GroupsRequest(),
+    request: ParameterValuesRequest,
     db: Session = Depends(get_db),
 ):
-    """Get parameter definitions (domain:key pairs) for a given entity type and groups."""
+    """Get distinct values for a specific domain:key pair, optionally filtered by groups."""
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import get_cached_data, set_cached_data
-    
+    from services.constraint_resolution_service import ConstraintResolutionService
+    from domain.planning.output_solver_domain import ConstraintSpec
+
+    domain = request.domain
+    key = request.key
     groups = request.groups
-    
+
     # Check cache first
-    cache_key = f"param_defs:{entity_type_id}:{','.join(sorted(groups))}"
+    cache_key = f"param_values:{project_id}:{domain}:{key}:{','.join(sorted(groups))}"
     if settings.l1_caching:
         cached = get_cached_data(cache_key)
         if cached is not None:
             return cached
-    
+
     service = EntityService(db)
+    constraint_service = ConstraintResolutionService(db)
+
     try:
-        # Get the project template
-        project = service.project_repository.get_by_id(project_id)
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-        
-        template = service.template_repository.get_by_id(project.project_template_id)
-        if not template:
-            raise HTTPException(status_code=404, detail="Template not found")
-        
-        # Get the entity type
-        entity_type = service.template_repository.get_entity_type_by_id(entity_type_id)
-        if not entity_type:
-            raise HTTPException(status_code=404, detail="Entity type not found")
-        
-        # Get parameter definitions for the entity type
-        param_defs = service.template_repository.list_parameter_definitions_by_entity_type(entity_type_id)
-        
-        # Filter by groups if provided
+        # Build constraints from groups (system.group constraints)
+        constraints = []
         if groups:
-            param_defs = [p for p in param_defs if p.group in groups]
-        
-        # Return as domain:key strings
-        result = [f"{p.domain}:{p.key}" for p in param_defs]
-        
+            for group in groups:
+                constraints.append(ConstraintSpec(
+                    domain="__system__",
+                    key="group",
+                    operator="=",
+                    value_string=group
+                ))
+
+        # Find materials matching the group constraints
+        material_ids = constraint_service.find_materials_by_constraints(constraints, project_id)
+
+        # Get parameter values for the specified domain:key from these materials
+        all_values = set()
+        for material_id in material_ids:
+            params = service.entity_parameter_repository.list_by_entity(material_id)
+            for param in params:
+                # Check if this parameter matches the domain:key
+                if param.domain == domain and param.key == key:
+                    if param.value_string is not None:
+                        all_values.add(param.value_string)
+                    elif param.value_number is not None:
+                        all_values.add(str(param.value_number))
+                    elif param.value_boolean is not None:
+                        all_values.add(str(param.value_boolean))
+
+        result = sorted(list(all_values))
+
         # Cache the result
         if settings.l1_caching:
             set_cached_data(cache_key, result)
-        
+
         return result
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
