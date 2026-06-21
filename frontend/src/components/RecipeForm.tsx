@@ -3,6 +3,7 @@ import { DraftParameter } from './ParameterRow';
 import { ImageUpload } from './ImageUpload';
 import { Combobox } from './Combobox';
 import { getDistinctParameterValues } from '../api/entities';
+import { listSlotGroups } from '../api/templates';
 
 type SlotGroupConfig = {
   type: 'requires' | 'consumes' | 'produces';
@@ -101,6 +102,73 @@ export function RecipeForm({
     }
   }, [slotGroups, initialSlotCounts]);
 
+  // Load template slot definitions for new recipes
+  useEffect(() => {
+    const hasInitialConstraints = initialSlotConstraints && 
+      (initialSlotConstraints.requires?.length > 0 || 
+       initialSlotConstraints.consumes?.length > 0 || 
+       initialSlotConstraints.produces?.length > 0);
+    
+    if (!hasInitialConstraints && template && template.entity_types) {
+      // Find the recipe entity type from the template
+      const recipeEntityType = template.entity_types.find((et: any) => et.kind === 'recipe');
+      
+      if (recipeEntityType) {
+        listSlotGroups(recipeEntityType.id)
+          .then((slotGroupsData) => {
+            // Convert template per_slots to slot constraints format
+            const newConstraints: SlotConstraints = {
+              requires: [],
+              consumes: [],
+              produces: [],
+            };
+            
+            const newCounts: Record<string, number> = {
+              requires: 0,
+              consumes: 0,
+              produces: 0,
+            };
+            
+            slotGroupsData.forEach((sg: any) => {
+              if (sg.per_slots && sg.per_slots.length > 0) {
+                newConstraints[sg.type] = sg.per_slots.map((perSlot: any) => {
+                  if (!perSlot.options || perSlot.options.length === 0) {
+                    return [];
+                  }
+                  return perSlot.options.map((option: any) => ({
+                    constraints: option.parameter_constraints.map((c: any) => {
+                      const isSystem = c.domain === 'system';
+                      return {
+                        id: c.id,
+                        origin: c.domain || 'parameter',
+                        system_key: isSystem ? c.key : null,
+                        entity_type_id: isSystem ? null : (c.entity_type_id || null),
+                        domain: isSystem ? null : c.domain,
+                        key: isSystem ? null : c.key,
+                        operator: c.operator,
+                        value_string: c.value_string,
+                        value_number: c.value_number,
+                        value_boolean: c.value_boolean,
+                        is_wildcard: c.is_wildcard,
+                      };
+                    }),
+                    quantity: option.quantity || 0,
+                  }));
+                });
+                newCounts[sg.type] = sg.per_slots.length;
+              }
+            });
+            
+            setSlotConstraints(newConstraints);
+            setSlotCounts(newCounts);
+          })
+          .catch(() => {
+            // Silently fail if template loading fails
+          });
+      }
+    }
+  }, [template, initialSlotConstraints]);
+
   // State to track existing parameter values for each constraint
   const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
 
@@ -154,7 +222,7 @@ export function RecipeForm({
   };
 
   // Helper to add a slot
-  const addSlot = (kind: 'requires' | 'consumes' | 'produces') => {
+  const addSlot = async (kind: 'requires' | 'consumes' | 'produces') => {
     const config = getSlotGroupConfig(kind);
     if (!config) return;
 
@@ -163,10 +231,54 @@ export function RecipeForm({
     const maxSlots = config.max_slots === null ? Infinity : config.max_slots;
     if (currentCount < maxSlots) {
       setSlotCounts(prev => ({ ...prev, [kind]: currentCount + 1 }));
-      // Initialize empty constraints for the new slot
+      
+      // Try to load default slot from template
+      if (template && template.entity_types) {
+        const recipeEntityType = template.entity_types.find((et: any) => et.kind === 'recipe');
+        if (recipeEntityType) {
+          try {
+            const slotGroupsData = await listSlotGroups(recipeEntityType.id);
+            const slotGroup = slotGroupsData.find((sg: any) => sg.type === kind);
+            
+            if (slotGroup && slotGroup.default_slot) {
+              // Convert default slot to slot constraints format
+              const defaultSlotConstraints = slotGroup.default_slot.options.map((option: any) => ({
+                constraints: option.parameter_constraints.map((c: any) => {
+                  const isSystem = c.domain === 'system';
+                  return {
+                    id: c.id,
+                    origin: c.domain || 'parameter',
+                    system_key: isSystem ? c.key : null,
+                    entity_type_id: isSystem ? null : (c.entity_type_id || null),
+                    domain: isSystem ? null : c.domain,
+                    key: isSystem ? null : c.key,
+                    operator: c.operator,
+                    value_string: c.value_string,
+                    value_number: c.value_number,
+                    value_boolean: c.value_boolean,
+                    is_wildcard: c.is_wildcard,
+                  };
+                }),
+                quantity: option.quantity || 0,
+              }));
+              
+              setSlotConstraints(prev => {
+                const newConstraints = { ...prev };
+                const currentArray = newConstraints[kind] || [];
+                newConstraints[kind] = [...currentArray, defaultSlotConstraints];
+                return newConstraints;
+              });
+              return;
+            }
+          } catch {
+            // Silently fail if template loading fails
+          }
+        }
+      }
+      
+      // Fallback to empty constraints if no template or error
       setSlotConstraints(prev => {
         const newConstraints = { ...prev };
-        // Ensure the array exists before spreading
         const currentArray = newConstraints[kind] || [];
         newConstraints[kind] = [...currentArray, []];
         return newConstraints;
