@@ -20,6 +20,7 @@ qdra/alembic/versions/20260618_param_validation.py
 qdra/alembic/versions/20260618_template_views_editor.py
 qdra/alembic/versions/20260620_add_entity_type.py
 qdra/alembic/versions/20260620_add_type_to_entities.py
+qdra/alembic/versions/20260621_drop_slot_definitions_and_constraints.py
 qdra/api/__init__.py
 qdra/api/entities.py
 qdra/api/health.py
@@ -92,7 +93,6 @@ qdra/tests/test_field_definitions.py
 qdra/tests/test_health.py
 qdra/tests/test_object_types.py
 qdra/tests/test_projects.py
-qdra/tests/test_slot_definitions.py
 qdra/tests/e2e/__init__.py
 qdra/tests/integration/__init__.py
 qdra/tests/integration/conftest.py
