@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { WorkspaceHeader } from './WorkspaceHeader';
-import { WorkspaceSidebar } from './WorkspaceSidebar';
+import { WorkspaceNav } from './WorkspaceNav';
 import { BreadcrumbItem } from './Breadcrumb';
 
 type WorkspaceLayoutProps = {
@@ -18,12 +18,10 @@ export function WorkspaceLayout({ projectId, projectName, children }: WorkspaceL
   return (
     <div className="workspace">
       <WorkspaceHeader breadcrumbItems={breadcrumbItems} />
-      <div className="workspace-body">
-        <WorkspaceSidebar projectId={projectId} />
-        <div className="workspace-content">
-          <div className="card workspace-content__card">
-            {children}
-          </div>
+      <WorkspaceNav projectId={projectId} />
+      <div className="workspace-content">
+        <div className="card workspace-content__card">
+          {children}
         </div>
       </div>
     </div>

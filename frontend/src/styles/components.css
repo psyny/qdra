@@ -429,56 +429,42 @@
   color: var(--text-primary);
 }
 
-.workspace-body {
+.workspace-nav {
   display: flex;
-  flex: 1;
-  padding: 32px;
-  gap: 24px;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.workspace-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-}
-
-.workspace-sidebar__card {
-  padding: 16px;
-}
-
-.workspace-sidebar__nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.workspace-sidebar__nav-item {
+.workspace-nav__item {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 16px;
   border-radius: var(--radius-small);
   color: var(--text-secondary);
   text-decoration: none;
   font-size: 14px;
+  font-weight: 500;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.workspace-sidebar__nav-item:hover {
+.workspace-nav__item:hover {
   background: var(--card-bg-hover);
   color: var(--text-primary);
 }
 
-.workspace-sidebar__nav-item--active {
+.workspace-nav__item--active {
   background: var(--accent);
   color: white;
 }
 
-.workspace-sidebar__nav-item--active:hover {
+.workspace-nav__item--active:hover {
   background: var(--accent-hover);
 }
 
 .workspace-content {
-  flex: 1;
-  min-width: 0;
+  padding: 32px;
 }
 
 .workspace-content__card {
