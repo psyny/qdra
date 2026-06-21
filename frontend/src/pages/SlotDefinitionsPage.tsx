@@ -6,12 +6,16 @@ import {
   createSlotGroup,
   updateSlotGroup,
   deleteSlotGroup,
-  createGroupConstraint,
-  deleteSlotConstraint,
-  getTemplate,
   getEntityType,
   listEntityTypes,
   listParameterDefinitions,
+  createDefaultSlot,
+  updateDefaultSlot,
+  deleteDefaultSlot,
+  getDefaultSlot,
+  createPerSlot,
+  deletePerSlot,
+  listPerSlots,
 } from '../api/templates';
 import { EntityType, ParameterDefinition } from '../types/template';
 
@@ -123,9 +127,10 @@ export function SlotDefinitionsPage() {
       const data = await listSlotGroups(entityTypeId!);
       setSlotGroups(data);
       
-      // Load template constraints for each group
+      // Load default slot and per slots for each group
       for (const group of data) {
-        loadTemplateConstraints(group.id, group.type as 'consumes' | 'requires' | 'produces');
+        loadDefaultSlot(group.id, group.type as 'consumes' | 'requires' | 'produces');
+        loadPerSlots(group.id, group.type as 'consumes' | 'requires' | 'produces');
       }
     } catch (err) {
       setError('Failed to load slot groups');
@@ -365,28 +370,26 @@ export function SlotDefinitionsPage() {
     });
   };
 
-  // Convert template constraints (OptionSpec[]) to backend constraint format
-  const templateConstraintsToBackendFormat = (options: OptionSpec[]): any[] => {
-    const constraints: any[] = [];
-    let sortOrder = 0;
-
-    for (const option of options) {
-      for (const constraint of option.constraints) {
+  // Convert template constraints (OptionSpec[]) to new backend slot format
+  const templateConstraintsToSlotFormat = (options: OptionSpec[], kind: string): any => {
+    const slotOptions = options.map((option, index) => ({
+      quantity: option.quantity,
+      sort_order: index,
+      parameter_constraints: option.constraints.map((constraint) => {
         if (constraint.origin === 'system' && constraint.system_key === 'group') {
-          // System group constraint
-          constraints.push({
-            domain: null,
-            key: null,
-            operator: '=',
+          // System group constraint - convert to domain/key format
+          return {
+            domain: 'system',
+            key: 'group',
+            operator: constraint.operator,
             value_string: constraint.value_string,
-            value_number: null,
-            value_boolean: null,
+            value_number: constraint.value_number,
+            value_boolean: constraint.value_boolean,
             is_wildcard: false,
-            sort_order: sortOrder++,
-          });
+          };
         } else if (constraint.origin === 'parameter') {
           // Parameter constraint
-          constraints.push({
+          return {
             domain: constraint.domain,
             key: constraint.key,
             operator: constraint.operator,
@@ -394,120 +397,170 @@ export function SlotDefinitionsPage() {
             value_number: constraint.value_number,
             value_boolean: constraint.value_boolean,
             is_wildcard: false,
-            sort_order: sortOrder++,
-          });
+          };
         }
-      }
-    }
+        return null;
+      }).filter(c => c !== null),
+    }));
 
-    return constraints;
+    return {
+      kind,
+      sort_order: 0,
+      options: slotOptions,
+    };
   };
 
-  // Convert backend constraints to template constraints (OptionSpec[]) format
-  const backendConstraintsToTemplateFormat = (backendConstraints: SlotConstraint[]): OptionSpec[] => {
-    const options: OptionSpec[] = [];
-    const systemGroupConstraint = backendConstraints.find(c => c.domain === null && c.key === null);
-    
-    if (systemGroupConstraint) {
-      // Create an option with the system group constraint
-      const option: OptionSpec = {
-        constraints: [{
-          origin: 'system',
-          system_key: 'group',
-          entity_type_id: null,
-          domain: null,
-          key: null,
-          operator: systemGroupConstraint.operator || '=',
-          value_string: systemGroupConstraint.value_string,
-          value_number: systemGroupConstraint.value_number,
-          value_boolean: systemGroupConstraint.value_boolean,
-        }],
-        quantity: 1,
-      };
-      
-      // Add parameter constraints to this option
-      const paramConstraints = backendConstraints.filter(c => c.domain !== null || c.key !== null);
-      for (const param of paramConstraints) {
-        option.constraints.push({
-          origin: 'parameter',
-          system_key: null,
-          entity_type_id: null,
-          domain: param.domain,
-          key: param.key,
-          operator: param.operator || '=',
-          value_string: param.value_string,
-          value_number: param.value_number,
-          value_boolean: param.value_boolean,
-        });
-      }
-      
-      options.push(option);
-    } else {
-      // No system group constraint, group parameter constraints by their position
-      const paramConstraints = backendConstraints.filter(c => c.domain !== null || c.key !== null);
-      if (paramConstraints.length > 0) {
-        const option: OptionSpec = {
-          constraints: paramConstraints.map(c => ({
+  // Convert per-slot constraints to new backend slot format
+  const perSlotConstraintsToSlotFormat = (slots: OptionSpec[][], kind: string): any[] => {
+    return slots.map((slotOptions, slotIndex) => ({
+      kind,
+      sort_order: slotIndex,
+      options: slotOptions.map((option, optionIndex) => ({
+        quantity: option.quantity,
+        sort_order: optionIndex,
+        parameter_constraints: option.constraints.map((constraint) => {
+          if (constraint.origin === 'system' && constraint.system_key === 'group') {
+            return {
+              domain: 'system',
+              key: 'group',
+              operator: constraint.operator,
+              value_string: constraint.value_string,
+              value_number: constraint.value_number,
+              value_boolean: constraint.value_boolean,
+              is_wildcard: false,
+            };
+          } else if (constraint.origin === 'parameter') {
+            return {
+              domain: constraint.domain,
+              key: constraint.key,
+              operator: constraint.operator,
+              value_string: constraint.value_string,
+              value_number: constraint.value_number,
+              value_boolean: constraint.value_boolean,
+              is_wildcard: false,
+            };
+          }
+          return null;
+        }).filter(c => c !== null),
+      })),
+    }));
+  };
+
+  // Convert backend slot format to template constraints (OptionSpec[]) format
+  const backendSlotToTemplateFormat = (backendSlot: any): OptionSpec[] => {
+    if (!backendSlot || !backendSlot.options) return [];
+
+    return backendSlot.options.map((option: any) => ({
+      constraints: (option.parameter_constraints || []).map((constraint: any) => {
+        if (constraint.domain === 'system' && constraint.key === 'group') {
+          return {
+            origin: 'system' as const,
+            system_key: 'group',
+            entity_type_id: null,
+            domain: null,
+            key: null,
+            operator: constraint.operator || '=',
+            value_string: constraint.value_string,
+            value_number: constraint.value_number,
+            value_boolean: constraint.value_boolean,
+          };
+        } else {
+          return {
             origin: 'parameter' as const,
             system_key: null,
             entity_type_id: null,
-            domain: c.domain,
-            key: c.key,
-            operator: c.operator || '=',
-            value_string: c.value_string,
-            value_number: c.value_number,
-            value_boolean: c.value_boolean,
-          })),
-          quantity: 1,
-        };
-        options.push(option);
-      }
-    }
-
-    return options;
-  };
-
-  // Save template constraints to backend
-  const saveTemplateConstraints = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
-    try {
-      // Delete existing constraints for this slot group
-      const group = slotGroups.find((g: SlotGroup) => g.id === slotGroupId);
-      if (group) {
-        for (const constraint of group.constraints) {
-          await deleteSlotConstraint(constraint.id);
+            domain: constraint.domain,
+            key: constraint.key,
+            operator: constraint.operator || '=',
+            value_string: constraint.value_string,
+            value_number: constraint.value_number,
+            value_boolean: constraint.value_boolean,
+          };
         }
-      }
-
-      // Convert and create new constraints
-      const options = templateConstraints[type] || [];
-      const backendConstraints = templateConstraintsToBackendFormat(options);
-
-      for (const constraint of backendConstraints) {
-        await createGroupConstraint(slotGroupId, constraint);
-      }
-
-      // Update local state to reflect saved constraints without full reload
-      setSlotGroups((prev: SlotGroup[]) => prev.map((g: SlotGroup) => {
-        if (g.id === slotGroupId) {
-          return { ...g, constraints: backendConstraints };
-        }
-        return g;
-      }));
-    } catch (err: any) {
-      setError(err.message || 'Failed to save template constraints');
-    }
-  };
-
-  // Load template constraints from backend
-  const loadTemplateConstraints = (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
-    const group = slotGroups.find((g: SlotGroup) => g.id === slotGroupId);
-    if (!group) return;
-
-    const options = backendConstraintsToTemplateFormat(group.constraints);
-    setTemplateConstraints((prev: Record<string, OptionSpec[]>) => ({
-      ...prev,
-      [type]: options,
+      }),
+      quantity: option.quantity || 1,
     }));
+  };
+
+  // Save default slot to backend
+  const saveDefaultSlot = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    try {
+      const options = templateConstraints[type] || [];
+      
+      if (options.length === 0) {
+        // Delete default slot if it exists and no options
+        await deleteDefaultSlot(slotGroupId);
+      } else {
+        // Create or update default slot
+        const slotData = templateConstraintsToSlotFormat(options, type);
+        const existingDefaultSlot = await getDefaultSlot(slotGroupId);
+        
+        if (existingDefaultSlot) {
+          await updateDefaultSlot(slotGroupId, slotData);
+        } else {
+          await createDefaultSlot(slotGroupId, slotData);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to save default slot');
+    }
+  };
+
+  // Load default slot from backend
+  const loadDefaultSlot = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    try {
+      const backendSlot = await getDefaultSlot(slotGroupId);
+      const options = backendSlotToTemplateFormat(backendSlot);
+      setTemplateConstraints((prev: Record<string, OptionSpec[]>) => ({
+        ...prev,
+        [type]: options,
+      }));
+    } catch (err) {
+      // No default slot exists, that's fine
+      setTemplateConstraints((prev: Record<string, OptionSpec[]>) => ({
+        ...prev,
+        [type]: [],
+      }));
+    }
+  };
+
+  // Save per slots to backend
+  const savePerSlots = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    try {
+      const slots = perSlotConstraints[type] || [];
+      
+      // Delete all existing per slots for this group
+      const existingPerSlots = await listPerSlots(slotGroupId);
+      for (const perSlot of existingPerSlots) {
+        await deletePerSlot(perSlot.id);
+      }
+      
+      // Create new per slots
+      const slotDataArray = perSlotConstraintsToSlotFormat(slots, type);
+      for (const slotData of slotDataArray) {
+        await createPerSlot(slotGroupId, slotData);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to save per slots');
+    }
+  };
+
+  // Load per slots from backend
+  const loadPerSlots = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    try {
+      const backendSlots = await listPerSlots(slotGroupId);
+      const slots = backendSlots.map((slot: any) => backendSlotToTemplateFormat(slot));
+      setPerSlotConstraints((prev: Record<string, OptionSpec[][]>) => ({
+        ...prev,
+        [type]: slots,
+      }));
+    } catch (err) {
+      // No per slots exist, that's fine
+      setPerSlotConstraints((prev: Record<string, OptionSpec[][]>) => ({
+        ...prev,
+        [type]: [],
+      }));
+    }
   };
 
   // Helper to add a slot for per-slot definitions
@@ -1346,15 +1399,16 @@ export function SlotDefinitionsPage() {
               }
             }
             
-            // Save template constraints for each group
-            for (const group of slotGroups) {
-              if (!group.id.startsWith('temp-')) {
-                await saveTemplateConstraints(group.id, group.type as 'consumes' | 'requires' | 'produces');
-              }
-            }
-            
             // Reload to get updated data with real IDs
             await loadSlotGroups();
+            
+            // Save default slot and per slots for each group
+            for (const group of slotGroups) {
+              if (!group.id.startsWith('temp-')) {
+                await saveDefaultSlot(group.id, group.type as 'consumes' | 'requires' | 'produces');
+                await savePerSlots(group.id, group.type as 'consumes' | 'requires' | 'produces');
+              }
+            }
             
             // Navigate back to Edit Template page
             navigate(`/templates/${templateId}/edit`);

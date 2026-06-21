@@ -1327,7 +1327,7 @@ def create_default_slot(
         slot_group_id=slot_group_id,
         kind=data.kind,
         sort_order=data.sort_order,
-        options_data=data.options,
+        options_data=[opt.model_dump() for opt in data.options] if data.options else None,
     )
     
     # Load options with parameter constraints
@@ -1375,7 +1375,7 @@ def update_default_slot(
         slot_group_id=slot_group_id,
         kind=data.kind,
         sort_order=data.sort_order,
-        options_data=data.options,
+        options_data=[opt.model_dump() for opt in data.options] if data.options else None,
     )
     
     # Load options with parameter constraints
@@ -1476,7 +1476,7 @@ def create_per_slot(
         slot_group_id=slot_group_id,
         kind=data.kind,
         sort_order=data.sort_order,
-        options_data=data.options,
+        options_data=[opt.model_dump() for opt in data.options] if data.options else None,
     )
     
     # Load options with parameter constraints
@@ -1549,7 +1549,7 @@ def update_per_slot(
         per_slot_id=per_slot_id,
         kind=data.kind,
         sort_order=data.sort_order,
-        options_data=data.options,
+        options_data=[opt.model_dump() for opt in data.options] if data.options else None,
     )
     
     # Load options with parameter constraints

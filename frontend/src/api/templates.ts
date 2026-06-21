@@ -433,3 +433,155 @@ export async function deleteSlotConstraint(constraintId: string): Promise<void> 
   });
   if (!response.ok) throw new Error('Failed to delete constraint');
 }
+
+// Default Slot operations
+
+export async function getDefaultSlot(slotGroupId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`);
+  if (!response.ok) throw new Error('Failed to fetch default slot');
+  return response.json();
+}
+
+export async function createDefaultSlot(
+  slotGroupId: string,
+  payload: {
+    kind: string;
+    sort_order?: number;
+    options?: Array<{
+      quantity?: number | null;
+      sort_order?: number;
+      parameter_constraints?: Array<{
+        domain: string;
+        key: string;
+        operator: string;
+        value_string?: string | null;
+        value_number?: number | null;
+        value_boolean?: boolean | null;
+        is_wildcard?: boolean;
+      }>;
+    }>;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create default slot');
+  return response.json();
+}
+
+export async function updateDefaultSlot(
+  slotGroupId: string,
+  payload: {
+    kind?: string;
+    sort_order?: number;
+    options?: Array<{
+      quantity?: number | null;
+      sort_order?: number;
+      parameter_constraints?: Array<{
+        domain: string;
+        key: string;
+        operator: string;
+        value_string?: string | null;
+        value_number?: number | null;
+        value_boolean?: boolean | null;
+        is_wildcard?: boolean;
+      }>;
+    }>;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update default slot');
+  return response.json();
+}
+
+export async function deleteDefaultSlot(slotGroupId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete default slot');
+}
+
+// Per Slot operations
+
+export async function listPerSlots(slotGroupId: string): Promise<any[]> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/per-slots`);
+  if (!response.ok) throw new Error('Failed to fetch per slots');
+  return response.json();
+}
+
+export async function createPerSlot(
+  slotGroupId: string,
+  payload: {
+    kind: string;
+    sort_order?: number;
+    options?: Array<{
+      quantity?: number | null;
+      sort_order?: number;
+      parameter_constraints?: Array<{
+        domain: string;
+        key: string;
+        operator: string;
+        value_string?: string | null;
+        value_number?: number | null;
+        value_boolean?: boolean | null;
+        is_wildcard?: boolean;
+      }>;
+    }>;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/per-slots`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create per slot');
+  return response.json();
+}
+
+export async function getPerSlot(perSlotId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`);
+  if (!response.ok) throw new Error('Failed to fetch per slot');
+  return response.json();
+}
+
+export async function updatePerSlot(
+  perSlotId: string,
+  payload: {
+    kind?: string;
+    sort_order?: number;
+    options?: Array<{
+      quantity?: number | null;
+      sort_order?: number;
+      parameter_constraints?: Array<{
+        domain: string;
+        key: string;
+        operator: string;
+        value_string?: string | null;
+        value_number?: number | null;
+        value_boolean?: boolean | null;
+        is_wildcard?: boolean;
+      }>;
+    }>;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update per slot');
+  return response.json();
+}
+
+export async function deletePerSlot(perSlotId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete per slot');
+}
