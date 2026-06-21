@@ -243,13 +243,15 @@ export function RecipeForm({
         }
       }
 
-      const newConstraint = {
+      const newConstraint: ConstraintSpec = {
         origin: 'parameter' as const,
         entity_type_id: firstEntityTypeId,
         domain: firstDomain,
         key: firstKey,
         operator: '=',
         value_string: null,
+        value_number: undefined,
+        value_boolean: undefined,
       };
 
       newConstraints[kind][slotIndex][orGroupIndex] = [
@@ -259,9 +261,22 @@ export function RecipeForm({
 
       // Fetch existing values for the auto-selected domain+key
       if (firstDomain && firstKey && firstEntityTypeId) {
-        const entityType = template?.entity_types?.find((et: any) => et.id === firstEntityTypeId);
-        const groupName = entityType?.name || '';
-        fetchExistingValues(firstEntityTypeId, groupName, firstDomain, firstKey);
+        const paramDef = getParameterDefinition(firstDomain, firstKey, firstEntityTypeId);
+        
+        // Only fetch existing values for string parameters
+        if (paramDef?.value_type === 'string') {
+          const entityType = template?.entity_types?.find((et: any) => et.id === firstEntityTypeId);
+          const groupName = entityType?.name || '';
+          fetchExistingValues(firstEntityTypeId, groupName, firstDomain, firstKey);
+        } else if (paramDef?.value_type === 'number') {
+          // Set default value for number parameters
+          const defaultValue = paramDef.default_value !== null ? parseFloat(paramDef.default_value) : 0;
+          newConstraint.value_number = defaultValue;
+        } else if (paramDef?.value_type === 'boolean') {
+          // Set default value for boolean parameters
+          const defaultValue = paramDef.default_value !== null ? paramDef.default_value === 'true' : false;
+          newConstraint.value_boolean = defaultValue;
+        }
       }
 
       return newConstraints;
@@ -285,10 +300,28 @@ export function RecipeForm({
       const constraint = newConstraints[kind][slotIndex][orGroupIndex][constraintIndex];
       if (field === 'entity_type_id' || field === 'domain' || field === 'key') {
         if (constraint.origin === 'parameter' && constraint.entity_type_id && constraint.domain && constraint.key && constraint.domain !== 'entity_type') {
-          // Get the group name from the entity type
-          const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
-          const groupName = entityType?.name || '';
-          fetchExistingValues(constraint.entity_type_id, groupName, constraint.domain, constraint.key);
+          // Get the parameter definition to check value_type
+          const paramDef = getParameterDefinition(constraint.domain, constraint.key, constraint.entity_type_id);
+          
+          // Only fetch existing values for string parameters
+          if (paramDef?.value_type === 'string') {
+            // Get the group name from the entity type
+            const entityType = template?.entity_types?.find((et: any) => et.id === constraint.entity_type_id);
+            const groupName = entityType?.name || '';
+            fetchExistingValues(constraint.entity_type_id, groupName, constraint.domain, constraint.key);
+          } else if (paramDef?.value_type === 'number') {
+            // Set default value for number parameters
+            const defaultValue = paramDef.default_value !== null ? parseFloat(paramDef.default_value) : 0;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_number = defaultValue;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_string = null;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_boolean = null;
+          } else if (paramDef?.value_type === 'boolean') {
+            // Set default value for boolean parameters
+            const defaultValue = paramDef.default_value !== null ? paramDef.default_value === 'true' : false;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_boolean = defaultValue;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_string = null;
+            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_number = null;
+          }
         }
       }
 
@@ -351,6 +384,22 @@ export function RecipeForm({
     }).filter(Boolean);
 
     return allParams.filter((param: any) => groupEntityIds.includes(param.entity_type_id));
+  };
+
+  // Helper to get parameter definition for a specific domain+key
+  const getParameterDefinition = (domain: string, key: string, entityTypeId?: string | null) => {
+    if (!template || !domain || !key) return null;
+    
+    // Search across all entity types if no specific entityTypeId provided
+    const entityTypesToSearch = entityTypeId 
+      ? template.entity_types?.filter((et: any) => et.id === entityTypeId)
+      : template.entity_types;
+    
+    for (const et of entityTypesToSearch || []) {
+      const param = et.parameter_definitions?.find((p: any) => p.domain === domain && p.key === key);
+      if (param) return param;
+    }
+    return null;
   };
 
   // Helper to fetch existing parameter values for a constraint
@@ -568,40 +617,74 @@ export function RecipeForm({
                         <input
                           type="text"
                           value={constraint.value_string || ''}
-                          onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                          onChange={(e: any) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
                           disabled={isSubmitting}
                           placeholder="Value"
                           style={{ padding: '2px', fontSize: '11px', flex: 1 }}
                         />
                       )
                     ) : (
-                      <Combobox
-                        value={constraint.value_string || ''}
-                        onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
-                        options={(() => {
-                          // Check for system.group constraints in the same OR group
-                          const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
-                          const groupsFromSystem = orGroupConstraints
-                            .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
-                            .map((c: any) => c.value_string);
-                          
-                          // Use these groups to fetch parameter values
-                          const cacheKey = `${constraint.domain}:${constraint.key}:${groupsFromSystem.join(',')}`;
-                          if (existingValues[cacheKey]) {
-                            return existingValues[cacheKey];
-                          }
-                          
-                          // Trigger fetch if not cached
-                          if (constraint.domain && constraint.key && projectId) {
-                            fetchExistingValuesForGroups(constraint.domain, constraint.key, groupsFromSystem);
-                          }
-                          
-                          return existingValues[cacheKey] || [];
-                        })()}
-                        disabled={isSubmitting}
-                        placeholder="Value"
-                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                      />
+                      (() => {
+                        const paramDef = getParameterDefinition(constraint.domain, constraint.key, constraint.entity_type_id);
+                        const valueType = paramDef?.value_type || 'string';
+                        
+                        if (valueType === 'string') {
+                          return (
+                            <Combobox
+                              value={constraint.value_string || ''}
+                              onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
+                              options={(() => {
+                                // Check for system.group constraints in the same OR group
+                                const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
+                                const groupsFromSystem = orGroupConstraints
+                                  .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
+                                  .map((c: any) => c.value_string);
+                                
+                                // Use these groups to fetch parameter values
+                                const cacheKey = `${constraint.domain}:${constraint.key}:${groupsFromSystem.join(',')}`;
+                                if (existingValues[cacheKey]) {
+                                  return existingValues[cacheKey];
+                                }
+                                
+                                // Trigger fetch if not cached
+                                if (constraint.domain && constraint.key && projectId) {
+                                  fetchExistingValuesForGroups(constraint.domain, constraint.key, groupsFromSystem);
+                                }
+                                
+                                return existingValues[cacheKey] || [];
+                              })()}
+                              disabled={isSubmitting}
+                              placeholder="Value"
+                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                            />
+                          );
+                        } else if (valueType === 'number') {
+                          return (
+                            <input
+                              type="number"
+                              value={constraint.value_number ?? ''}
+                              onChange={(e: any) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
+                              disabled={isSubmitting}
+                              placeholder="Value"
+                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                            />
+                          );
+                        } else if (valueType === 'boolean') {
+                          return (
+                            <select
+                              value={constraint.value_boolean === true ? 'true' : constraint.value_boolean === false ? 'false' : ''}
+                              onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true' ? true : e.target.value === 'false' ? false : null)}
+                              disabled={isSubmitting}
+                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                            >
+                              <option value="">Select...</option>
+                              <option value="true">True</option>
+                              <option value="false">False</option>
+                            </select>
+                          );
+                        }
+                        return null;
+                      })()
                     )}
                     
                     <button
