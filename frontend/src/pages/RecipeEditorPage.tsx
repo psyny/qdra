@@ -20,7 +20,7 @@ import { RecipeForm } from '../components/RecipeForm';
 import { DraftParameter } from '../components/ParameterRow';
 
 type SlotGroupConfig = {
-  kind: 'requires' | 'consumes' | 'produces';
+  type: 'requires' | 'consumes' | 'produces';
   min_slots: number;
   max_slots: number;
 };
@@ -94,7 +94,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
               try {
                 const slotGroupsData = await listSlotGroups(config.entity_type_id);
                 const formattedSlotGroups: SlotGroupConfig[] = slotGroupsData.map((sg: any) => ({
-                  kind: sg.kind,
+                  type: sg.type,
                   min_slots: sg.min_slots,
                   max_slots: sg.max_slots,
                 }));

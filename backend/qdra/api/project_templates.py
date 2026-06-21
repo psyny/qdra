@@ -903,16 +903,18 @@ def update_view_config(
 # ---------------------------------------------------------------------------
 
 class SlotGroupCreate(BaseModel):
-    kind: str
+    type: str
     min_slots: int = 0
     max_slots: Optional[int] = None
+    default_slots_qty: int = 0
     sort_order: int = 0
 
 
 class SlotGroupUpdate(BaseModel):
-    kind: Optional[str] = None
+    type: Optional[str] = None
     min_slots: Optional[int] = None
     max_slots: Optional[int] = None
+    default_slots_qty: Optional[int] = None
     sort_order: Optional[int] = None
 
 
@@ -938,6 +940,7 @@ class SlotDefinitionResponse(BaseModel):
     id: uuid.UUID
     slot_group_id: uuid.UUID
     slot_key: str
+    slot_idx: Optional[int]
     min_occurrences: int
     max_occurrences: Optional[int]
     sort_order: int
@@ -950,9 +953,10 @@ class SlotGroupResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     entity_type_id: uuid.UUID
-    kind: str
+    type: str
     min_slots: int
     max_slots: Optional[int]
+    default_slots_qty: int
     sort_order: int
     created_at: datetime
     updated_at: datetime
@@ -966,6 +970,7 @@ class SlotGroupResponse(BaseModel):
 
 class SlotDefinitionCreate(BaseModel):
     slot_key: str
+    slot_idx: Optional[int] = None
     min_occurrences: int = 0
     max_occurrences: Optional[int] = None
     sort_order: int = 0
@@ -973,6 +978,7 @@ class SlotDefinitionCreate(BaseModel):
 
 class SlotDefinitionUpdate(BaseModel):
     slot_key: Optional[str] = None
+    slot_idx: Optional[int] = None
     min_occurrences: Optional[int] = None
     max_occurrences: Optional[int] = None
     sort_order: Optional[int] = None
@@ -1069,11 +1075,11 @@ def create_slot_group(
             detail="Slot groups can only be created for recipe entity types"
         )
     
-    # Validate kind
-    if data.kind not in ("consumes", "requires", "produces"):
+    # Validate type
+    if data.type not in ("consumes", "requires", "produces"):
         raise HTTPException(
             status_code=400,
-            detail="kind must be one of: consumes, requires, produces"
+            detail="type must be one of: consumes, requires, produces"
         )
     
     # Validate min/max slots
@@ -1082,20 +1088,21 @@ def create_slot_group(
     if data.max_slots is not None and data.max_slots < data.min_slots:
         raise HTTPException(status_code=400, detail="max_slots must be >= min_slots")
     
-    # Check for duplicate kind
+    # Check for duplicate type
     existing_groups = repo.list_slot_groups(entity_type_id)
     for eg in existing_groups:
-        if eg.kind == data.kind:
+        if eg.type == data.type:
             raise HTTPException(
                 status_code=409,
-                detail=f"A {data.kind} slot group already exists for this entity type"
+                detail=f"A {data.type} slot group already exists for this entity type"
             )
     
     slot_group = repo.create_slot_group(
         entity_type_id=entity_type_id,
-        kind=data.kind,
+        type=data.type,
         min_slots=data.min_slots,
         max_slots=data.max_slots,
+        default_slots_qty=data.default_slots_qty,
         sort_order=data.sort_order,
     )
     
@@ -1119,11 +1126,11 @@ def update_slot_group(
     if not slot_group:
         raise HTTPException(status_code=404, detail="Slot group not found")
     
-    # Validate kind if provided
-    if data.kind is not None and data.kind not in ("consumes", "requires", "produces"):
+    # Validate type if provided
+    if data.type is not None and data.type not in ("consumes", "requires", "produces"):
         raise HTTPException(
             status_code=400,
-            detail="kind must be one of: consumes, requires, produces"
+            detail="type must be one of: consumes, requires, produces"
         )
     
     # Validate min/max slots if provided
@@ -1134,21 +1141,22 @@ def update_slot_group(
         if data.max_slots < data.min_slots:
             raise HTTPException(status_code=400, detail="max_slots must be >= min_slots")
     
-    # Check for duplicate kind if changing
-    if data.kind is not None and data.kind != slot_group.kind:
+    # Check for duplicate type if changing
+    if data.type is not None and data.type != slot_group.type:
         existing_groups = repo.list_slot_groups(slot_group.entity_type_id)
         for eg in existing_groups:
-            if eg.id != slot_group_id and eg.kind == data.kind:
+            if eg.id != slot_group_id and eg.type == data.type:
                 raise HTTPException(
                     status_code=409,
-                    detail=f"A {data.kind} slot group already exists for this entity type"
+                    detail=f"A {data.type} slot group already exists for this entity type"
                 )
     
     updated = repo.update_slot_group(
         slot_group_id=slot_group_id,
-        kind=data.kind,
+        type=data.type,
         min_slots=data.min_slots,
         max_slots=data.max_slots,
+        default_slots_qty=data.default_slots_qty,
         sort_order=data.sort_order,
     )
     
@@ -1219,6 +1227,7 @@ def create_slot_definition(
     slot_def = repo.create_slot_definition(
         slot_group_id=slot_group_id,
         slot_key=data.slot_key,
+        slot_idx=data.slot_idx,
         min_occurrences=data.min_occurrences,
         max_occurrences=data.max_occurrences,
         sort_order=data.sort_order,
@@ -1264,6 +1273,7 @@ def update_slot_definition(
     updated = repo.update_slot_definition(
         slot_def_id=slot_definition_id,
         slot_key=data.slot_key,
+        slot_idx=data.slot_idx,
         min_occurrences=data.min_occurrences,
         max_occurrences=data.max_occurrences,
         sort_order=data.sort_order,

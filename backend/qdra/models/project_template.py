@@ -171,9 +171,10 @@ class ProjectTemplateSlotGroup(Base):
         ForeignKey("project_template_entity_types.id", ondelete="CASCADE"),
         nullable=False,
     )
-    kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
     min_slots: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_slots: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    default_slots_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -183,7 +184,7 @@ class ProjectTemplateSlotGroup(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("entity_type_id", "kind", name="uq_slot_group_entity_type_kind"),
+        UniqueConstraint("entity_type_id", "type", name="uq_slot_group_entity_type_type"),
         CheckConstraint("min_slots >= 0", name="ck_slot_group_min_slots_non_negative"),
         CheckConstraint(
             "max_slots IS NULL OR max_slots >= min_slots",
@@ -204,6 +205,7 @@ class ProjectTemplateSlotDefinition(Base):
         nullable=False,
     )
     slot_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    slot_idx: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     min_occurrences: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_occurrences: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

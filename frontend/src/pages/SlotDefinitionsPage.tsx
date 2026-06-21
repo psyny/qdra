@@ -6,12 +6,7 @@ import {
   createSlotGroup,
   updateSlotGroup,
   deleteSlotGroup,
-  createSlotDefinition,
-  updateSlotDefinition,
-  deleteSlotDefinition,
   createGroupConstraint,
-  createDefinitionConstraint,
-  updateSlotConstraint,
   deleteSlotConstraint,
   getTemplate,
   getEntityType,
@@ -23,9 +18,10 @@ import { EntityType, ParameterDefinition } from '../types/template';
 type SlotGroup = {
   id: string;
   entity_type_id: string;
-  kind: string;
+  type: string;
   min_slots: number;
   max_slots: number | null;
+  default_slots_qty: number;
   sort_order: number;
   constraints: SlotConstraint[];
   slot_definitions: SlotDefinition[];
@@ -35,10 +31,28 @@ type SlotDefinition = {
   id: string;
   slot_group_id: string;
   slot_key: string;
+  slot_idx: number | null;
   min_occurrences: number;
   max_occurrences: number | null;
   sort_order: number;
   constraints: SlotConstraint[];
+};
+
+type ConstraintSpec = {
+  origin: 'system' | 'parameter';
+  system_key?: string | null;
+  entity_type_id?: string | null;
+  domain?: string | null;
+  key?: string | null;
+  operator: string;
+  value_string?: string | null;
+  value_number?: number | null;
+  value_boolean?: boolean | null;
+};
+
+type OptionSpec = {
+  constraints: ConstraintSpec[];
+  quantity: number;
 };
 
 type SlotConstraint = {
@@ -66,40 +80,28 @@ export function SlotDefinitionsPage() {
   const [entityTypes, setEntityTypes] = useState<EntityType[]>([]);
   const [parameterDefinitions, setParameterDefinitions] = useState<Record<string, ParameterDefinition[]>>({});
   
-  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<SlotGroup | null>(null);
+  // State for template constraints (inline builder)
+  const [templateConstraints, setTemplateConstraints] = useState<Record<string, OptionSpec[]>>({
+    consumes: [],
+    requires: [],
+    produces: [],
+  });
   
+  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
+
   const [groupForm, setGroupForm] = useState({
-    kind: 'consumes',
+    type: 'consumes',
     min_slots: 0,
     max_slots: '',
+    default_slots_qty: 0,
     sort_order: 0,
   });
-  
-  const [showDefinitionForm, setShowDefinitionForm] = useState(false);
-  const [editingDefinition, setEditingDefinition] = useState<SlotDefinition | null>(null);
-  const [definitionForm, setDefinitionForm] = useState({
-    slot_key: '',
-    min_occurrences: 0,
-    max_occurrences: '',
-    sort_order: 0,
-  });
-  
-  const [showConstraintForm, setShowConstraintForm] = useState(false);
-  const [constraintParent, setConstraintParent] = useState<{ type: 'group' | 'definition'; id: string } | null>(null);
-  const [editingConstraint, setEditingConstraint] = useState<SlotConstraint | null>(null);
-  const [constraintForm, setConstraintForm] = useState({
-    is_wildcard: false,
-    entity_type_id: '',
-    parameter_id: '',
-    domain: '',
-    key: '',
-    operator: '=',
-    value_type: 'string',
-    value_string: '',
-    value_number: '',
-    value_boolean: false,
-    sort_order: 0,
+
+  // State to track per-slot constraints (similar to RecipeForm)
+  const [perSlotConstraints, setPerSlotConstraints] = useState<Record<string, OptionSpec[]>>({
+    consumes: [],
+    requires: [],
+    produces: [],
   });
 
   useEffect(() => {
@@ -120,6 +122,11 @@ export function SlotDefinitionsPage() {
     try {
       const data = await listSlotGroups(entityTypeId!);
       setSlotGroups(data);
+      
+      // Load template constraints for each group
+      for (const group of data) {
+        loadTemplateConstraints(group.id, group.type as 'consumes' | 'requires' | 'produces');
+      }
     } catch (err) {
       setError('Failed to load slot groups');
     } finally {
@@ -155,41 +162,33 @@ export function SlotDefinitionsPage() {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!groupForm.kind) {
-      setError('Kind is required');
+  const handleCreateGroup = () => {
+    if (!groupForm.type) {
+      setError('Type is required');
       return;
     }
-    try {
-      await createSlotGroup(entityTypeId!, {
-        kind: groupForm.kind,
-        min_slots: groupForm.min_slots,
-        max_slots: groupForm.max_slots ? parseInt(groupForm.max_slots) : null,
-        sort_order: groupForm.sort_order,
-      });
-      setShowCreateGroupForm(false);
-      setGroupForm({ kind: 'consumes', min_slots: 0, max_slots: '', sort_order: 0 });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create slot group');
-    }
+    // Add to local state only, don't save to API yet
+    const newGroup: SlotGroup = {
+      id: `temp-${Date.now()}`,
+      entity_type_id: entityTypeId!,
+      type: groupForm.type,
+      min_slots: groupForm.min_slots,
+      max_slots: groupForm.max_slots ? parseInt(groupForm.max_slots) : null,
+      default_slots_qty: groupForm.default_slots_qty,
+      sort_order: groupForm.sort_order,
+      constraints: [],
+      slot_definitions: [],
+    };
+    setSlotGroups((prev: SlotGroup[]) => [...prev, newGroup]);
+    setShowCreateGroupForm(false);
+    setGroupForm({ type: 'consumes', min_slots: 0, max_slots: '', default_slots_qty: 0, sort_order: 0 });
   };
 
-  const handleUpdateGroup = async () => {
-    if (!editingGroup) return;
-    try {
-      await updateSlotGroup(editingGroup.id, {
-        kind: groupForm.kind,
-        min_slots: groupForm.min_slots,
-        max_slots: groupForm.max_slots ? parseInt(groupForm.max_slots) : null,
-        sort_order: groupForm.sort_order,
-      });
-      setEditingGroup(null);
-      setGroupForm({ kind: 'consumes', min_slots: 0, max_slots: '', sort_order: 0 });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update slot group');
-    }
+  const handleUpdateGroup = (groupId: string, updates: Partial<SlotGroup>) => {
+    // Update local state only, don't save to API yet
+    setSlotGroups((prev: SlotGroup[]) => prev.map((g: SlotGroup) => 
+      g.id === groupId ? { ...g, ...updates } : g
+    ));
   };
 
   const handleDeleteGroup = async (groupId: string) => {
@@ -202,212 +201,6 @@ export function SlotDefinitionsPage() {
     }
   };
 
-  const handleCreateDefinition = async (groupId: string) => {
-    if (!definitionForm.slot_key.trim()) {
-      setError('Slot key is required');
-      return;
-    }
-    try {
-      await createSlotDefinition(groupId, {
-        slot_key: definitionForm.slot_key,
-        min_occurrences: definitionForm.min_occurrences,
-        max_occurrences: definitionForm.max_occurrences ? parseInt(definitionForm.max_occurrences) : null,
-        sort_order: definitionForm.sort_order,
-      });
-      setShowDefinitionForm(false);
-      setDefinitionForm({ slot_key: '', min_occurrences: 0, max_occurrences: '', sort_order: 0 });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create slot definition');
-    }
-  };
-
-  const handleUpdateDefinition = async () => {
-    if (!editingDefinition) return;
-    try {
-      await updateSlotDefinition(editingDefinition.id, {
-        slot_key: definitionForm.slot_key,
-        min_occurrences: definitionForm.min_occurrences,
-        max_occurrences: definitionForm.max_occurrences ? parseInt(definitionForm.max_occurrences) : null,
-        sort_order: definitionForm.sort_order,
-      });
-      setEditingDefinition(null);
-      setDefinitionForm({ slot_key: '', min_occurrences: 0, max_occurrences: '', sort_order: 0 });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update slot definition');
-    }
-  };
-
-  const handleDeleteDefinition = async (definitionId: string) => {
-    if (!confirm('Are you sure you want to delete this slot definition?')) return;
-    try {
-      await deleteSlotDefinition(definitionId);
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete slot definition');
-    }
-  };
-
-  const handleCreateConstraint = async () => {
-    if (!constraintParent) return;
-    
-    if (!constraintForm.is_wildcard && (!constraintForm.domain || !constraintForm.key || !constraintForm.operator)) {
-      setError('Non-wildcard constraints require domain, key, and operator');
-      return;
-    }
-    
-    try {
-      const payload: any = {
-        is_wildcard: constraintForm.is_wildcard,
-        sort_order: constraintForm.sort_order,
-      };
-      
-      if (!constraintForm.is_wildcard) {
-        payload.domain = constraintForm.domain;
-        payload.key = constraintForm.key;
-        payload.operator = constraintForm.operator;
-        
-        if (constraintForm.value_type === 'string') {
-          payload.value_string = constraintForm.value_string;
-        } else if (constraintForm.value_type === 'number') {
-          payload.value_number = constraintForm.value_number ? parseFloat(constraintForm.value_number) : null;
-        } else if (constraintForm.value_type === 'boolean') {
-          payload.value_boolean = constraintForm.value_boolean;
-        }
-      }
-      
-      if (constraintParent.type === 'group') {
-        await createGroupConstraint(constraintParent.id, payload);
-      } else {
-        await createDefinitionConstraint(constraintParent.id, payload);
-      }
-      
-      setShowConstraintForm(false);
-      setConstraintParent(null);
-      setConstraintForm({
-        is_wildcard: false,
-        entity_type_id: '',
-        parameter_id: '',
-        domain: '',
-        key: '',
-        operator: '=',
-        value_type: 'string',
-        value_string: '',
-        value_number: '',
-        value_boolean: false,
-        sort_order: 0,
-      });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create constraint');
-    }
-  };
-
-  const handleUpdateConstraint = async () => {
-    if (!editingConstraint) return;
-    
-    try {
-      const payload: any = {
-        is_wildcard: constraintForm.is_wildcard,
-        sort_order: constraintForm.sort_order,
-      };
-      
-      if (!constraintForm.is_wildcard) {
-        payload.domain = constraintForm.domain;
-        payload.key = constraintForm.key;
-        payload.operator = constraintForm.operator;
-        
-        if (constraintForm.value_type === 'string') {
-          payload.value_string = constraintForm.value_string;
-        } else if (constraintForm.value_type === 'number') {
-          payload.value_number = constraintForm.value_number ? parseFloat(constraintForm.value_number) : null;
-        } else if (constraintForm.value_type === 'boolean') {
-          payload.value_boolean = constraintForm.value_boolean;
-        }
-      }
-      
-      await updateSlotConstraint(editingConstraint.id, payload);
-      setEditingConstraint(null);
-      setConstraintForm({
-        is_wildcard: false,
-        entity_type_id: '',
-        parameter_id: '',
-        domain: '',
-        key: '',
-        operator: '=',
-        value_type: 'string',
-        value_string: '',
-        value_number: '',
-        value_boolean: false,
-        sort_order: 0,
-      });
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update constraint');
-    }
-  };
-
-  const handleDeleteConstraint = async (constraintId: string) => {
-    if (!confirm('Are you sure you want to delete this constraint?')) return;
-    try {
-      await deleteSlotConstraint(constraintId);
-      loadSlotGroups();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete constraint');
-    }
-  };
-
-  const startEditGroup = (group: SlotGroup) => {
-    setEditingGroup(group);
-    setGroupForm({
-      kind: group.kind,
-      min_slots: group.min_slots,
-      max_slots: group.max_slots?.toString() || '',
-      sort_order: group.sort_order,
-    });
-  };
-
-  const startEditDefinition = (def: SlotDefinition) => {
-    setEditingDefinition(def);
-    setDefinitionForm({
-      slot_key: def.slot_key,
-      min_occurrences: def.min_occurrences,
-      max_occurrences: def.max_occurrences?.toString() || '',
-      sort_order: def.sort_order,
-    });
-  };
-
-  const startEditConstraint = (constraint: SlotConstraint) => {
-    setEditingConstraint(constraint);
-    setConstraintForm({
-      is_wildcard: constraint.is_wildcard,
-      domain: constraint.domain || '',
-      key: constraint.key || '',
-      operator: constraint.operator || '=',
-      value_type: constraint.value_string ? 'string' : constraint.value_number !== null ? 'number' : constraint.value_boolean !== null ? 'boolean' : 'string',
-      value_string: constraint.value_string || '',
-      value_number: constraint.value_number?.toString() || '',
-      value_boolean: constraint.value_boolean || false,
-      sort_order: constraint.sort_order,
-    });
-  };
-
-  const startCreateConstraint = (type: 'group' | 'definition', id: string) => {
-    setConstraintParent({ type, id });
-    setShowConstraintForm(true);
-    setConstraintForm({
-      is_wildcard: false,
-      domain: '',
-      key: '',
-      operator: '=',
-      value_type: 'string',
-      value_string: '',
-      value_number: '',
-      value_boolean: false,
-      sort_order: 0,
-    });
-  };
 
   const getGroupKindLabel = (kind: string) => {
     const labels: Record<string, string> = {
@@ -418,10 +211,458 @@ export function SlotDefinitionsPage() {
     return labels[kind] || kind;
   };
 
-  const getConstraintDisplay = (constraint: SlotConstraint) => {
-    if (constraint.is_wildcard) return '*';
-    const value = constraint.value_string || constraint.value_number || constraint.value_boolean;
-    return `${constraint.domain}:${constraint.key} ${constraint.operator} ${value}`;
+  // Helper to get parameters for an entity type
+  const getParametersForEntityType = (entityTypeId: string) => {
+    return parameterDefinitions[entityTypeId] || [];
+  };
+
+  // Helper to get parameter definition
+  const getParameterDefinition = (domain: string, key: string, entityTypeId?: string | null) => {
+    if (!domain || !key) return null;
+    
+    if (entityTypeId) {
+      const params = parameterDefinitions[entityTypeId] || [];
+      return params.find((p) => p.domain === domain && p.key === key);
+    }
+    
+    // Search across all entity types
+    for (const etId of Object.keys(parameterDefinitions)) {
+      const params = parameterDefinitions[etId] || [];
+      const param = params.find((p) => p.domain === domain && p.key === key);
+      if (param) return param;
+    }
+    return null;
+  };
+
+  // Helper to add an OR group (option) to template constraints
+  const addTemplateOrGroup = (type: 'consumes' | 'requires' | 'produces') => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      if (!newConstraints[type]) {
+        newConstraints[type] = [];
+      }
+      
+      const defaultConstraint: ConstraintSpec = {
+        origin: 'system',
+        system_key: 'group',
+        entity_type_id: null,
+        domain: null,
+        key: null,
+        operator: '=',
+        value_string: entityTypes[0]?.name || null,
+      };
+
+      const newOption: OptionSpec = {
+        constraints: [defaultConstraint],
+        quantity: 1,
+      };
+
+      newConstraints[type] = [...newConstraints[type], newOption];
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove an OR group from template constraints
+  const removeTemplateOrGroup = (type: 'consumes' | 'requires' | 'produces', orGroupIndex: number) => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[type] = newConstraints[type].filter((_, i) => i !== orGroupIndex);
+      return newConstraints;
+    });
+  };
+
+  // Helper to update option quantity
+  const updateTemplateOptionQuantity = (type: 'consumes' | 'requires' | 'produces', orGroupIndex: number, quantity: number) => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[type] = [...newConstraints[type]];
+      newConstraints[type][orGroupIndex] = {
+        ...newConstraints[type][orGroupIndex],
+        quantity,
+      };
+      return newConstraints;
+    });
+  };
+
+  // Helper to add a constraint to an OR group
+  const addTemplateConstraint = (type: 'consumes' | 'requires' | 'produces', orGroupIndex: number) => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[type] = [...newConstraints[type]];
+      newConstraints[type][orGroupIndex] = { ...newConstraints[type][orGroupIndex] };
+
+      let firstDomain = null;
+      let firstKey = null;
+      let firstEntityTypeId = entityTypes[0]?.id || null;
+
+      for (const et of entityTypes) {
+        const params = getParametersForEntityType(et.id);
+        if (params.length > 0) {
+          firstDomain = params[0].domain;
+          firstKey = params[0].key;
+          firstEntityTypeId = et.id;
+          break;
+        }
+      }
+
+      const newConstraint: ConstraintSpec = {
+        origin: 'parameter',
+        entity_type_id: firstEntityTypeId,
+        domain: firstDomain,
+        key: firstKey,
+        operator: '=',
+        value_string: null,
+        value_number: undefined,
+        value_boolean: undefined,
+      };
+
+      newConstraints[type][orGroupIndex] = {
+        ...newConstraints[type][orGroupIndex],
+        constraints: [...newConstraints[type][orGroupIndex].constraints, newConstraint],
+      };
+
+      return newConstraints;
+    });
+  };
+
+  // Helper to update a constraint
+  const updateTemplateConstraint = (
+    type: 'consumes' | 'requires' | 'produces',
+    orGroupIndex: number,
+    constraintIndex: number,
+    field: keyof ConstraintSpec,
+    value: any
+  ) => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[type] = [...newConstraints[type]];
+      newConstraints[type][orGroupIndex] = { ...newConstraints[type][orGroupIndex] };
+      newConstraints[type][orGroupIndex] = {
+        ...newConstraints[type][orGroupIndex],
+        constraints: [...newConstraints[type][orGroupIndex].constraints],
+      };
+      newConstraints[type][orGroupIndex].constraints[constraintIndex][field] = value;
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove a constraint
+  const removeTemplateConstraint = (
+    type: 'consumes' | 'requires' | 'produces',
+    orGroupIndex: number,
+    constraintIndex: number
+  ) => {
+    setTemplateConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[type] = [...newConstraints[type]];
+      newConstraints[type][orGroupIndex] = {
+        ...newConstraints[type][orGroupIndex],
+        constraints: newConstraints[type][orGroupIndex].constraints.filter(
+          (_, i) => i !== constraintIndex
+        ),
+      };
+      return newConstraints;
+    });
+  };
+
+  // Convert template constraints (OptionSpec[]) to backend constraint format
+  const templateConstraintsToBackendFormat = (options: OptionSpec[]): any[] => {
+    const constraints: any[] = [];
+    let sortOrder = 0;
+
+    for (const option of options) {
+      for (const constraint of option.constraints) {
+        if (constraint.origin === 'system' && constraint.system_key === 'group') {
+          // System group constraint
+          constraints.push({
+            domain: null,
+            key: null,
+            operator: '=',
+            value_string: constraint.value_string,
+            value_number: null,
+            value_boolean: null,
+            is_wildcard: false,
+            sort_order: sortOrder++,
+          });
+        } else if (constraint.origin === 'parameter') {
+          // Parameter constraint
+          constraints.push({
+            domain: constraint.domain,
+            key: constraint.key,
+            operator: constraint.operator,
+            value_string: constraint.value_string,
+            value_number: constraint.value_number,
+            value_boolean: constraint.value_boolean,
+            is_wildcard: false,
+            sort_order: sortOrder++,
+          });
+        }
+      }
+    }
+
+    return constraints;
+  };
+
+  // Convert backend constraints to template constraints (OptionSpec[]) format
+  const backendConstraintsToTemplateFormat = (backendConstraints: SlotConstraint[]): OptionSpec[] => {
+    const options: OptionSpec[] = [];
+    const systemGroupConstraint = backendConstraints.find(c => c.domain === null && c.key === null);
+    
+    if (systemGroupConstraint) {
+      // Create an option with the system group constraint
+      const option: OptionSpec = {
+        constraints: [{
+          origin: 'system',
+          system_key: 'group',
+          entity_type_id: null,
+          domain: null,
+          key: null,
+          operator: systemGroupConstraint.operator || '=',
+          value_string: systemGroupConstraint.value_string,
+          value_number: systemGroupConstraint.value_number,
+          value_boolean: systemGroupConstraint.value_boolean,
+        }],
+        quantity: 1,
+      };
+      
+      // Add parameter constraints to this option
+      const paramConstraints = backendConstraints.filter(c => c.domain !== null || c.key !== null);
+      for (const param of paramConstraints) {
+        option.constraints.push({
+          origin: 'parameter',
+          system_key: null,
+          entity_type_id: null,
+          domain: param.domain,
+          key: param.key,
+          operator: param.operator || '=',
+          value_string: param.value_string,
+          value_number: param.value_number,
+          value_boolean: param.value_boolean,
+        });
+      }
+      
+      options.push(option);
+    } else {
+      // No system group constraint, group parameter constraints by their position
+      const paramConstraints = backendConstraints.filter(c => c.domain !== null || c.key !== null);
+      if (paramConstraints.length > 0) {
+        const option: OptionSpec = {
+          constraints: paramConstraints.map(c => ({
+            origin: 'parameter' as const,
+            system_key: null,
+            entity_type_id: null,
+            domain: c.domain,
+            key: c.key,
+            operator: c.operator || '=',
+            value_string: c.value_string,
+            value_number: c.value_number,
+            value_boolean: c.value_boolean,
+          })),
+          quantity: 1,
+        };
+        options.push(option);
+      }
+    }
+
+    return options;
+  };
+
+  // Save template constraints to backend
+  const saveTemplateConstraints = async (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    try {
+      // Delete existing constraints for this slot group
+      const group = slotGroups.find((g: SlotGroup) => g.id === slotGroupId);
+      if (group) {
+        for (const constraint of group.constraints) {
+          await deleteSlotConstraint(constraint.id);
+        }
+      }
+
+      // Convert and create new constraints
+      const options = templateConstraints[type] || [];
+      const backendConstraints = templateConstraintsToBackendFormat(options);
+
+      for (const constraint of backendConstraints) {
+        await createGroupConstraint(slotGroupId, constraint);
+      }
+
+      // Update local state to reflect saved constraints without full reload
+      setSlotGroups((prev: SlotGroup[]) => prev.map((g: SlotGroup) => {
+        if (g.id === slotGroupId) {
+          return { ...g, constraints: backendConstraints };
+        }
+        return g;
+      }));
+    } catch (err: any) {
+      setError(err.message || 'Failed to save template constraints');
+    }
+  };
+
+  // Load template constraints from backend
+  const loadTemplateConstraints = (slotGroupId: string, type: 'consumes' | 'requires' | 'produces') => {
+    const group = slotGroups.find((g: SlotGroup) => g.id === slotGroupId);
+    if (!group) return;
+
+    const options = backendConstraintsToTemplateFormat(group.constraints);
+    setTemplateConstraints((prev: Record<string, OptionSpec[]>) => ({
+      ...prev,
+      [type]: options,
+    }));
+  };
+
+  // Helper to add a slot for per-slot definitions
+  const addSlot = (kind: 'requires' | 'consumes' | 'produces') => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      const currentArray = newConstraints[kind] || [];
+      newConstraints[kind] = [...currentArray, []];
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove a slot by index
+  const removeSlot = (kind: 'requires' | 'consumes' | 'produces', index: number) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = newConstraints[kind].filter((_, i) => i !== index);
+      return newConstraints;
+    });
+  };
+
+  // Helper to add an OR group to a slot
+  const addPerSlotOrGroup = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      if (!newConstraints[kind][slotIndex]) {
+        newConstraints[kind][slotIndex] = [];
+      }
+      newConstraints[kind] = [...newConstraints[kind]];
+
+      const defaultConstraint: ConstraintSpec = {
+        origin: 'system',
+        system_key: 'group',
+        entity_type_id: null,
+        domain: null,
+        key: null,
+        operator: '=',
+        value_string: entityTypes[0]?.name || null,
+      };
+
+      const newOption: OptionSpec = {
+        constraints: [defaultConstraint],
+        quantity: 1,
+      };
+
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], newOption];
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove an OR group from a slot
+  const removePerSlotOrGroup = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind][slotIndex] = newConstraints[kind][slotIndex].filter((_, i) => i !== orGroupIndex);
+      return newConstraints;
+    });
+  };
+
+  // Helper to update option quantity
+  const updatePerSlotOptionQuantity = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number, quantity: number) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        quantity,
+      };
+      return newConstraints;
+    });
+  };
+
+  // Helper to add a constraint to an OR group
+  const addPerSlotConstraint = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+
+      let firstDomain = null;
+      let firstKey = null;
+      let firstEntityTypeId = entityTypes[0]?.id || null;
+
+      for (const et of entityTypes) {
+        const params = getParametersForEntityType(et.id);
+        if (params.length > 0) {
+          firstDomain = params[0].domain;
+          firstKey = params[0].key;
+          firstEntityTypeId = et.id;
+          break;
+        }
+      }
+
+      const newConstraint: ConstraintSpec = {
+        origin: 'parameter',
+        entity_type_id: firstEntityTypeId,
+        domain: firstDomain,
+        key: firstKey,
+        operator: '=',
+        value_string: null,
+        value_number: undefined,
+        value_boolean: undefined,
+      };
+
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        constraints: [...newConstraints[kind][slotIndex][orGroupIndex].constraints, newConstraint],
+      };
+
+      return newConstraints;
+    });
+  };
+
+  // Helper to update a constraint
+  const updatePerSlotConstraint = (
+    kind: 'requires' | 'consumes' | 'produces',
+    slotIndex: number,
+    orGroupIndex: number,
+    constraintIndex: number,
+    field: keyof ConstraintSpec,
+    value: any
+  ) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        constraints: [...newConstraints[kind][slotIndex][orGroupIndex].constraints],
+      };
+      newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex][field] = value;
+      return newConstraints;
+    });
+  };
+
+  // Helper to remove a constraint
+  const removePerSlotConstraint = (
+    kind: 'requires' | 'consumes' | 'produces',
+    slotIndex: number,
+    orGroupIndex: number,
+    constraintIndex: number
+  ) => {
+    setPerSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        constraints: newConstraints[kind][slotIndex][orGroupIndex].constraints.filter(
+          (_, i) => i !== constraintIndex
+        ),
+      };
+      return newConstraints;
+    });
   };
 
   if (loading) {
@@ -461,11 +702,11 @@ export function SlotDefinitionsPage() {
         <div className="card" style={{ marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Slot Group</h3>
           <div className="form-field">
-            <label className="form-label">Kind *</label>
+            <label className="form-label">Type *</label>
             <select
               className="form-input"
-              value={groupForm.kind}
-              onChange={(e) => setGroupForm({ ...groupForm, kind: e.target.value })}
+              value={groupForm.type}
+              onChange={(e) => setGroupForm({ ...groupForm, type: e.target.value })}
             >
               <option value="consumes">Consumes</option>
               <option value="requires">Requires</option>
@@ -493,6 +734,16 @@ export function SlotDefinitionsPage() {
             />
           </div>
           <div className="form-field">
+            <label className="form-label">Default Slots Qty</label>
+            <input
+              type="number"
+              className="form-input"
+              value={groupForm.default_slots_qty}
+              onChange={(e) => setGroupForm({ ...groupForm, default_slots_qty: parseInt(e.target.value) || 0 })}
+              min="0"
+            />
+          </div>
+          <div className="form-field">
             <label className="form-label">Sort Order</label>
             <input
               type="number"
@@ -508,18 +759,18 @@ export function SlotDefinitionsPage() {
         </div>
       )}
 
-      {['consumes', 'requires', 'produces'].map((kind) => {
-        const group = slotGroups.find(g => g.kind === kind);
+      {['consumes', 'requires', 'produces'].map((type) => {
+        const group = slotGroups.find(g => g.type === type);
         if (!group) {
           return (
-            <div key={kind} className="card" style={{ marginBottom: '12px' }}>
-              <p style={{ margin: 0, color: '#666' }}>No {getGroupKindLabel(kind)} group defined</p>
+            <div key={type} className="card" style={{ marginBottom: '12px' }}>
+              <p style={{ margin: 0, color: '#666' }}>No {getGroupKindLabel(type)} group defined</p>
               <button
-                onClick={() => { setShowCreateGroupForm(true); setGroupForm({ ...groupForm, kind }); }}
+                onClick={() => { setShowCreateGroupForm(true); setGroupForm({ ...groupForm, type }); }}
                 className="button button--primary"
                 style={{ marginTop: '8px', fontSize: '12px' }}
               >
-                Add {getGroupKindLabel(kind)} Group
+                Add {getGroupKindLabel(type)} Group
               </button>
             </div>
           );
@@ -529,345 +780,592 @@ export function SlotDefinitionsPage() {
           <div key={group.id} className="card" style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: '0 0 4px 0' }}>{getGroupKindLabel(group.kind)}</h3>
-                <p style={{ margin: 0, color: '#666', fontSize: '14px' }}>
-                  Min: {group.min_slots} | Max: {group.max_slots || 'unlimited'} | 
-                  Constraints: {group.constraints.length} | Definitions: {group.slot_definitions.length}
-                </p>
+                <h3 style={{ margin: '0 0 4px 0' }}>{getGroupKindLabel(group.type)}</h3>
               </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button onClick={() => startEditGroup(group)} className="button button--secondary">
-                  Edit
-                </button>
-                <button onClick={() => handleDeleteGroup(group.id)} className="button button--danger">
-                  Delete
-                </button>
+              <button onClick={() => handleDeleteGroup(group.id)} className="button button--danger">
+                Delete
+              </button>
+            </div>
+
+            <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
+              <h4 style={{ marginTop: 0 }}>Slot Group Settings</h4>
+              <div className="form-field">
+                <label className="form-label">Type *</label>
+                <select
+                  className="form-input"
+                  value={group.type}
+                  onChange={(e) => handleUpdateGroup(group.id, { type: e.target.value })}
+                >
+                  <option value="consumes">Consumes</option>
+                  <option value="requires">Requires</option>
+                  <option value="produces">Produces</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label className="form-label">Min Slots</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={group.min_slots}
+                  onChange={(e) => handleUpdateGroup(group.id, { min_slots: parseInt(e.target.value) || 0 })}
+                  min="0"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Max Slots (leave blank for unlimited)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={group.max_slots || ''}
+                  onChange={(e) => handleUpdateGroup(group.id, { max_slots: e.target.value ? parseInt(e.target.value) : null })}
+                  min="0"
+                />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Default Slots Qty</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={group.default_slots_qty}
+                  onChange={(e) => handleUpdateGroup(group.id, { default_slots_qty: parseInt(e.target.value) || 0 })}
+                  min="0"
+                />
               </div>
             </div>
 
-            {editingGroup?.id === group.id && (
-              <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
-                <h4 style={{ marginTop: 0 }}>Edit Slot Group</h4>
-                <div className="form-field">
-                  <label className="form-label">Kind *</label>
-                  <select
-                    className="form-input"
-                    value={groupForm.kind}
-                    onChange={(e) => setGroupForm({ ...groupForm, kind: e.target.value })}
-                  >
-                    <option value="consumes">Consumes</option>
-                    <option value="requires">Requires</option>
-                    <option value="produces">Produces</option>
-                  </select>
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Min Slots</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={groupForm.min_slots}
-                    onChange={(e) => setGroupForm({ ...groupForm, min_slots: parseInt(e.target.value) || 0 })}
-                    min="0"
-                  />
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Max Slots (leave blank for unlimited)</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={groupForm.max_slots}
-                    onChange={(e) => setGroupForm({ ...groupForm, max_slots: e.target.value })}
-                    min="0"
-                  />
-                </div>
-                <div className="form-actions">
-                  <button onClick={() => { setEditingGroup(null); setGroupForm({ kind: 'consumes', min_slots: 0, max_slots: '', sort_order: 0 }); }} className="button button--secondary">Cancel</button>
-                  <button onClick={handleUpdateGroup} className="button button--primary">Save</button>
-                </div>
-              </div>
-            )}
-
             <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
                 <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ margin: 0 }}>Default Constraints</h4>
-                    <button onClick={() => startCreateConstraint('group', group.id)} className="button button--primary">
-                      Add Constraint
+                  <h4 style={{ margin: '0 0 8px 0' }}>Default Slot Template</h4>
+                  <p style={{ color: '#888', fontSize: '13px', margin: '0 0 12px 0' }}>
+                    These constraints will be applied to all new slots created during recipe creation.
+                  </p>
+                  
+                  {/* Inline Constraint Builder */}
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                      Options:
+                    </div>
+                    
+                    {(templateConstraints[group.type] || []).map((option, orGroupIndex) => (
+                      <div key={orGroupIndex} className="card" style={{ padding: '12px', marginBottom: '12px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center',
+                          marginBottom: '8px',
+                          paddingBottom: '8px',
+                          borderBottom: '1px solid rgba(255,255,255,0.1)'
+                        }}>
+                          <div>
+                            <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>
+                              Option {orGroupIndex + 1}
+                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                              <label className="form-label" style={{ fontSize: '11px', marginBottom: '0' }}>Quantity:</label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                value={option.quantity || 1}
+                                onChange={(e) => updateTemplateOptionQuantity(group.type, orGroupIndex, e.target.value ? Number(e.target.value) : 1)}
+                                min="0"
+                                step="any"
+                                style={{ fontSize: '12px', padding: '4px 8px', width: '60px' }}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeTemplateOrGroup(group.type, orGroupIndex)}
+                            style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                        
+                        {option.constraints.map((constraint, constraintIndex) => (
+                          <div key={constraintIndex} style={{
+                            display: 'flex',
+                            gap: '4px',
+                            alignItems: 'center',
+                            marginBottom: '8px'
+                          }}>
+                            {/* Type selector */}
+                            <select
+                              value={constraint.origin || 'parameter'}
+                              onChange={(e) => {
+                                const newOrigin = e.target.value as 'system' | 'parameter';
+                                updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'origin', newOrigin);
+                                if (newOrigin === 'system') {
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'entity_type_id', null);
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', null);
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', null);
+                                } else {
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'system_key', null);
+                                }
+                              }}
+                              className="form-input"
+                              style={{ width: '80px', fontSize: '12px', padding: '5px 6px' }}
+                            >
+                              <option value="parameter">Parameter</option>
+                              <option value="system">System</option>
+                            </select>
+
+                            {/* Key selector */}
+                            <select
+                              value={constraint.origin === 'system' ? (constraint.system_key || '') : (constraint.domain && constraint.key ? `${constraint.domain}:${constraint.key}` : '')}
+                              onChange={(e) => {
+                                if (constraint.origin === 'system') {
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'system_key', e.target.value);
+                                } else {
+                                  const [domain, key] = e.target.value.split(':');
+                                  if (domain && key) {
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', domain);
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', key);
+                                  } else {
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', null);
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', null);
+                                  }
+                                }
+                              }}
+                              className="form-input"
+                              style={{ width: '200px', fontSize: '12px', padding: '5px 6px' }}
+                            >
+                              {constraint.origin === 'system' ? (
+                                <>
+                                  <option value="id">id</option>
+                                  <option value="group">group</option>
+                                </>
+                              ) : (
+                                entityTypes.flatMap((et) => 
+                                  getParametersForEntityType(et.id).map((param) => ({
+                                    domain: param.domain,
+                                    key: param.key,
+                                    label: `${param.domain}:${param.key}`
+                                  }))
+                                ).map((param, idx) => (
+                                  <option key={`${param.domain}:${param.key}:${idx}`} value={`${param.domain}:${param.key}`}>
+                                    {param.label}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+
+                            {/* Operator selector */}
+                            <select
+                              value={constraint.operator || '='}
+                              onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'operator', e.target.value)}
+                              className="form-input"
+                              style={{ width: '50px', fontSize: '12px', padding: '5px 6px' }}
+                            >
+                              <option value="=">=</option>
+                              <option value="<">&lt;</option>
+                              <option value="<=">&le;</option>
+                              <option value=">">&gt;</option>
+                              <option value=">=">&ge;</option>
+                              <option value="in">in</option>
+                            </select>
+
+                            {/* Value input */}
+                            {constraint.origin === 'system' ? (
+                              constraint.system_key === 'group' ? (
+                                <select
+                                  value={constraint.value_string || ''}
+                                  onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                  className="form-input"
+                                  style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                >
+                                  {entityTypes.map((et) => (
+                                    <option key={et.id} value={et.name}>
+                                      {et.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={constraint.value_string || ''}
+                                  onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                  placeholder="Value"
+                                  className="form-input"
+                                  style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                />
+                              )
+                            ) : (
+                              (() => {
+                                const paramDef = getParameterDefinition(constraint.domain, constraint.key, constraint.entity_type_id);
+                                const valueType = paramDef?.value_type || 'string';
+                                
+                                if (valueType === 'string') {
+                                  return (
+                                    <input
+                                      type="text"
+                                      value={constraint.value_string || ''}
+                                      onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                      placeholder="Value"
+                                      className="form-input"
+                                      style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                    />
+                                  );
+                                } else if (valueType === 'number') {
+                                  return (
+                                    <input
+                                      type="number"
+                                      value={constraint.value_number ?? ''}
+                                      onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
+                                      placeholder="Value"
+                                      className="form-input"
+                                      style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                    />
+                                  );
+                                } else if (valueType === 'boolean') {
+                                  return (
+                                    <select
+                                      value={constraint.value_boolean === true ? 'true' : constraint.value_boolean === false ? 'false' : ''}
+                                      onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true' ? true : e.target.value === 'false' ? false : null)}
+                                      className="form-input"
+                                      style={{ flex: 1 }}
+                                    >
+                                      <option value="">Select...</option>
+                                      <option value="true">True</option>
+                                      <option value="false">False</option>
+                                    </select>
+                                  );
+                                }
+                                return null;
+                              })()
+                            )}
+                            
+                            <button
+                              onClick={() => removeTemplateConstraint(group.type, orGroupIndex, constraintIndex)}
+                              style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        
+                        <button
+                          onClick={() => addTemplateConstraint(group.type, orGroupIndex)}
+                          className="button button--primary"
+                          style={{ padding: '4px 8px', fontSize: '12px' }}
+                        >
+                          + Add Parameter Requirement
+                        </button>
+                      </div>
+                    ))}
+                    
+                    <button
+                      onClick={() => addTemplateOrGroup(group.type)}
+                      className="button button--primary"
+                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                    >
+                      + Add Option
                     </button>
                   </div>
-                  {group.constraints.length === 0 ? (
-                    <p style={{ color: '#666', fontSize: '14px' }}>No default constraints</p>
-                  ) : (
-                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
-                      {group.constraints.map((constraint) => (
-                        <li key={constraint.id} style={{ marginBottom: '4px' }}>
-                          <span>{getConstraintDisplay(constraint)}</span>
-                          <button onClick={() => startEditConstraint(constraint)} className="button button--secondary" style={{ marginLeft: '8px' }}>Edit</button>
-                          <button onClick={() => handleDeleteConstraint(constraint.id)} className="button button--danger" style={{ marginLeft: '4px' }}>Delete</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
 
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <h4 style={{ margin: 0 }}>Slot Definitions</h4>
-                    <button onClick={() => { setShowDefinitionForm(true); setEditingDefinition(null); }} className="button button--primary">
-                      Add Slot Definition
-                    </button>
-                  </div>
-                  {group.slot_definitions.length === 0 ? (
-                    <p style={{ color: '#666', fontSize: '14px' }}>No slot definitions</p>
+                  <h4 style={{ margin: '0 0 8px 0' }}>Per Slot Definitions</h4>
+                  {(perSlotConstraints[group.type] || []).length === 0 ? (
+                    <p style={{ color: '#666', fontSize: '14px' }}>No slots defined</p>
                   ) : (
-                    group.slot_definitions.map((def) => (
-                      <div key={def.id} className="card" style={{ padding: '16px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <strong>{def.slot_key}</strong>
-                            <span style={{ marginLeft: '8px', color: '#666', fontSize: '13px' }}>
-                              Min: {def.min_occurrences} | Max: {def.max_occurrences || 'unlimited'}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            <button onClick={() => startEditDefinition(def)} className="button button--secondary">Edit</button>
-                            <button onClick={() => handleDeleteDefinition(def.id)} className="button button--danger">Delete</button>
-                          </div>
+                    (perSlotConstraints[group.type] || []).map((slotOrGroups, slotIndex) => (
+                      <div key={`${group.type}-${slotIndex}`} className="card" style={{ padding: '16px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <p style={{ color: '#999', fontStyle: 'italic', margin: 0 }}>
+                            {group.type.charAt(0).toUpperCase() + group.type.slice(1)} slot {slotIndex + 1}
+                          </p>
+                          <button
+                            onClick={() => removeSlot(group.type as 'requires' | 'consumes' | 'produces', slotIndex)}
+                            className="button button--danger"
+                            style={{ padding: '2px 6px', fontSize: '10px' }}
+                          >
+                            Remove
+                          </button>
                         </div>
-                        {def.constraints.length > 0 && (
-                          <div className="card" style={{ marginTop: '12px', padding: '12px' }}>
-                            <strong style={{ fontSize: '12px' }}>Constraints:</strong>
-                            <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', fontSize: '13px' }}>
-                              {def.constraints.map((constraint) => (
-                                <li key={constraint.id}>
-                                  {getConstraintDisplay(constraint)}
-                                  <button onClick={() => startEditConstraint(constraint)} className="button button--secondary" style={{ marginLeft: '8px' }}>Edit</button>
-                                  <button onClick={() => handleDeleteConstraint(constraint.id)} className="button button--danger" style={{ marginLeft: '4px' }}>Delete</button>
-                                </li>
-                              ))}
-                            </ul>
+
+                        {/* Constraint Builder */}
+                        <div style={{ marginTop: '8px' }}>
+                          <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                            Options:
                           </div>
-                        )}
-                        <button onClick={() => startCreateConstraint('definition', def.id)} className="button button--primary" style={{ marginTop: '12px' }}>
-                          Add Constraint
-                        </button>
+
+                          {slotOrGroups.map((option, orGroupIndex) => (
+                            <div key={orGroupIndex} className="card" style={{ padding: '12px', marginBottom: '12px' }}>
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                marginBottom: '8px',
+                                paddingBottom: '8px',
+                                borderBottom: '1px solid rgba(255,255,255,0.1)'
+                              }}>
+                                <div>
+                                  <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>
+                                    Option {orGroupIndex + 1}
+                                  </span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                    <label className="form-label" style={{ fontSize: '11px', marginBottom: '0' }}>Quantity:</label>
+                                    <input
+                                      type="number"
+                                      className="form-input"
+                                      value={option.quantity || 1}
+                                      onChange={(e) => updatePerSlotOptionQuantity(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, e.target.value ? Number(e.target.value) : 1)}
+                                      min="0"
+                                      step="any"
+                                      style={{ fontSize: '12px', padding: '4px 8px', width: '60px' }}
+                                    />
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => removePerSlotOrGroup(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex)}
+                                  style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+
+                              {option.constraints.map((constraint, constraintIndex) => (
+                                <div key={constraintIndex} style={{
+                                  display: 'flex',
+                                  gap: '4px',
+                                  alignItems: 'center',
+                                  marginBottom: '8px'
+                                }}>
+                                  {/* Type selector */}
+                                  <select
+                                    value={constraint.origin || 'parameter'}
+                                    onChange={(e) => {
+                                      const newOrigin = e.target.value as 'system' | 'parameter';
+                                      updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'origin', newOrigin);
+                                      if (newOrigin === 'system') {
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'entity_type_id', null);
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', null);
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', null);
+                                      } else {
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'system_key', null);
+                                      }
+                                    }}
+                                    className="form-input"
+                                    style={{ width: '80px', fontSize: '12px', padding: '5px 6px' }}
+                                  >
+                                    <option value="parameter">Parameter</option>
+                                    <option value="system">System</option>
+                                  </select>
+
+                                  {/* Key selector */}
+                                  <select
+                                    value={constraint.origin === 'system' ? (constraint.system_key || '') : (constraint.domain && constraint.key ? `${constraint.domain}:${constraint.key}` : '')}
+                                    onChange={(e) => {
+                                      if (constraint.origin === 'system') {
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'system_key', e.target.value);
+                                      } else {
+                                        const [domain, key] = e.target.value.split(':');
+                                        if (domain && key) {
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', domain);
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', key);
+                                        } else {
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', null);
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', null);
+                                        }
+                                      }
+                                    }}
+                                    className="form-input"
+                                    style={{ width: '200px', fontSize: '12px', padding: '5px 6px' }}
+                                  >
+                                    {constraint.origin === 'system' ? (
+                                      <>
+                                        <option value="id">id</option>
+                                        <option value="group">group</option>
+                                      </>
+                                    ) : (
+                                      entityTypes.flatMap((et) =>
+                                        getParametersForEntityType(et.id).map((param) => ({
+                                          domain: param.domain,
+                                          key: param.key,
+                                          label: `${param.domain}:${param.key}`
+                                        }))
+                                      ).map((param, idx) => (
+                                        <option key={`${param.domain}:${param.key}:${idx}`} value={`${param.domain}:${param.key}`}>
+                                          {param.label}
+                                        </option>
+                                      ))
+                                    )}
+                                  </select>
+
+                                  {/* Operator selector */}
+                                  <select
+                                    value={constraint.operator || '='}
+                                    onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'operator', e.target.value)}
+                                    className="form-input"
+                                    style={{ width: '50px', fontSize: '12px', padding: '5px 6px' }}
+                                  >
+                                    <option value="=">=</option>
+                                    <option value="<">&lt;</option>
+                                    <option value="<=">&le;</option>
+                                    <option value=">">&gt;</option>
+                                    <option value=">=">&ge;</option>
+                                    <option value="in">in</option>
+                                  </select>
+
+                                  {/* Value input */}
+                                  {constraint.origin === 'system' ? (
+                                    constraint.system_key === 'group' ? (
+                                      <select
+                                        value={constraint.value_string || ''}
+                                        onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                        className="form-input"
+                                        style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                      >
+                                        {entityTypes.map((et) => (
+                                          <option key={et.id} value={et.name}>
+                                            {et.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={constraint.value_string || ''}
+                                        onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                        placeholder="Value"
+                                        className="form-input"
+                                        style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                      />
+                                    )
+                                  ) : (
+                                    (() => {
+                                      const paramDef = getParameterDefinition(constraint.domain, constraint.key, constraint.entity_type_id);
+                                      const valueType = paramDef?.value_type || 'string';
+
+                                      if (valueType === 'string') {
+                                        return (
+                                          <input
+                                            type="text"
+                                            value={constraint.value_string || ''}
+                                            onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                            placeholder="Value"
+                                            className="form-input"
+                                            style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                          />
+                                        );
+                                      } else if (valueType === 'number') {
+                                        return (
+                                          <input
+                                            type="number"
+                                            value={constraint.value_number ?? ''}
+                                            onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
+                                            placeholder="Value"
+                                            className="form-input"
+                                            style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
+                                          />
+                                        );
+                                      } else if (valueType === 'boolean') {
+                                        return (
+                                          <select
+                                            value={constraint.value_boolean === true ? 'true' : constraint.value_boolean === false ? 'false' : ''}
+                                            onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true' ? true : e.target.value === 'false' ? false : null)}
+                                            className="form-input"
+                                            style={{ flex: 1 }}
+                                          >
+                                            <option value="">Select...</option>
+                                            <option value="true">True</option>
+                                            <option value="false">False</option>
+                                          </select>
+                                        );
+                                      }
+                                      return null;
+                                    })()
+                                  )}
+
+                                  <button
+                                    onClick={() => removePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex)}
+                                    style={{ padding: '1px 4px', fontSize: '9px', border: '1px solid #ccc', background: '#fff' }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+
+                              <button
+                                onClick={() => addPerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex)}
+                                className="button button--primary"
+                                style={{ padding: '4px 8px', fontSize: '12px' }}
+                              >
+                                + Add Parameter Requirement
+                              </button>
+                            </div>
+                          ))}
+
+                          <button
+                            onClick={() => addPerSlotOrGroup(group.type as 'requires' | 'consumes' | 'produces', slotIndex)}
+                            className="button button--primary"
+                            style={{ padding: '4px 8px', fontSize: '12px' }}
+                          >
+                            + Add Option
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
+                  <button
+                    onClick={() => addSlot(group.type as 'requires' | 'consumes' | 'produces')}
+                    className="button button--primary"
+                    style={{ padding: '4px 8px', fontSize: '12px' }}
+                  >
+                    + Add Slot
+                  </button>
                 </div>
-
-                {showDefinitionForm && (
-                  <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
-                    <h5 style={{ marginTop: 0 }}>{editingDefinition ? 'Edit' : 'Create'} Slot Definition</h5>
-                    <div className="form-field">
-                      <label className="form-label">Slot Key *</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={definitionForm.slot_key}
-                        onChange={(e) => setDefinitionForm({ ...definitionForm, slot_key: e.target.value })}
-                        placeholder="e.g., 1, main_input, catalyst, *"
-                      />
-                      <small style={{ color: '#666' }}>Use numeric keys like 1, 2, 3 for positional slots, semantic keys like catalyst or main_input for named slots, or * for default unmatched slots.</small>
-                    </div>
-                    <div className="form-field">
-                      <label className="form-label">Min Occurrences</label>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={definitionForm.min_occurrences}
-                        onChange={(e) => setDefinitionForm({ ...definitionForm, min_occurrences: parseInt(e.target.value) || 0 })}
-                        min="0"
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label className="form-label">Max Occurrences (leave blank for unlimited)</label>
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={definitionForm.max_occurrences}
-                        onChange={(e) => setDefinitionForm({ ...definitionForm, max_occurrences: e.target.value })}
-                        min="0"
-                      />
-                    </div>
-                    <div className="form-actions">
-                      <button onClick={() => { setShowDefinitionForm(false); setEditingDefinition(null); setDefinitionForm({ slot_key: '', min_occurrences: 0, max_occurrences: '', sort_order: 0 }); }} className="button button--secondary">Cancel</button>
-                      <button onClick={editingDefinition ? handleUpdateDefinition : () => handleCreateDefinition(group.id)} className="button button--primary">
-                        {editingDefinition ? 'Save' : 'Create'}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
           </div>
         );
       })}
 
-      {showConstraintForm && (
-        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', backgroundColor: 'rgba(10,10,10,0.95)', border: '1px solid rgba(255,255,255,0.1)', padding: '24px', borderRadius: '18px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 1000, maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
-          <h3 style={{ marginTop: 0 }}>{editingConstraint ? 'Edit' : 'Create'} Constraint</h3>
-          <div className="form-field">
-            <label>
-              <input
-                type="checkbox"
-                checked={constraintForm.is_wildcard}
-                onChange={(e) => setConstraintForm({ ...constraintForm, is_wildcard: e.target.checked })}
-              />
-              <span style={{ marginLeft: '8px' }}>Wildcard (accepts any value)</span>
-            </label>
-          </div>
-          {!constraintForm.is_wildcard && (
-            <>
-              <div className="form-field">
-                <label className="form-label">Entity Type</label>
-                <select
-                  className="form-input"
-                  value={constraintForm.entity_type_id}
-                  onChange={(e) => {
-                    const selectedEntityTypeId = e.target.value;
-                    setConstraintForm({ 
-                      ...constraintForm, 
-                      entity_type_id: selectedEntityTypeId,
-                      parameter_id: '',
-                      domain: '',
-                      key: '',
-                      value_type: 'string'
-                    });
-                  }}
-                >
-                  <option value="">Select entity type...</option>
-                  {entityTypes.map((et) => (
-                    <option key={et.id} value={et.id}>{et.name} ({et.kind})</option>
-                  ))}
-                </select>
-              </div>
-              {constraintForm.entity_type_id && (
-                <div className="form-field">
-                  <label className="form-label">Parameter</label>
-                  <select
-                    className="form-input"
-                    value={constraintForm.parameter_id}
-                    onChange={(e) => {
-                      const selectedParamId = e.target.value;
-                      const params = parameterDefinitions[constraintForm.entity_type_id] || [];
-                      const selectedParam = params.find((p) => p.id === selectedParamId);
-                      if (selectedParam) {
-                        setConstraintForm({
-                          ...constraintForm,
-                          parameter_id: selectedParamId,
-                          domain: selectedParam.domain,
-                          key: selectedParam.key,
-                          value_type: selectedParam.value_type
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">Select parameter...</option>
-                    {(parameterDefinitions[constraintForm.entity_type_id] || []).map((param) => (
-                      <option key={param.id} value={param.id}>{param.label || param.key} ({param.domain}:{param.key})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="form-field">
-                <label className="form-label">Domain *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={constraintForm.domain}
-                  disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
-                  onChange={(e) => setConstraintForm({ ...constraintForm, domain: e.target.value })}
-                  placeholder="e.g., identity"
-                />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Key *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={constraintForm.key}
-                  disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
-                  onChange={(e) => setConstraintForm({ ...constraintForm, key: e.target.value })}
-                  placeholder="e.g., category"
-                />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Value Type *</label>
-                <select
-                  className="form-input"
-                  value={constraintForm.value_type}
-                  disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
-                  onChange={(e) => setConstraintForm({ ...constraintForm, value_type: e.target.value })}
-                >
-                  <option value="string">String</option>
-                  <option value="number">Number</option>
-                  <option value="boolean">Boolean</option>
-                </select>
-              </div>
-              <div className="form-field">
-                <label className="form-label">Operator *</label>
-                <select
-                  className="form-input"
-                  value={constraintForm.operator}
-                  onChange={(e) => setConstraintForm({ ...constraintForm, operator: e.target.value })}
-                >
-                  <option value="=">=</option>
-                  <option value="!=">!=</option>
-                  <option value="<">&lt;</option>
-                  <option value="<=">&lt;=</option>
-                  <option value=">">&gt;</option>
-                  <option value=">=">&gt;=</option>
-                  <option value="contains">contains</option>
-                </select>
-              </div>
-              {constraintForm.value_type === 'string' && (
-                <div className="form-field">
-                  <label className="form-label">Value *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={constraintForm.value_string}
-                    onChange={(e) => setConstraintForm({ ...constraintForm, value_string: e.target.value })}
-                  />
-                </div>
-              )}
-              {constraintForm.value_type === 'number' && (
-                <div className="form-field">
-                  <label className="form-label">Value *</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={constraintForm.value_number}
-                    onChange={(e) => setConstraintForm({ ...constraintForm, value_number: e.target.value })}
-                  />
-                </div>
-              )}
-              {constraintForm.value_type === 'boolean' && (
-                <div className="form-field">
-                  <label className="form-label">Value *</label>
-                  <select
-                    className="form-input"
-                    value={constraintForm.value_boolean.toString()}
-                    onChange={(e) => setConstraintForm({ ...constraintForm, value_boolean: e.target.value === 'true' })}
-                  >
-                    <option value="false">False</option>
-                    <option value="true">True</option>
-                  </select>
-                </div>
-              )}
-            </>
-          )}
-          <div className="form-actions">
-            <button onClick={() => { setShowConstraintForm(false); setConstraintParent(null); setEditingConstraint(null); setConstraintForm({ is_wildcard: false, entity_type_id: '', parameter_id: '', domain: '', key: '', operator: '=', value_type: 'string', value_string: '', value_number: '', value_boolean: false, sort_order: 0 }); }} className="button button--secondary">Cancel</button>
-            <button onClick={editingConstraint ? handleUpdateConstraint : handleCreateConstraint} className="button button--primary">
-              {editingConstraint ? 'Save' : 'Create'}
-            </button>
-          </div>
-        </div>
-      )}
+      <div style={{ marginTop: '24px', padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+        <button
+          onClick={async () => {
+            // Save slot groups (create new ones, update existing ones)
+            for (const group of slotGroups) {
+              if (group.id.startsWith('temp-')) {
+                // Create new group
+                await createSlotGroup(entityTypeId!, {
+                  type: group.type,
+                  min_slots: group.min_slots,
+                  max_slots: group.max_slots,
+                  default_slots_qty: group.default_slots_qty,
+                  sort_order: group.sort_order,
+                });
+              } else {
+                // Update existing group
+                await updateSlotGroup(group.id, {
+                  type: group.type,
+                  min_slots: group.min_slots,
+                  max_slots: group.max_slots,
+                  default_slots_qty: group.default_slots_qty,
+                  sort_order: group.sort_order,
+                });
+              }
+            }
+            
+            // Save template constraints for each group
+            for (const group of slotGroups) {
+              if (!group.id.startsWith('temp-')) {
+                await saveTemplateConstraints(group.id, group.type as 'consumes' | 'requires' | 'produces');
+              }
+            }
+            
+            // Reload to get updated data with real IDs
+            await loadSlotGroups();
+            
+            // Navigate back to Edit Template page
+            navigate(`/templates/${templateId}/edit`);
+          }}
+          className="button button--primary"
+          style={{ fontSize: '16px', padding: '12px 24px' }}
+        >
+          Save All Changes
+        </button>
+      </div>
+
       </div>
     </div>
   );

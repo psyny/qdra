@@ -660,16 +660,18 @@ class ProjectTemplateRepository:
     def create_slot_group(
         self,
         entity_type_id: uuid.UUID,
-        kind: str,
+        type: str,
         min_slots: int = 0,
         max_slots: Optional[int] = None,
+        default_slots_qty: int = 0,
         sort_order: int = 0,
     ) -> ProjectTemplateSlotGroup:
         slot_group = ProjectTemplateSlotGroup(
             entity_type_id=entity_type_id,
-            kind=kind,
+            type=type,
             min_slots=min_slots,
             max_slots=max_slots,
+            default_slots_qty=default_slots_qty,
             sort_order=sort_order,
         )
         self.db.add(slot_group)
@@ -695,19 +697,22 @@ class ProjectTemplateRepository:
     def update_slot_group(
         self,
         slot_group_id: uuid.UUID,
-        kind: Optional[str] = None,
+        type: Optional[str] = None,
         min_slots: Optional[int] = None,
         max_slots: Optional[int] = None,
+        default_slots_qty: Optional[int] = None,
         sort_order: Optional[int] = None,
     ) -> Optional[ProjectTemplateSlotGroup]:
         slot_group = self.get_slot_group_by_id(slot_group_id)
         if slot_group:
-            if kind is not None:
-                slot_group.kind = kind
+            if type is not None:
+                slot_group.type = type
             if min_slots is not None:
                 slot_group.min_slots = min_slots
             if max_slots is not None:
                 slot_group.max_slots = max_slots
+            if default_slots_qty is not None:
+                slot_group.default_slots_qty = default_slots_qty
             if sort_order is not None:
                 slot_group.sort_order = sort_order
             self.db.commit()
@@ -728,6 +733,7 @@ class ProjectTemplateRepository:
         self,
         slot_group_id: uuid.UUID,
         slot_key: str,
+        slot_idx: Optional[int] = None,
         min_occurrences: int = 0,
         max_occurrences: Optional[int] = None,
         sort_order: int = 0,
@@ -735,6 +741,7 @@ class ProjectTemplateRepository:
         slot_def = ProjectTemplateSlotDefinition(
             slot_group_id=slot_group_id,
             slot_key=slot_key,
+            slot_idx=slot_idx,
             min_occurrences=min_occurrences,
             max_occurrences=max_occurrences,
             sort_order=sort_order,
@@ -763,6 +770,7 @@ class ProjectTemplateRepository:
         self,
         slot_def_id: uuid.UUID,
         slot_key: Optional[str] = None,
+        slot_idx: Optional[int] = None,
         min_occurrences: Optional[int] = None,
         max_occurrences: Optional[int] = None,
         sort_order: Optional[int] = None,
@@ -771,6 +779,8 @@ class ProjectTemplateRepository:
         if slot_def:
             if slot_key is not None:
                 slot_def.slot_key = slot_key
+            if slot_idx is not None:
+                slot_def.slot_idx = slot_idx
             if min_occurrences is not None:
                 slot_def.min_occurrences = min_occurrences
             if max_occurrences is not None:

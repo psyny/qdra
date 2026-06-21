@@ -5,7 +5,7 @@ import { Combobox } from './Combobox';
 import { getDistinctParameterValues } from '../api/entities';
 
 type SlotGroupConfig = {
-  kind: 'requires' | 'consumes' | 'produces';
+  type: 'requires' | 'consumes' | 'produces';
   min_slots: number;
   max_slots: number;
 };
@@ -73,9 +73,9 @@ export function RecipeForm({
   // State to track current number of slots for each category
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>(
     initialSlotCounts || {
-      requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
-      consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
-      produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+      requires: slotGroups.find(g => g.type === 'requires')?.min_slots || 0,
+      consumes: slotGroups.find(g => g.type === 'consumes')?.min_slots || 0,
+      produces: slotGroups.find(g => g.type === 'produces')?.min_slots || 0,
     }
   );
 
@@ -93,9 +93,9 @@ export function RecipeForm({
     const hasInitialCounts = initialSlotCounts && Object.keys(initialSlotCounts).length > 0;
     if (!hasInitialCounts && slotGroups.length > 0) {
       setSlotCounts({
-        requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
-        consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
-        produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+        requires: slotGroups.find(g => g.type === 'requires')?.min_slots || 0,
+        consumes: slotGroups.find(g => g.type === 'consumes')?.min_slots || 0,
+        produces: slotGroups.find(g => g.type === 'produces')?.min_slots || 0,
       });
     }
   }, [slotGroups, initialSlotCounts]);
@@ -149,7 +149,7 @@ export function RecipeForm({
 
   // Helper to get slot group config for a kind
   const getSlotGroupConfig = (kind: 'requires' | 'consumes' | 'produces') => {
-    return slotGroups.find(g => g.kind === kind);
+    return slotGroups.find(g => g.type === kind);
   };
 
   // Helper to add a slot

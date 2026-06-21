@@ -270,9 +270,10 @@ export async function listSlotGroups(entityTypeId: string): Promise<any[]> {
 export async function createSlotGroup(
   entityTypeId: string,
   payload: {
-    kind: string;
+    type: string;
     min_slots?: number;
     max_slots?: number | null;
+    default_slots_qty?: number;
     sort_order?: number;
   },
 ): Promise<any> {
@@ -288,9 +289,10 @@ export async function createSlotGroup(
 export async function updateSlotGroup(
   slotGroupId: string,
   payload: {
-    kind?: string;
+    type?: string;
     min_slots?: number;
     max_slots?: number | null;
+    default_slots_qty?: number;
     sort_order?: number;
   },
 ): Promise<any> {
@@ -316,6 +318,7 @@ export async function createSlotDefinition(
   slotGroupId: string,
   payload: {
     slot_key: string;
+    slot_idx?: number | null;
     min_occurrences?: number;
     max_occurrences?: number | null;
     sort_order?: number;
@@ -334,6 +337,7 @@ export async function updateSlotDefinition(
   slotDefinitionId: string,
   payload: {
     slot_key?: string;
+    slot_idx?: number | null;
     min_occurrences?: number;
     max_occurrences?: number | null;
     sort_order?: number;
