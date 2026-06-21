@@ -83,6 +83,18 @@ export function RecipeForm({
     }
   );
 
+  // Update initial slot counts when slotGroups changes (for new recipes)
+  useEffect(() => {
+    const hasInitialCounts = initialSlotCounts && Object.keys(initialSlotCounts).length > 0;
+    if (!hasInitialCounts && slotGroups.length > 0) {
+      setSlotCounts({
+        requires: slotGroups.find(g => g.kind === 'requires')?.min_slots || 0,
+        consumes: slotGroups.find(g => g.kind === 'consumes')?.min_slots || 0,
+        produces: slotGroups.find(g => g.kind === 'produces')?.min_slots || 0,
+      });
+    }
+  }, [slotGroups, initialSlotCounts]);
+
   // State to track existing parameter values for each constraint
   const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
 
@@ -139,7 +151,7 @@ export function RecipeForm({
   const addSlot = (kind: 'requires' | 'consumes' | 'produces') => {
     const config = getSlotGroupConfig(kind);
     if (!config) return;
-    
+
     const currentCount = slotCounts[kind];
     // If max_slots is null, it means unlimited
     const maxSlots = config.max_slots === null ? Infinity : config.max_slots;
@@ -148,7 +160,9 @@ export function RecipeForm({
       // Initialize empty constraints for the new slot
       setSlotConstraints(prev => {
         const newConstraints = { ...prev };
-        newConstraints[kind] = [...newConstraints[kind], []];
+        // Ensure the array exists before spreading
+        const currentArray = newConstraints[kind] || [];
+        newConstraints[kind] = [...currentArray, []];
         return newConstraints;
       });
     }
@@ -297,10 +311,24 @@ export function RecipeForm({
   };
 
   // Helper to get parameter definitions for a given entity type
-  const getParametersForEntityType = (entityTypeId: string) => {
+  const getParametersForEntityType = (entityTypeId: string, groups: string[] = []) => {
     if (!template) return [];
     const entityType = template.entity_types?.find((et: any) => et.id === entityTypeId);
-    return entityType?.parameter_definitions || [];
+    const allParams = entityType?.parameter_definitions || [];
+
+    // If groups is empty, return all parameters
+    if (groups.length === 0) {
+      return allParams;
+    }
+
+    // Filter parameters by entity type (group is entity type name)
+    // Find entity type IDs that match the group names
+    const groupEntityIds = groups.map((groupName) => {
+      const et = template.entity_types?.find((e: any) => e.name === groupName);
+      return et?.id;
+    }).filter(Boolean);
+
+    return allParams.filter((param: any) => groupEntityIds.includes(param.entity_type_id));
   };
 
   // Helper to fetch existing parameter values for a constraint
@@ -460,20 +488,27 @@ export function RecipeForm({
                       disabled={isSubmitting}
                       style={{ padding: '2px', fontSize: '11px', width: '200px' }}
                     >
-                      <option value="">Key</option>
                       {constraint.origin === 'system' ? (
                         <>
                           <option value="id">id</option>
                           <option value="group">group</option>
                         </>
                       ) : (
-                        materialEntityTypes.flatMap((et: any) => 
-                          getParametersForEntityType(et.id).map((param: any) => ({
+                        materialEntityTypes.flatMap((et: any) => {
+                          // Check for system.group constraints in the same OR group
+                          const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
+                          const groupsFromSystem = orGroupConstraints
+                            .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
+                            .map((c: any) => c.value_string);
+
+                          console.log('getParametersForEntityType groups:', groupsFromSystem);
+
+                          return getParametersForEntityType(et.id, groupsFromSystem).map((param: any) => ({
                             domain: param.domain,
                             key: param.key,
                             label: `${param.domain}:${param.key}`
-                          }))
-                        ).map((param: any, idx: number) => (
+                          }));
+                        }).map((param: any, idx: number) => (
                           <option key={`${param.domain}:${param.key}:${idx}`} value={`${param.domain}:${param.key}`}>
                             {param.label}
                           </option>
@@ -505,7 +540,6 @@ export function RecipeForm({
                           disabled={isSubmitting}
                           style={{ padding: '2px', fontSize: '11px', flex: 1 }}
                         >
-                          <option value="">Select group</option>
                           {materialEntityTypes.map((et: any) => (
                             <option key={et.id} value={et.name}>
                               {et.name}

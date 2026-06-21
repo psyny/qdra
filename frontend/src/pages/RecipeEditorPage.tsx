@@ -72,31 +72,36 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         });
         setMaterialEntityTypes(materialTypes);
 
-        if (configId) {
-          // Find the config in template
-          const recipeView = templateData.views.find(v => v.view_key === 'recipe_catalog');
-          if (recipeView) {
-            const config = recipeView.configs.find(c => c.id === configId);
-            if (config && config.entity_type_id) {
-              setSelectedConfig(config);
-              // Get parameter definitions for this entity type
-              const entityType = templateData.entity_types.find(et => et.id === config.entity_type_id);
-              if (entityType) {
-                setParameterDefinitions(entityType.parameter_definitions);
-                
-                // Load slot groups for this entity type
-                try {
-                  const slotGroupsData = await listSlotGroups(config.entity_type_id);
-                  const formattedSlotGroups: SlotGroupConfig[] = slotGroupsData.map((sg: any) => ({
-                    kind: sg.kind,
-                    min_slots: sg.min_slots,
-                    max_slots: sg.max_slots,
-                  }));
-                  setSlotGroups(formattedSlotGroups);
-                } catch (err) {
-                  // If slot groups fail to load, just use empty array
-                  setSlotGroups([]);
-                }
+        // Find the config in template
+        const recipeView = templateData.views.find(v => v.view_key === 'recipe_catalog');
+        if (recipeView) {
+          let config = null;
+          if (configId) {
+            config = recipeView.configs.find(c => c.id === configId);
+          } else if (recipeView.configs.length > 0) {
+            // Use first config if none specified
+            config = recipeView.configs[0];
+          }
+
+          if (config && config.entity_type_id) {
+            setSelectedConfig(config);
+            // Get parameter definitions for this entity type
+            const entityType = templateData.entity_types.find(et => et.id === config.entity_type_id);
+            if (entityType) {
+              setParameterDefinitions(entityType.parameter_definitions);
+
+              // Load slot groups for this entity type
+              try {
+                const slotGroupsData = await listSlotGroups(config.entity_type_id);
+                const formattedSlotGroups: SlotGroupConfig[] = slotGroupsData.map((sg: any) => ({
+                  kind: sg.kind,
+                  min_slots: sg.min_slots,
+                  max_slots: sg.max_slots,
+                }));
+                setSlotGroups(formattedSlotGroups);
+              } catch (err) {
+                // If slot groups fail to load, just use empty array
+                setSlotGroups([]);
               }
             }
           }
