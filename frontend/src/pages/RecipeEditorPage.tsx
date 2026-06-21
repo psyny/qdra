@@ -157,7 +157,11 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
                     };
                   }
                 });
-                slotConstraints[slot.kind][slotIndex].push(transformedConstraints);
+                // Create option spec with quantity and constraints
+                slotConstraints[slot.kind][slotIndex].push({
+                  constraints: transformedConstraints,
+                  quantity: option.quantity || 1,
+                });
               }
             }
 
@@ -246,11 +250,12 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
       const count = slotCounts[kind] || 0;
       for (let i = 0; i < count; i++) {
         const slot = await createRecipeSlot(projectId, recipeId, kind, i);
-        const orGroups = slotConstraints[kind]?.[i] || [];
+        const options = slotConstraints[kind]?.[i] || [];
 
-        for (const orGroup of orGroups) {
-          const option = await createRecipeOption(projectId, recipeId, slot.id, 1, 0);
-          for (const constraint of orGroup) {
+        for (const option of options) {
+          const optionQuantity = option.quantity || 1;
+          const recipeOption = await createRecipeOption(projectId, recipeId, slot.id, optionQuantity, 0);
+          for (const constraint of option.constraints) {
             // For system origin, use special domain/key format
             let domain = constraint.domain;
             let key = constraint.key;
@@ -259,7 +264,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
               key = constraint.system_key; // Store system_key in key for system
             }
 
-            await createRecipeConstraint(projectId, recipeId, slot.id, option.id, {
+            await createRecipeConstraint(projectId, recipeId, slot.id, recipeOption.id, {
               domain: domain,
               key: key,
               operator: constraint.operator,

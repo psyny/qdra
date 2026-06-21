@@ -22,8 +22,13 @@ type ConstraintSpec = {
   value_boolean?: boolean | null;
 };
 
+type OptionSpec = {
+  constraints: ConstraintSpec[];
+  quantity: number;
+};
+
 type SlotConstraints = {
-  [key: string]: ConstraintSpec[][]; // kind -> slotIndex -> OR groups -> AND constraints
+  [key: string]: OptionSpec[]; // kind -> slotIndex -> options
 };
 
 type RecipeFormProps = {
@@ -206,7 +211,12 @@ export function RecipeForm({
         value_string: materialEntityTypes[0]?.name || null,
       };
 
-      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], [defaultConstraint]];
+      const newOption: OptionSpec = {
+        constraints: [defaultConstraint],
+        quantity: 1,
+      };
+
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], newOption];
       return newConstraints;
     });
   };
@@ -216,6 +226,20 @@ export function RecipeForm({
     setSlotConstraints(prev => {
       const newConstraints = { ...prev };
       newConstraints[kind][slotIndex] = newConstraints[kind][slotIndex].filter((_, i) => i !== orGroupIndex);
+      return newConstraints;
+    });
+  };
+
+  // Helper to update option quantity
+  const updateOptionQuantity = (kind: 'requires' | 'consumes' | 'produces', slotIndex: number, orGroupIndex: number, quantity: number) => {
+    setSlotConstraints(prev => {
+      const newConstraints = { ...prev };
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        quantity,
+      };
       return newConstraints;
     });
   };
@@ -254,10 +278,10 @@ export function RecipeForm({
         value_boolean: undefined,
       };
 
-      newConstraints[kind][slotIndex][orGroupIndex] = [
+      newConstraints[kind][slotIndex][orGroupIndex] = {
         ...newConstraints[kind][slotIndex][orGroupIndex],
-        newConstraint
-      ];
+        constraints: [...newConstraints[kind][slotIndex][orGroupIndex].constraints, newConstraint],
+      };
 
       // Fetch existing values for the auto-selected domain+key
       if (firstDomain && firstKey && firstEntityTypeId) {
@@ -294,10 +318,16 @@ export function RecipeForm({
   ) => {
     setSlotConstraints(prev => {
       const newConstraints = { ...prev };
-      newConstraints[kind][slotIndex][orGroupIndex][constraintIndex][field] = value;
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        constraints: [...newConstraints[kind][slotIndex][orGroupIndex].constraints],
+      };
+      newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex][field] = value;
 
       // Fetch existing values when entity_type_id, domain, or key changes
-      const constraint = newConstraints[kind][slotIndex][orGroupIndex][constraintIndex];
+      const constraint = newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex];
       if (field === 'entity_type_id' || field === 'domain' || field === 'key') {
         if (constraint.origin === 'parameter' && constraint.entity_type_id && constraint.domain && constraint.key && constraint.domain !== 'entity_type') {
           // Get the parameter definition to check value_type
@@ -312,15 +342,15 @@ export function RecipeForm({
           } else if (paramDef?.value_type === 'number') {
             // Set default value for number parameters
             const defaultValue = paramDef.default_value !== null ? parseFloat(paramDef.default_value) : 0;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_number = defaultValue;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_string = null;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_boolean = null;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_number = defaultValue;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_string = null;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_boolean = null;
           } else if (paramDef?.value_type === 'boolean') {
             // Set default value for boolean parameters
             const defaultValue = paramDef.default_value !== null ? paramDef.default_value === 'true' : false;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_boolean = defaultValue;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_string = null;
-            newConstraints[kind][slotIndex][orGroupIndex][constraintIndex].value_number = null;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_boolean = defaultValue;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_string = null;
+            newConstraints[kind][slotIndex][orGroupIndex].constraints[constraintIndex].value_number = null;
           }
         }
       }
@@ -329,7 +359,7 @@ export function RecipeForm({
       if (field === 'system_key' || field === 'value_string') {
         if (constraint.origin === 'system' && constraint.system_key === 'group' && constraint.value_string) {
           // Get all groups from system.group constraints in this OR group
-          const orGroupConstraints = newConstraints[kind][slotIndex][orGroupIndex];
+          const orGroupConstraints = newConstraints[kind][slotIndex][orGroupIndex].constraints;
           const groupsFromSystem = orGroupConstraints
             .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
             .map((c: any) => c.value_string);
@@ -358,9 +388,14 @@ export function RecipeForm({
   ) => {
     setSlotConstraints(prev => {
       const newConstraints = { ...prev };
-      newConstraints[kind][slotIndex][orGroupIndex] = newConstraints[kind][slotIndex][orGroupIndex].filter(
-        (_, i) => i !== constraintIndex
-      );
+      newConstraints[kind] = [...newConstraints[kind]];
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
+      newConstraints[kind][slotIndex][orGroupIndex] = {
+        ...newConstraints[kind][slotIndex][orGroupIndex],
+        constraints: newConstraints[kind][slotIndex][orGroupIndex].constraints.filter(
+          (_, i) => i !== constraintIndex
+        ),
+      };
       return newConstraints;
     });
   };
@@ -476,17 +511,34 @@ export function RecipeForm({
               Options:
             </div>
             
-            {slotOrGroups.map((orGroup, orGroupIndex) => (
+            {slotOrGroups.map((option, orGroupIndex) => (
               <div key={orGroupIndex} className="card" style={{ padding: '12px', marginBottom: '12px' }}>
                 <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
-                  marginBottom: '4px' 
+                  marginBottom: '8px',
+                  paddingBottom: '8px',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)'
                 }}>
-                  <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>
-                    Option {orGroupIndex + 1}
-                  </span>
+                  <div>
+                    <span style={{ fontSize: '10px', color: '#666', fontWeight: 'bold' }}>
+                      Option {orGroupIndex + 1}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                      <label className="form-label" style={{ fontSize: '11px', marginBottom: '0' }}>Quantity:</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={option.quantity || 1}
+                        onChange={(e) => updateOptionQuantity(kind, index, orGroupIndex, e.target.value ? Number(e.target.value) : 1)}
+                        disabled={isSubmitting}
+                        min="0"
+                        step="any"
+                        style={{ fontSize: '12px', padding: '4px 8px', width: '60px' }}
+                      />
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeOrGroup(kind, index, orGroupIndex)}
@@ -497,7 +549,7 @@ export function RecipeForm({
                   </button>
                 </div>
                 
-                {orGroup.map((constraint, constraintIndex) => {
+                {option.constraints.map((constraint, constraintIndex) => {
                   return (
                   <div key={constraintIndex} style={{
                     display: 'flex',
@@ -557,7 +609,7 @@ export function RecipeForm({
                       ) : (
                         materialEntityTypes.flatMap((et: any) => {
                           // Check for system.group constraints in the same OR group
-                          const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
+                          const orGroupConstraints = slotConstraints[kind][index][orGroupIndex].constraints || [];
                           const groupsFromSystem = orGroupConstraints
                             .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
                             .map((c: any) => c.value_string);
@@ -630,7 +682,7 @@ export function RecipeForm({
                               onChange={(value) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', value)}
                               options={(() => {
                                 // Check for system.group constraints in the same OR group
-                                const orGroupConstraints = slotConstraints[kind][index][orGroupIndex] || [];
+                                const orGroupConstraints = slotConstraints[kind][index][orGroupIndex].constraints || [];
                                 const groupsFromSystem = orGroupConstraints
                                   .filter((c: any) => c.origin === 'system' && c.system_key === 'group' && c.value_string)
                                   .map((c: any) => c.value_string);
