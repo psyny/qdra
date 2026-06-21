@@ -127,8 +127,34 @@ export function SlotDefinitionsPage() {
       const data = await listSlotGroups(entityTypeId!);
       setSlotGroups(data);
       
+      // Ensure all three group types exist
+      const groupTypes = ['consumes', 'requires', 'produces'];
+      for (const type of groupTypes) {
+        if (!data.find(g => g.type === type)) {
+          // Create missing group
+          try {
+            await createSlotGroup(entityTypeId!, {
+              type,
+              min_slots: 0,
+              max_slots: 10,
+              default_slots_qty: 0,
+              sort_order: 0,
+            });
+          } catch (err: any) {
+            // Ignore conflict errors (group already exists)
+            if (err.status !== 409) {
+              throw err;
+            }
+          }
+        }
+      }
+      
+      // Reload to get all groups
+      const updatedData = await listSlotGroups(entityTypeId!);
+      setSlotGroups(updatedData);
+      
       // Load default slot and per slots for each group
-      for (const group of data) {
+      for (const group of updatedData) {
         loadDefaultSlot(group.id, group.type as 'consumes' | 'requires' | 'produces');
         loadPerSlots(group.id, group.type as 'consumes' | 'requires' | 'produces');
       }
@@ -732,16 +758,8 @@ export function SlotDefinitionsPage() {
       ]} />
 
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h2 className="card-title">Edit Slot Definitions{entityName && ` for ${entityName}`}</h2>
-          </div>
-          <button
-            onClick={() => setShowCreateGroupForm(true)}
-            className="button button--primary"
-          >
-            Add Slot Group
-          </button>
+        <div style={{ marginBottom: '16px' }}>
+          <h2 className="card-title">Edit Slot Definitions{entityName && ` for ${entityName}`}</h2>
         </div>
 
       {error && (
@@ -814,20 +832,7 @@ export function SlotDefinitionsPage() {
 
       {['consumes', 'requires', 'produces'].map((type) => {
         const group = slotGroups.find(g => g.type === type);
-        if (!group) {
-          return (
-            <div key={type} className="card" style={{ marginBottom: '12px' }}>
-              <p style={{ margin: 0, color: '#666' }}>No {getGroupKindLabel(type)} group defined</p>
-              <button
-                onClick={() => { setShowCreateGroupForm(true); setGroupForm({ ...groupForm, type }); }}
-                className="button button--primary"
-                style={{ marginTop: '8px', fontSize: '12px' }}
-              >
-                Add {getGroupKindLabel(type)} Group
-              </button>
-            </div>
-          );
-        }
+        if (!group) return null;
 
         return (
           <div key={group.id} className="card" style={{ marginBottom: '12px' }}>

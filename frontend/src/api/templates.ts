@@ -282,7 +282,11 @@ export async function createSlotGroup(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error('Failed to create slot group');
+  if (!response.ok) {
+    const error: any = new Error('Failed to create slot group');
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 }
 

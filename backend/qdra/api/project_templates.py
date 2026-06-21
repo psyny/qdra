@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from db.session import get_db
@@ -1180,14 +1181,23 @@ def create_slot_group(
                 detail=f"A {data.type} slot group already exists for this entity type"
             )
     
-    slot_group = repo.create_slot_group(
-        entity_type_id=entity_type_id,
-        type=data.type,
-        min_slots=data.min_slots,
-        max_slots=data.max_slots,
-        default_slots_qty=data.default_slots_qty,
-        sort_order=data.sort_order,
-    )
+    try:
+        slot_group = repo.create_slot_group(
+            entity_type_id=entity_type_id,
+            type=data.type,
+            min_slots=data.min_slots,
+            max_slots=data.max_slots,
+            default_slots_qty=data.default_slots_qty,
+            sort_order=data.sort_order,
+        )
+    except IntegrityError as e:
+        # Handle race condition where another request created the same group
+        if "uq_slot_group_entity_type_type" in str(e):
+            raise HTTPException(
+                status_code=409,
+                detail=f"A {data.type} slot group already exists for this entity type"
+            )
+        raise
     
     return SlotGroupResponse.model_validate(slot_group)
 
