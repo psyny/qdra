@@ -508,7 +508,7 @@ export async function deleteDefaultSlot(slotGroupId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
     method: 'DELETE',
   });
-  if (!response.ok) throw new Error('Failed to delete default slot');
+  if (!response.ok && response.status !== 404) throw new Error('Failed to delete default slot');
 }
 
 // Per Slot operations
@@ -587,5 +587,5 @@ export async function deletePerSlot(perSlotId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, {
     method: 'DELETE',
   });
-  if (!response.ok) throw new Error('Failed to delete per slot');
+  if (!response.ok && response.status !== 404) throw new Error('Failed to delete per slot');
 }

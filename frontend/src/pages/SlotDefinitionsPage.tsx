@@ -489,7 +489,10 @@ export function SlotDefinitionsPage() {
       
       if (options.length === 0) {
         // Delete default slot if it exists and no options
-        await deleteDefaultSlot(slotGroupId);
+        const existingDefaultSlot = await getDefaultSlot(slotGroupId);
+        if (existingDefaultSlot) {
+          await deleteDefaultSlot(slotGroupId);
+        }
       } else {
         // Create or update default slot
         const slotData = templateConstraintsToSlotFormat(options, type);
