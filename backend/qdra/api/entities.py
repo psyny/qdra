@@ -351,10 +351,25 @@ def get_values_for_parameter(
         # Find materials matching the group constraints
         material_ids = constraint_service.find_materials_by_constraints(constraints, project_id)
 
-        # Get parameter values for the specified domain:key from these materials
+        # Find recipes matching the group constraints
+        recipe_ids = constraint_service.find_recipes_by_constraints(constraints, project_id)
+
+        # Get parameter values for the specified domain:key from these materials and recipes
         all_values = set()
         for material_id in material_ids:
             params = service.entity_parameter_repository.list_by_entity(material_id)
+            for param in params:
+                # Check if this parameter matches the domain:key
+                if param.domain == domain and param.key == key:
+                    if param.value_string is not None:
+                        all_values.add(param.value_string)
+                    elif param.value_number is not None:
+                        all_values.add(str(param.value_number))
+                    elif param.value_boolean is not None:
+                        all_values.add(str(param.value_boolean))
+
+        for recipe_id in recipe_ids:
+            params = service.entity_parameter_repository.list_by_entity(recipe_id)
             for param in params:
                 # Check if this parameter matches the domain:key
                 if param.domain == domain and param.key == key:
