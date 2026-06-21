@@ -132,10 +132,16 @@ export function RecipeForm({
             slotGroupsData.forEach((sg: any) => {
               if (sg.per_slots && sg.per_slots.length > 0) {
                 newConstraints[sg.type] = sg.per_slots.map((perSlot: any) => {
-                  if (!perSlot.options || perSlot.options.length === 0) {
+                  // If per_slot has no options, fall back to default_slot
+                  const optionsToUse = (!perSlot.options || perSlot.options.length === 0) && sg.default_slot
+                    ? sg.default_slot.options
+                    : perSlot.options;
+
+                  if (!optionsToUse || optionsToUse.length === 0) {
                     return [];
                   }
-                  return perSlot.options.map((option: any) => ({
+
+                  return optionsToUse.map((option: any) => ({
                     constraints: option.parameter_constraints.map((c: any) => {
                       const isSystem = c.domain === 'system';
                       return {
