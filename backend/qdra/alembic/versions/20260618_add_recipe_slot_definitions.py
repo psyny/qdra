@@ -29,9 +29,10 @@ def upgrade() -> None:
             sa.ForeignKey("project_template_entity_types.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("kind", sa.String(50), nullable=False),
+        sa.Column("type", sa.String(50), nullable=False),
         sa.Column("min_slots", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("max_slots", sa.Integer(), nullable=True),
+        sa.Column("default_slots_qty", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
             "created_at",
@@ -45,7 +46,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.UniqueConstraint("entity_type_id", "kind", name="uq_slot_group_entity_type_kind"),
+        sa.UniqueConstraint("entity_type_id", "type", name="uq_slot_group_entity_type_type"),
         sa.CheckConstraint("min_slots >= 0", name="ck_slot_group_min_slots_non_negative"),
         sa.CheckConstraint(
             "max_slots IS NULL OR max_slots >= min_slots",

@@ -1,3 +1,6 @@
+from tests.integration.utils import print_pretty
+
+
 def create_medium_size_planning_dataset(client, project_id):
     """
     Create a comprehensive set of materials and recipes for testing various solver scenarios.
@@ -18,7 +21,7 @@ def create_medium_size_planning_dataset(client, project_id):
             {"domain": "identity", "key": "category", "value_string": "raw_resource"}
         ]
     }).json()
-    
+
     intermediate_1 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_1"},

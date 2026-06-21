@@ -2,6 +2,7 @@ def test_create_recipe(client, project_ctx):
     """Test that a recipe can be created."""
     project_id = project_ctx["project_id"]
     response = client.post(f"/api/projects/{project_id}/recipes", json={})
+
     assert response.status_code == 201
     data = response.json()
     assert data["project_id"] == project_id

@@ -17,7 +17,7 @@ from infrastructure.storage.local_image_storage_provider import LocalImageStorag
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.config.settings import settings
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 def _get_storage_provider() -> ImageStorageProvider:

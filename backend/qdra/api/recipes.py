@@ -93,6 +93,7 @@ class RecipeResponse(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
+    group: str = ""
     kind: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

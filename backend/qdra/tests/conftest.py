@@ -47,18 +47,18 @@ def client(db: Session) -> Generator[TestClient, None, None]:
 @pytest.fixture()
 def project_ctx(client: TestClient) -> Dict[str, Any]:
     """Create a project template with material+recipe entity types and a project."""
-    tmpl = client.post("/project-templates", json={"name": "Test Template"}).json()
+    tmpl = client.post("/api/project-templates", json={"name": "Test Template"}).json()
     tmpl_id = tmpl["id"]
     mat_type = client.post(
-        f"/project-templates/{tmpl_id}/entity-types",
+        f"/api/project-templates/{tmpl_id}/entity-types",
         json={"kind": "material", "name": "Material"},
     ).json()
     rec_type = client.post(
-        f"/project-templates/{tmpl_id}/entity-types",
+        f"/api/project-templates/{tmpl_id}/entity-types",
         json={"kind": "recipe", "name": "Recipe"},
     ).json()
     project = client.post(
-        "/projects", json={"name": "Test Project", "project_template_id": tmpl_id}
+        "/api/projects", json={"name": "Test Project", "project_template_id": tmpl_id}
     ).json()
     return {
         "project_id": project["id"],

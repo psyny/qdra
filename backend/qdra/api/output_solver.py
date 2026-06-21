@@ -16,7 +16,7 @@ from domain.planning.output_solver_domain import (
     Entities, EntityData,
 )
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 # ---------------------------------------------------------------------------

@@ -14,8 +14,8 @@ def test_create_project(client, project_ctx):
 def test_list_projects(client, project_ctx):
     """Test that projects can be listed."""
     template_id = project_ctx["template_id"]
-    client.post("/projects", json={"name": "Project 1", "project_template_id": template_id})
-    client.post("/projects", json={"name": "Project 2", "project_template_id": template_id})
+    client.post("/api/projects", json={"name": "Project 1", "project_template_id": template_id})
+    client.post("/api/projects", json={"name": "Project 2", "project_template_id": template_id})
     response = client.get("/projects")
     assert response.status_code == 200
     data = response.json()
@@ -24,5 +24,5 @@ def test_list_projects(client, project_ctx):
 
 def test_cannot_create_project_without_template(client):
     """Test that creating a project without a template fails."""
-    response = client.post("/projects", json={"name": "No Template"})
+    response = client.post("/api/projects", json={"name": "No Template"})
     assert response.status_code == 422

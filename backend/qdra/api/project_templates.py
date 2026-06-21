@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from db.session import get_db
 from repositories.project_template_repository import ProjectTemplateRepository
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 # ---------------------------------------------------------------------------

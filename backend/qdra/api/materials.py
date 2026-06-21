@@ -13,7 +13,7 @@ from services.recipe_evaluation_service import RecipeEvaluationService
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.project_repository import ProjectRepository
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 def _resolve_entity_type_id(
@@ -38,6 +38,7 @@ class MaterialResponse(BaseModel):
     id: uuid.UUID
     project_id: uuid.UUID
     entity_type_id: uuid.UUID
+    group: str = ""
     kind: str
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
