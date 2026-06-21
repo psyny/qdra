@@ -31,9 +31,9 @@
   --danger: #EF4444;
 
   /* Corner Radius */
-  --radius-small: 12px;
-  --radius-medium: 18px;
-  --radius-large: 24px;
+  --radius-small: 8px;
+  --radius-medium: 10px;
+  --radius-large: 14px;
 
   /* Shadows */
   --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.2);
