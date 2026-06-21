@@ -168,7 +168,7 @@ Qdra should feel calm and deliberate.
 ## Card Surface
 
 ```css
---card-bg: rgba(255,255,255,0.05);
+--card-bg: rgba(255,255,255,0.02);
 --card-bg-hover: rgba(255,255,255,0.08);
 ```
 

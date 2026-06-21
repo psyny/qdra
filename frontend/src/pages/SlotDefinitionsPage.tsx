@@ -458,7 +458,7 @@ export function SlotDefinitionsPage() {
       )}
 
       {showCreateGroupForm && (
-        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Slot Group</h3>
           <div className="form-field">
             <label className="form-label">Kind *</label>
@@ -526,7 +526,7 @@ export function SlotDefinitionsPage() {
         }
 
         return (
-          <div key={group.id} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '12px' }}>
+          <div key={group.id} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0' }}>{getGroupKindLabel(group.kind)}</h3>
@@ -776,7 +776,7 @@ export function SlotDefinitionsPage() {
                   className="form-input"
                   value={constraintForm.domain}
                   disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
                   onChange={(e) => setConstraintForm({ ...constraintForm, domain: e.target.value })}
                   placeholder="e.g., identity"
                 />
@@ -788,7 +788,7 @@ export function SlotDefinitionsPage() {
                   className="form-input"
                   value={constraintForm.key}
                   disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
                   onChange={(e) => setConstraintForm({ ...constraintForm, key: e.target.value })}
                   placeholder="e.g., category"
                 />
@@ -799,7 +799,7 @@ export function SlotDefinitionsPage() {
                   className="form-input"
                   value={constraintForm.value_type}
                   disabled={!!constraintForm.parameter_id}
-                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.05)' : '' }}
+                  style={{ backgroundColor: constraintForm.parameter_id ? 'rgba(255,255,255,0.02)' : '' }}
                   onChange={(e) => setConstraintForm({ ...constraintForm, value_type: e.target.value })}
                 >
                   <option value="string">String</option>

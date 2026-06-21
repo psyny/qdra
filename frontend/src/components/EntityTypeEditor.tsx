@@ -342,7 +342,7 @@ export function EntityTypeEditor({ templateId }: EntityTypeEditorProps) {
       )}
 
       {showCreateForm && (
-        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
+        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Entity Group</h3>
           <div className="form-field">
             <label className="form-label">Type *</label>
