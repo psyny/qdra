@@ -36,6 +36,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const navigate = useNavigate();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
+  const [recipeCatalogView, setRecipeCatalogView] = useState<any>(null);
   const [parameterDefinitions, setParameterDefinitions] = useState<ParameterDefinition[]>([]);
   const [slotGroups, setSlotGroups] = useState<SlotGroupConfig[]>([]);
   const [materialEntityTypes, setMaterialEntityTypes] = useState<any[]>([]);
@@ -55,6 +56,10 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
       try {
         const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
+
+        // Get recipe catalog view for dynamic labels
+        const recipeCatalogView = templateData.views.find(v => v.view_key === 'recipe_catalog');
+        setRecipeCatalogView(recipeCatalogView || null);
 
         // Load project to get image_size_px
         const projectData = await getProject(projectId);
@@ -360,7 +365,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   return (
     <div>
       <h2 className="card-title mb-4">
-        {recipeId ? 'Edit Recipe' : 'New Recipe'}
+        {recipeId ? 'Edit Entity' : 'New Entity'}
       </h2>
       <RecipeForm
         initialParameters={initialParameters}
@@ -368,7 +373,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         errorMessage={error}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
-        submitLabel={recipeId ? 'Save Recipe' : 'Create Recipe'}
+        submitLabel={recipeId ? 'Save Entity' : 'Create Entity'}
         entityId={recipeId || undefined}
         targetImageSize={imageSizePx}
         currentImage={entity?.image?.url || null}

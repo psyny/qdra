@@ -993,7 +993,7 @@ export function RecipeForm({
       {validationError && <p className="form-error">{validationError}</p>}
 
       <div className="card mb-6">
-        <h3 className="card-title mb-4">Recipe Parameters</h3>
+        <h3 className="card-title mb-4">Entity Parameters</h3>
         {sortedParameters.map((param, index) => (
           <div key={`${param.domain}:${param.key}`} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
             {param.value_type === 'boolean' ? (

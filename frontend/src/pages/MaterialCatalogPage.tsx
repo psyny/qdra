@@ -239,8 +239,8 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   if (materialCatalogView && materialCatalogView.configs.length > 0 && !selectedConfig) {
     return (
       <div>
-        <h2 className="card-title">Material Catalog</h2>
-        <p className="card-description">Select a material group to view materials.</p>
+        <h2 className="card-title">{materialCatalogView.label}</h2>
+        <p className="card-description">Select a group to view</p>
         <div className="project-grid">
           {materialCatalogView.configs.map((config: ViewConfig) => {
             const entityType = template?.entity_types.find((et) => et.id === config.entity_type_id);
@@ -270,14 +270,14 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
           <h2 className="card-title">
             {template?.entity_types.find((et) => et.id === selectedConfig?.entity_type_id)?.name || 'Materials'}
           </h2>
-          <p className="card-description">Create and manage project materials.</p>
+          <p className="card-description">Create and manage entities.</p>
         </div>
         {selectedConfig && (
           <Link
             to={`/projects/${projectId}/materials/new?configId=${selectedConfig.id}`}
             className="button button--primary"
           >
-            + New Material
+            + New {materialCatalogView.label} Entity
           </Link>
         )}
       </div>

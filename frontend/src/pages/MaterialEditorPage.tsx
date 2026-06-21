@@ -18,6 +18,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   const navigate = useNavigate();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
+  const [materialCatalogView, setMaterialCatalogView] = useState<any>(null);
   const [parameterDefinitions, setParameterDefinitions] = useState<ParameterDefinition[]>([]);
   const [entity, setEntity] = useState<Entity | null>(null);
   const [entityParameters, setEntityParameters] = useState<EntityParameter[]>([]);
@@ -33,6 +34,10 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
       try {
         const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
+
+        // Get material catalog view for dynamic labels
+        const materialView = templateData.views.find(v => v.view_key === 'material_catalog');
+        setMaterialCatalogView(materialView || null);
 
         // Load project to get image_size_px
         const projectData = await getProject(projectId);
@@ -180,7 +185,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   return (
     <div>
       <h2 className="card-title mb-4">
-        {materialId ? 'Edit Material' : 'New Material'}
+        {materialId ? 'Edit Entity' : 'New Entity'}
       </h2>
       <MaterialForm
         initialParameters={initialParameters}
@@ -188,7 +193,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         errorMessage={error}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
-        submitLabel={materialId ? 'Save Material' : 'Create Material'}
+        submitLabel={materialId ? 'Save Entity' : 'Create Entity'}
         entityId={materialId || undefined}
         targetImageSize={imageSizePx}
         currentImage={entity?.image?.url || null}

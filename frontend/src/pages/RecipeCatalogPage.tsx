@@ -239,8 +239,8 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
   if (recipeCatalogView && recipeCatalogView.configs.length > 1 && !selectedConfig) {
     return (
       <div>
-        <h2 className="card-title">Recipe Catalog</h2>
-        <p className="card-description">Select a recipe group to view recipes.</p>
+        <h2 className="card-title">{recipeCatalogView.label}</h2>
+        <p className="card-description">Select a group to view</p>
         <div className="project-grid">
           {recipeCatalogView.configs.map((config: ViewConfig) => {
             const entityType = template?.entity_types.find((et) => et.id === config.entity_type_id);
@@ -287,14 +287,14 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
           <h2 className="card-title">
             {template?.entity_types.find((et) => et.id === selectedConfig?.entity_type_id)?.name || 'Recipes'}
           </h2>
-          <p className="card-description">Create and manage project recipes.</p>
+          <p className="card-description">Create and manage entities.</p>
         </div>
         {selectedConfig && (
           <Link
             to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
             className="button button--primary"
           >
-            + New Recipe
+            + New {recipeCatalogView.label} Entity
           </Link>
         )}
       </div>
