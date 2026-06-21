@@ -899,6 +899,144 @@ def update_view_config(
 
 
 # ---------------------------------------------------------------------------
+# Default Slot Models
+# ---------------------------------------------------------------------------
+
+class DefaultSlotParameterConstraintCreate(BaseModel):
+    domain: str
+    key: str
+    operator: str
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+    is_wildcard: bool = False
+
+
+class DefaultSlotParameterConstraintResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    default_option_id: uuid.UUID
+    domain: str
+    key: str
+    operator: str
+    value_string: Optional[str]
+    value_number: Optional[float]
+    value_boolean: Optional[bool]
+    is_wildcard: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class DefaultSlotOptionCreate(BaseModel):
+    quantity: Optional[float] = None
+    sort_order: int = 0
+    parameter_constraints: List[DefaultSlotParameterConstraintCreate] = []
+
+
+class DefaultSlotOptionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    default_slot_id: uuid.UUID
+    quantity: Optional[float]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    parameter_constraints: List[DefaultSlotParameterConstraintResponse] = []
+
+
+class DefaultSlotCreate(BaseModel):
+    kind: str
+    sort_order: int = 0
+    options: List[DefaultSlotOptionCreate] = []
+
+
+class DefaultSlotUpdate(BaseModel):
+    kind: Optional[str] = None
+    sort_order: Optional[int] = None
+    options: Optional[List[DefaultSlotOptionCreate]] = None
+
+
+class DefaultSlotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    slot_group_id: uuid.UUID
+    kind: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    options: List[DefaultSlotOptionResponse] = []
+
+
+# ---------------------------------------------------------------------------
+# Per Slot Models
+# ---------------------------------------------------------------------------
+
+class PerSlotParameterConstraintCreate(BaseModel):
+    domain: str
+    key: str
+    operator: str
+    value_string: Optional[str] = None
+    value_number: Optional[float] = None
+    value_boolean: Optional[bool] = None
+    is_wildcard: bool = False
+
+
+class PerSlotParameterConstraintResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    per_option_id: uuid.UUID
+    domain: str
+    key: str
+    operator: str
+    value_string: Optional[str]
+    value_number: Optional[float]
+    value_boolean: Optional[bool]
+    is_wildcard: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PerSlotOptionCreate(BaseModel):
+    quantity: Optional[float] = None
+    sort_order: int = 0
+    parameter_constraints: List[PerSlotParameterConstraintCreate] = []
+
+
+class PerSlotOptionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    per_slot_id: uuid.UUID
+    quantity: Optional[float]
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    parameter_constraints: List[PerSlotParameterConstraintResponse] = []
+
+
+class PerSlotCreate(BaseModel):
+    kind: str
+    sort_order: int = 0
+    options: List[PerSlotOptionCreate] = []
+
+
+class PerSlotUpdate(BaseModel):
+    kind: Optional[str] = None
+    sort_order: Optional[int] = None
+    options: Optional[List[PerSlotOptionCreate]] = None
+
+
+class PerSlotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    slot_group_id: uuid.UUID
+    kind: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    options: List[PerSlotOptionResponse] = []
+
+
+# ---------------------------------------------------------------------------
 # Slot Group Models
 # ---------------------------------------------------------------------------
 
@@ -929,6 +1067,8 @@ class SlotGroupResponse(BaseModel):
     sort_order: int
     created_at: datetime
     updated_at: datetime
+    default_slot: Optional[DefaultSlotResponse] = None
+    per_slots: List[PerSlotResponse] = []
 
 
 # ---------------------------------------------------------------------------
@@ -949,7 +1089,51 @@ def list_slot_groups(
         raise HTTPException(status_code=404, detail="Entity type not found")
     
     slot_groups = repo.list_slot_groups(entity_type_id)
-    return [SlotGroupResponse.model_validate(sg) for sg in slot_groups]
+    
+    # Enrich each slot group with default_slot and per_slots
+    result = []
+    for sg in slot_groups:
+        # Get default slot
+        default_slot = repo.get_default_slot(sg.id)
+        default_slot_response = None
+        if default_slot:
+            options = []
+            for option in default_slot.options:
+                constraints = [
+                    DefaultSlotParameterConstraintResponse.model_validate(c)
+                    for c in option.parameter_constraints
+                ]
+                option_response = DefaultSlotOptionResponse.model_validate(option)
+                option_response.parameter_constraints = constraints
+                options.append(option_response)
+            
+            default_slot_response = DefaultSlotResponse.model_validate(default_slot)
+            default_slot_response.options = options
+        
+        # Get per slots
+        per_slots = repo.list_per_slots(sg.id)
+        per_slots_response = []
+        for per_slot in per_slots:
+            options = []
+            for option in per_slot.options:
+                constraints = [
+                    PerSlotParameterConstraintResponse.model_validate(c)
+                    for c in option.parameter_constraints
+                ]
+                option_response = PerSlotOptionResponse.model_validate(option)
+                option_response.parameter_constraints = constraints
+                options.append(option_response)
+            
+            slot_response = PerSlotResponse.model_validate(per_slot)
+            slot_response.options = options
+            per_slots_response.append(slot_response)
+        
+        sg_response = SlotGroupResponse.model_validate(sg)
+        sg_response.default_slot = default_slot_response
+        sg_response.per_slots = per_slots_response
+        result.append(sg_response)
+    
+    return result
 
 
 @router.post(
@@ -1070,3 +1254,328 @@ def delete_slot_group(
     repo = ProjectTemplateRepository(db)
     if not repo.delete_slot_group(slot_group_id):
         raise HTTPException(status_code=404, detail="Slot group not found")
+
+
+# ---------------------------------------------------------------------------
+# Default Slot Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/project-template-slot-groups/{slot_group_id}/default-slot",
+    response_model=Optional[DefaultSlotResponse],
+)
+def get_default_slot(
+    slot_group_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    default_slot = repo.get_default_slot(slot_group_id)
+    if not default_slot:
+        return None
+    
+    # Load options with parameter constraints
+    options = []
+    for option in default_slot.options:
+        constraints = [
+            DefaultSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = DefaultSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = DefaultSlotResponse.model_validate(default_slot)
+    response.options = options
+    return response
+
+
+@router.post(
+    "/project-template-slot-groups/{slot_group_id}/default-slot",
+    response_model=DefaultSlotResponse,
+    status_code=201,
+)
+def create_default_slot(
+    slot_group_id: uuid.UUID,
+    data: DefaultSlotCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    # Check if default slot already exists
+    existing = repo.get_default_slot(slot_group_id)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail="Default slot already exists for this slot group"
+        )
+    
+    # Validate kind
+    if data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    default_slot = repo.create_default_slot(
+        slot_group_id=slot_group_id,
+        kind=data.kind,
+        sort_order=data.sort_order,
+        options_data=data.options,
+    )
+    
+    # Load options with parameter constraints
+    options = []
+    for option in default_slot.options:
+        constraints = [
+            DefaultSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = DefaultSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = DefaultSlotResponse.model_validate(default_slot)
+    response.options = options
+    return response
+
+
+@router.put(
+    "/project-template-slot-groups/{slot_group_id}/default-slot",
+    response_model=DefaultSlotResponse,
+)
+def update_default_slot(
+    slot_group_id: uuid.UUID,
+    data: DefaultSlotUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    default_slot = repo.get_default_slot(slot_group_id)
+    if not default_slot:
+        raise HTTPException(status_code=404, detail="Default slot not found")
+    
+    # Validate kind if provided
+    if data.kind is not None and data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    updated = repo.update_default_slot(
+        slot_group_id=slot_group_id,
+        kind=data.kind,
+        sort_order=data.sort_order,
+        options_data=data.options,
+    )
+    
+    # Load options with parameter constraints
+    options = []
+    for option in updated.options:
+        constraints = [
+            DefaultSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = DefaultSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = DefaultSlotResponse.model_validate(updated)
+    response.options = options
+    return response
+
+
+@router.delete(
+    "/project-template-slot-groups/{slot_group_id}/default-slot",
+    status_code=204,
+)
+def delete_default_slot(
+    slot_group_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    if not repo.delete_default_slot(slot_group_id):
+        raise HTTPException(status_code=404, detail="Default slot not found")
+
+
+# ---------------------------------------------------------------------------
+# Per Slot Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/project-template-slot-groups/{slot_group_id}/per-slots",
+    response_model=List[PerSlotResponse],
+)
+def list_per_slots(
+    slot_group_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    per_slots = repo.list_per_slots(slot_group_id)
+    
+    # Load options with parameter constraints for each slot
+    result = []
+    for per_slot in per_slots:
+        options = []
+        for option in per_slot.options:
+            constraints = [
+                PerSlotParameterConstraintResponse.model_validate(c)
+                for c in option.parameter_constraints
+            ]
+            option_response = PerSlotOptionResponse.model_validate(option)
+            option_response.parameter_constraints = constraints
+            options.append(option_response)
+        
+        slot_response = PerSlotResponse.model_validate(per_slot)
+        slot_response.options = options
+        result.append(slot_response)
+    
+    return result
+
+
+@router.post(
+    "/project-template-slot-groups/{slot_group_id}/per-slots",
+    response_model=PerSlotResponse,
+    status_code=201,
+)
+def create_per_slot(
+    slot_group_id: uuid.UUID,
+    data: PerSlotCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    slot_group = repo.get_slot_group_by_id(slot_group_id)
+    if not slot_group:
+        raise HTTPException(status_code=404, detail="Slot group not found")
+    
+    # Validate kind
+    if data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    per_slot = repo.create_per_slot(
+        slot_group_id=slot_group_id,
+        kind=data.kind,
+        sort_order=data.sort_order,
+        options_data=data.options,
+    )
+    
+    # Load options with parameter constraints
+    options = []
+    for option in per_slot.options:
+        constraints = [
+            PerSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = PerSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = PerSlotResponse.model_validate(per_slot)
+    response.options = options
+    return response
+
+
+@router.get(
+    "/project-template-per-slots/{per_slot_id}",
+    response_model=PerSlotResponse,
+)
+def get_per_slot(
+    per_slot_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    per_slot = repo.get_per_slot_by_id(per_slot_id)
+    if not per_slot:
+        raise HTTPException(status_code=404, detail="Per slot not found")
+    
+    # Load options with parameter constraints
+    options = []
+    for option in per_slot.options:
+        constraints = [
+            PerSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = PerSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = PerSlotResponse.model_validate(per_slot)
+    response.options = options
+    return response
+
+
+@router.put(
+    "/project-template-per-slots/{per_slot_id}",
+    response_model=PerSlotResponse,
+)
+def update_per_slot(
+    per_slot_id: uuid.UUID,
+    data: PerSlotUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    per_slot = repo.get_per_slot_by_id(per_slot_id)
+    if not per_slot:
+        raise HTTPException(status_code=404, detail="Per slot not found")
+    
+    # Validate kind if provided
+    if data.kind is not None and data.kind not in ("consumes", "requires", "produces"):
+        raise HTTPException(
+            status_code=400,
+            detail="kind must be one of: consumes, requires, produces"
+        )
+    
+    updated = repo.update_per_slot(
+        per_slot_id=per_slot_id,
+        kind=data.kind,
+        sort_order=data.sort_order,
+        options_data=data.options,
+    )
+    
+    # Load options with parameter constraints
+    options = []
+    for option in updated.options:
+        constraints = [
+            PerSlotParameterConstraintResponse.model_validate(c)
+            for c in option.parameter_constraints
+        ]
+        option_response = PerSlotOptionResponse.model_validate(option)
+        option_response.parameter_constraints = constraints
+        options.append(option_response)
+    
+    response = PerSlotResponse.model_validate(updated)
+    response.options = options
+    return response
+
+
+@router.delete(
+    "/project-template-per-slots/{per_slot_id}",
+    status_code=204,
+)
+def delete_per_slot(
+    per_slot_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.delete_per_slot(per_slot_id):
+        raise HTTPException(status_code=404, detail="Per slot not found")

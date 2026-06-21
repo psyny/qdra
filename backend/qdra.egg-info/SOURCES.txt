@@ -20,6 +20,7 @@ qdra/alembic/versions/20260618_param_validation.py
 qdra/alembic/versions/20260618_template_views_editor.py
 qdra/alembic/versions/20260620_add_entity_type.py
 qdra/alembic/versions/20260620_add_type_to_entities.py
+qdra/alembic/versions/20260621_add_template_slot_definitions.py
 qdra/alembic/versions/20260621_drop_slot_definitions_and_constraints.py
 qdra/api/__init__.py
 qdra/api/entities.py

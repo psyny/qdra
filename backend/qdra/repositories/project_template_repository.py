@@ -11,6 +11,12 @@ from models.project_template import (
     ProjectTemplateView,
     ProjectTemplateViewConfig,
     ProjectTemplateSlotGroup,
+    ProjectTemplateDefaultSlot,
+    ProjectTemplateDefaultOption,
+    ProjectTemplateDefaultParameterConstraint,
+    ProjectTemplatePerSlot,
+    ProjectTemplatePerOption,
+    ProjectTemplatePerParameterConstraint,
 )
 
 
@@ -691,6 +697,281 @@ class ProjectTemplateRepository:
         slot_group = self.get_slot_group_by_id(slot_group_id)
         if slot_group:
             self.db.delete(slot_group)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplateDefaultSlot CRUD
+
+    def get_default_slot(self, slot_group_id: uuid.UUID) -> Optional[ProjectTemplateDefaultSlot]:
+        return (
+            self.db.query(ProjectTemplateDefaultSlot)
+            .options(
+                selectinload(ProjectTemplateDefaultSlot.options).selectinload(
+                    ProjectTemplateDefaultOption.parameter_constraints
+                )
+            )
+            .filter(ProjectTemplateDefaultSlot.slot_group_id == slot_group_id)
+            .first()
+        )
+
+    def create_default_slot(
+        self,
+        slot_group_id: uuid.UUID,
+        kind: str,
+        sort_order: int = 0,
+        options_data: Optional[List[Dict[str, Any]]] = None,
+    ) -> ProjectTemplateDefaultSlot:
+        default_slot = ProjectTemplateDefaultSlot(
+            slot_group_id=slot_group_id,
+            kind=kind,
+            sort_order=sort_order,
+        )
+        self.db.add(default_slot)
+        self.db.commit()
+        self.db.refresh(default_slot)
+
+        # Create options if provided
+        if options_data:
+            for option_data in options_data:
+                option = ProjectTemplateDefaultOption(
+                    default_slot_id=default_slot.id,
+                    quantity=option_data.get("quantity"),
+                    sort_order=option_data.get("sort_order", 0),
+                )
+                self.db.add(option)
+                self.db.commit()
+                self.db.refresh(option)
+
+                # Create parameter constraints if provided
+                constraints_data = option_data.get("parameter_constraints", [])
+                for constraint_data in constraints_data:
+                    constraint = ProjectTemplateDefaultParameterConstraint(
+                        default_option_id=option.id,
+                        domain=constraint_data["domain"],
+                        key=constraint_data["key"],
+                        operator=constraint_data["operator"],
+                        value_string=constraint_data.get("value_string"),
+                        value_number=constraint_data.get("value_number"),
+                        value_boolean=constraint_data.get("value_boolean"),
+                        is_wildcard=constraint_data.get("is_wildcard", False),
+                    )
+                    self.db.add(constraint)
+                self.db.commit()
+            self.db.refresh(default_slot)
+
+        return default_slot
+
+    def update_default_slot(
+        self,
+        slot_group_id: uuid.UUID,
+        kind: Optional[str] = None,
+        sort_order: Optional[int] = None,
+        options_data: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[ProjectTemplateDefaultSlot]:
+        default_slot = self.get_default_slot(slot_group_id)
+        if not default_slot:
+            return None
+
+        if kind is not None:
+            default_slot.kind = kind
+        if sort_order is not None:
+            default_slot.sort_order = sort_order
+
+        # Update options if provided
+        if options_data is not None:
+            # Delete existing options and constraints
+            self.db.query(ProjectTemplateDefaultParameterConstraint).filter(
+                ProjectTemplateDefaultParameterConstraint.default_option_id.in_(
+                    self.db.query(ProjectTemplateDefaultOption.id).filter(
+                        ProjectTemplateDefaultOption.default_slot_id == default_slot.id
+                    )
+                )
+            ).delete(synchronize_session=False)
+
+            self.db.query(ProjectTemplateDefaultOption).filter(
+                ProjectTemplateDefaultOption.default_slot_id == default_slot.id
+            ).delete(synchronize_session=False)
+
+            # Create new options
+            for option_data in options_data:
+                option = ProjectTemplateDefaultOption(
+                    default_slot_id=default_slot.id,
+                    quantity=option_data.get("quantity"),
+                    sort_order=option_data.get("sort_order", 0),
+                )
+                self.db.add(option)
+                self.db.commit()
+                self.db.refresh(option)
+
+                # Create parameter constraints
+                constraints_data = option_data.get("parameter_constraints", [])
+                for constraint_data in constraints_data:
+                    constraint = ProjectTemplateDefaultParameterConstraint(
+                        default_option_id=option.id,
+                        domain=constraint_data["domain"],
+                        key=constraint_data["key"],
+                        operator=constraint_data["operator"],
+                        value_string=constraint_data.get("value_string"),
+                        value_number=constraint_data.get("value_number"),
+                        value_boolean=constraint_data.get("value_boolean"),
+                        is_wildcard=constraint_data.get("is_wildcard", False),
+                    )
+                    self.db.add(constraint)
+                self.db.commit()
+
+        self.db.commit()
+        self.db.refresh(default_slot)
+        return default_slot
+
+    def delete_default_slot(self, slot_group_id: uuid.UUID) -> bool:
+        default_slot = self.get_default_slot(slot_group_id)
+        if default_slot:
+            self.db.delete(default_slot)
+            self.db.commit()
+            return True
+        return False
+
+    # ProjectTemplatePerSlot CRUD
+
+    def get_per_slot_by_id(self, per_slot_id: uuid.UUID) -> Optional[ProjectTemplatePerSlot]:
+        return (
+            self.db.query(ProjectTemplatePerSlot)
+            .options(
+                selectinload(ProjectTemplatePerSlot.options).selectinload(
+                    ProjectTemplatePerOption.parameter_constraints
+                )
+            )
+            .filter(ProjectTemplatePerSlot.id == per_slot_id)
+            .first()
+        )
+
+    def list_per_slots(self, slot_group_id: uuid.UUID) -> List[ProjectTemplatePerSlot]:
+        return (
+            self.db.query(ProjectTemplatePerSlot)
+            .options(
+                selectinload(ProjectTemplatePerSlot.options).selectinload(
+                    ProjectTemplatePerOption.parameter_constraints
+                )
+            )
+            .filter(ProjectTemplatePerSlot.slot_group_id == slot_group_id)
+            .order_by(ProjectTemplatePerSlot.sort_order)
+            .all()
+        )
+
+    def create_per_slot(
+        self,
+        slot_group_id: uuid.UUID,
+        kind: str,
+        sort_order: int = 0,
+        options_data: Optional[List[Dict[str, Any]]] = None,
+    ) -> ProjectTemplatePerSlot:
+        per_slot = ProjectTemplatePerSlot(
+            slot_group_id=slot_group_id,
+            kind=kind,
+            sort_order=sort_order,
+        )
+        self.db.add(per_slot)
+        self.db.commit()
+        self.db.refresh(per_slot)
+
+        # Create options if provided
+        if options_data:
+            for option_data in options_data:
+                option = ProjectTemplatePerOption(
+                    per_slot_id=per_slot.id,
+                    quantity=option_data.get("quantity"),
+                    sort_order=option_data.get("sort_order", 0),
+                )
+                self.db.add(option)
+                self.db.commit()
+                self.db.refresh(option)
+
+                # Create parameter constraints if provided
+                constraints_data = option_data.get("parameter_constraints", [])
+                for constraint_data in constraints_data:
+                    constraint = ProjectTemplatePerParameterConstraint(
+                        per_option_id=option.id,
+                        domain=constraint_data["domain"],
+                        key=constraint_data["key"],
+                        operator=constraint_data["operator"],
+                        value_string=constraint_data.get("value_string"),
+                        value_number=constraint_data.get("value_number"),
+                        value_boolean=constraint_data.get("value_boolean"),
+                        is_wildcard=constraint_data.get("is_wildcard", False),
+                    )
+                    self.db.add(constraint)
+                self.db.commit()
+            self.db.refresh(per_slot)
+
+        return per_slot
+
+    def update_per_slot(
+        self,
+        per_slot_id: uuid.UUID,
+        kind: Optional[str] = None,
+        sort_order: Optional[int] = None,
+        options_data: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[ProjectTemplatePerSlot]:
+        per_slot = self.get_per_slot_by_id(per_slot_id)
+        if not per_slot:
+            return None
+
+        if kind is not None:
+            per_slot.kind = kind
+        if sort_order is not None:
+            per_slot.sort_order = sort_order
+
+        # Update options if provided
+        if options_data is not None:
+            # Delete existing options and constraints
+            self.db.query(ProjectTemplatePerParameterConstraint).filter(
+                ProjectTemplatePerParameterConstraint.per_option_id.in_(
+                    self.db.query(ProjectTemplatePerOption.id).filter(
+                        ProjectTemplatePerOption.per_slot_id == per_slot.id
+                    )
+                )
+            ).delete(synchronize_session=False)
+
+            self.db.query(ProjectTemplatePerOption).filter(
+                ProjectTemplatePerOption.per_slot_id == per_slot.id
+            ).delete(synchronize_session=False)
+
+            # Create new options
+            for option_data in options_data:
+                option = ProjectTemplatePerOption(
+                    per_slot_id=per_slot.id,
+                    quantity=option_data.get("quantity"),
+                    sort_order=option_data.get("sort_order", 0),
+                )
+                self.db.add(option)
+                self.db.commit()
+                self.db.refresh(option)
+
+                # Create parameter constraints
+                constraints_data = option_data.get("parameter_constraints", [])
+                for constraint_data in constraints_data:
+                    constraint = ProjectTemplatePerParameterConstraint(
+                        per_option_id=option.id,
+                        domain=constraint_data["domain"],
+                        key=constraint_data["key"],
+                        operator=constraint_data["operator"],
+                        value_string=constraint_data.get("value_string"),
+                        value_number=constraint_data.get("value_number"),
+                        value_boolean=constraint_data.get("value_boolean"),
+                        is_wildcard=constraint_data.get("is_wildcard", False),
+                    )
+                    self.db.add(constraint)
+                self.db.commit()
+
+        self.db.commit()
+        self.db.refresh(per_slot)
+        return per_slot
+
+    def delete_per_slot(self, per_slot_id: uuid.UUID) -> bool:
+        per_slot = self.get_per_slot_by_id(per_slot_id)
+        if per_slot:
+            self.db.delete(per_slot)
             self.db.commit()
             return True
         return False

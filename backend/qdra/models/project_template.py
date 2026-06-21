@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func, CheckConstraint
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Float, Integer, String, Text, UniqueConstraint, func, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID, DOUBLE_PRECISION
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -190,6 +190,175 @@ class ProjectTemplateSlotGroup(Base):
             "max_slots IS NULL OR max_slots >= min_slots",
             name="ck_slot_group_max_slots_ge_min",
         ),
+    )
+
+    default_slot: Mapped[Optional["ProjectTemplateDefaultSlot"]] = relationship(
+        "ProjectTemplateDefaultSlot", backref="slot_group", uselist=False
+    )
+    per_slots: Mapped[List["ProjectTemplatePerSlot"]] = relationship(
+        "ProjectTemplatePerSlot", backref="slot_group", order_by="ProjectTemplatePerSlot.sort_order"
+    )
+
+
+class Operator(str, Enum):
+    EQ = "="
+    LT = "<"
+    LTE = "<="
+    GT = ">"
+    GTE = ">="
+    IN = "in"
+    EXISTS = "exists"
+
+
+class ProjectTemplateDefaultSlot(Base):
+    __tablename__ = "project_template_default_slots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    slot_group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_slot_groups.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    options: Mapped[List["ProjectTemplateDefaultOption"]] = relationship(
+        "ProjectTemplateDefaultOption", backref="default_slot", order_by="ProjectTemplateDefaultOption.sort_order"
+    )
+
+
+class ProjectTemplateDefaultOption(Base):
+    __tablename__ = "project_template_default_options"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    default_slot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_default_slots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    parameter_constraints: Mapped[List["ProjectTemplateDefaultParameterConstraint"]] = relationship(
+        "ProjectTemplateDefaultParameterConstraint", backref="default_option"
+    )
+
+
+class ProjectTemplateDefaultParameterConstraint(Base):
+    __tablename__ = "project_template_default_parameter_constraints"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    default_option_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_default_options.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    key: Mapped[str] = mapped_column(String(255), nullable=False)
+    operator: Mapped[Operator] = mapped_column(String(50), nullable=False)
+    value_string: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    value_number: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    value_boolean: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    is_wildcard: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProjectTemplatePerSlot(Base):
+    __tablename__ = "project_template_per_slots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    slot_group_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_slot_groups.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(50), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    options: Mapped[List["ProjectTemplatePerOption"]] = relationship(
+        "ProjectTemplatePerOption", backref="per_slot", order_by="ProjectTemplatePerOption.sort_order"
+    )
+
+
+class ProjectTemplatePerOption(Base):
+    __tablename__ = "project_template_per_options"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    per_slot_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_per_slots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    quantity: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    parameter_constraints: Mapped[List["ProjectTemplatePerParameterConstraint"]] = relationship(
+        "ProjectTemplatePerParameterConstraint", backref="per_option"
+    )
+
+
+class ProjectTemplatePerParameterConstraint(Base):
+    __tablename__ = "project_template_per_parameter_constraints"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    per_option_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_template_per_options.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    key: Mapped[str] = mapped_column(String(255), nullable=False)
+    operator: Mapped[Operator] = mapped_column(String(50), nullable=False)
+    value_string: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    value_number: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    value_boolean: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    is_wildcard: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
