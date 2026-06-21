@@ -228,11 +228,26 @@ export function RecipeForm({
       newConstraints[kind] = [...newConstraints[kind]];
       newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex]];
 
+      // Get the first available domain+key pair
+      let firstDomain = null;
+      let firstKey = null;
+      let firstEntityTypeId = materialEntityTypes[0]?.id || null;
+
+      for (const et of materialEntityTypes) {
+        const params = getParametersForEntityType(et.id);
+        if (params.length > 0) {
+          firstDomain = params[0].domain;
+          firstKey = params[0].key;
+          firstEntityTypeId = et.id;
+          break;
+        }
+      }
+
       const newConstraint = {
         origin: 'parameter' as const,
-        entity_type_id: materialEntityTypes[0]?.id || null,
-        domain: null,
-        key: null,
+        entity_type_id: firstEntityTypeId,
+        domain: firstDomain,
+        key: firstKey,
         operator: '=',
         value_string: null,
       };
@@ -241,6 +256,13 @@ export function RecipeForm({
         ...newConstraints[kind][slotIndex][orGroupIndex],
         newConstraint
       ];
+
+      // Fetch existing values for the auto-selected domain+key
+      if (firstDomain && firstKey && firstEntityTypeId) {
+        const entityType = template?.entity_types?.find((et: any) => et.id === firstEntityTypeId);
+        const groupName = entityType?.name || '';
+        fetchExistingValues(firstEntityTypeId, groupName, firstDomain, firstKey);
+      }
 
       return newConstraints;
     });
