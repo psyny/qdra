@@ -622,12 +622,10 @@ export function RecipeForm({
 
   // Helper to fetch existing parameter values for regular recipe parameters
   const fetchParameterExistingValues = async (domain: string, key: string) => {
-    console.log('RecipeForm fetchParameterExistingValues called', { domain, key, projectId, group });
     if (!projectId || !domain || !key) return [];
 
     const cacheKey = `${domain}:${key}`;
     if (parameterExistingValues[cacheKey]) {
-      console.log('RecipeForm fetchParameterExistingValues - cache hit', { cacheKey });
       return parameterExistingValues[cacheKey];
     }
 

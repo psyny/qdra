@@ -91,7 +91,6 @@ export async function getDistinctParameterValues(
   key: string,
   groups: string[] = [],
 ): Promise<string[]> {
-  console.log('getDistinctParameterValues called', { projectId, domain, key, groups });
   const url = `${API_URL}/api/projects/${projectId}/parameter-values`;
   const response = await fetch(url, {
     method: 'POST',
@@ -99,9 +98,7 @@ export async function getDistinctParameterValues(
     body: JSON.stringify({ domain, key, groups }),
   });
   if (!response.ok) throw new Error('Failed to fetch parameter values');
-  const result = await response.json();
-  console.log('getDistinctParameterValues returned', result);
-  return result;
+  return response.json();
 }
 
 // Recipe slot operations
