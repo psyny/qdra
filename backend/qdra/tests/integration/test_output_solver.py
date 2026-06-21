@@ -15,7 +15,7 @@ def test_final_product_unrestricted(client, project_ctx):
 
     # Plan for materials with category "final_product" - should match final_product_1 and final_product_2
     plan_response = client.post(
-        f"/projects/{project_id}/solver/output",
+        f"/api/projects/{project_id}/solver/output",
         json={
             "target": {
                 "quantity": 5,
@@ -66,7 +66,7 @@ def test_final_product_recipe_restricted_forbiden(client, project_ctx):
 
     # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
-        f"/projects/{project_id}/solver/output",
+        f"/api/projects/{project_id}/solver/output",
         json={
             "target": {
                 "quantity": 5,
@@ -125,7 +125,7 @@ def test_final_product_recipe_restricted_required(client, project_ctx):
 
     # Plan for final_product - byproduct is produced but unused, should be tagged as "leaf" (excess)
     plan_response = client.post(
-        f"/projects/{project_id}/solver/output",
+        f"/api/projects/{project_id}/solver/output",
         json={
             "target": {
                 "quantity": 5,
@@ -185,7 +185,7 @@ def test_target_recipe_unrestricted(client, project_ctx):
 
     # Plan for recipe with name "Refining_A" - should generate 1 plan
     plan_response = client.post(
-        f"/projects/{project_id}/solver/output",
+        f"/api/projects/{project_id}/solver/output",
         json={
             "target": {
                 "quantity": 5,

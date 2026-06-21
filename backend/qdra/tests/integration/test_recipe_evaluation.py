@@ -7,14 +7,14 @@ def test_constraint_matching_exists(client, project_ctx):
 
     # Create material with metal classification using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -35,7 +35,7 @@ def test_constraint_matching_exists(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -49,14 +49,14 @@ def test_constraint_matching_gte(client, project_ctx):
 
     # Create material with quality 78 using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "stat", "key": "quality", "value_number": 78}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -77,7 +77,7 @@ def test_constraint_matching_gte(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -90,14 +90,14 @@ def test_constraint_matching_lt(client, project_ctx):
 
     # Create material with quality 50 using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "stat", "key": "quality", "value_number": 50}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -118,7 +118,7 @@ def test_constraint_matching_lt(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -131,14 +131,14 @@ def test_constraint_matching_eq(client, project_ctx):
 
     # Create material with name iron_ore using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -159,7 +159,7 @@ def test_constraint_matching_eq(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -174,7 +174,7 @@ def test_quantity_matching_sufficient(client, project_ctx):
     material_ids = []
     for _ in range(3):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
         material_id = material_response.json()["id"]
@@ -182,7 +182,7 @@ def test_quantity_matching_sufficient(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -203,7 +203,7 @@ def test_quantity_matching_sufficient(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -219,7 +219,7 @@ def test_quantity_matching_insufficient(client, project_ctx):
     material_ids = []
     for _ in range(2):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
         material_id = material_response.json()["id"]
@@ -227,7 +227,7 @@ def test_quantity_matching_insufficient(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -248,7 +248,7 @@ def test_quantity_matching_insufficient(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -261,14 +261,14 @@ def test_option_matching_or_semantics(client, project_ctx):
 
     # Create material with metal classification using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -295,7 +295,7 @@ def test_option_matching_or_semantics(client, project_ctx):
 
     # Evaluate recipe - should fail because option A requires 2 but only 1 available
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -308,46 +308,46 @@ def test_option_matching_second_option_succeeds(client, project_ctx):
 
     # Create material with precious metal classification using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "precious_metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe
-    recipe_response = client.post(f"/projects/{project_id}/recipes", json={})
+    recipe_response = client.post(f"/api/projects/{project_id}/recipes", json={})
     recipe_id = recipe_response.json()["id"]
 
     # Create slot
     slot_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/slots", json={"kind": "CONSUMES"}
     )
     slot_id = slot_response.json()["id"]
 
     # Create option A: requires 2 metals
     option_a_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options",
+        f"/api/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options",
         json={"quantity": 2},
     )
     option_a_id = option_a_response.json()["id"]
     client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_a_id}/constraints",
+        f"/api/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_a_id}/constraints",
         json={"domain": "classification", "key": "metal", "operator": "exists"},
     )
 
     # Create option B: requires 1 precious metal
     option_b_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options",
+        f"/api/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options",
         json={"quantity": 1},
     )
     option_b_id = option_b_response.json()["id"]
     client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_b_id}/constraints",
+        f"/api/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_b_id}/constraints",
         json={"domain": "classification", "key": "precious_metal", "operator": "exists"},
     )
 
     # Evaluate recipe - should succeed with option B
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -365,7 +365,7 @@ def test_slot_matching_and_semantics(client, project_ctx):
     metal_ids = []
     for _ in range(2):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
         material_id = material_response.json()["id"]
@@ -373,7 +373,7 @@ def test_slot_matching_and_semantics(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -405,7 +405,7 @@ def test_slot_matching_and_semantics(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": metal_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": metal_ids}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -420,14 +420,14 @@ def test_slot_matching_one_slot_fails(client, project_ctx):
 
     # Create 1 metal material using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -459,7 +459,7 @@ def test_slot_matching_one_slot_fails(client, project_ctx):
 
     # Evaluate recipe
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -475,14 +475,14 @@ def test_allocation_material_reuse_forbidden(client, project_ctx):
 
     # Create 1 metal material using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -514,7 +514,7 @@ def test_allocation_material_reuse_forbidden(client, project_ctx):
 
     # Evaluate recipe - should fail because material can't be reused
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -529,7 +529,7 @@ def test_allocation_distinct_materials(client, project_ctx):
     material_ids = []
     for _ in range(2):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
         )
         material_id = material_response.json()["id"]
@@ -537,7 +537,7 @@ def test_allocation_distinct_materials(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -569,7 +569,7 @@ def test_allocation_distinct_materials(client, project_ctx):
 
     # Evaluate recipe - should succeed with distinct allocations
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": material_ids}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -586,14 +586,14 @@ def test_recipe_evaluation_single_slot_success(client, project_ctx):
 
     # Create material using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "classification", "key": "metal", "value_boolean": True}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -614,7 +614,7 @@ def test_recipe_evaluation_single_slot_success(client, project_ctx):
 
     # Evaluate
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -628,14 +628,14 @@ def test_recipe_evaluation_single_slot_failure(client, project_ctx):
 
     # Create material without required classification using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "stone"}]}
     )
     material_id = material_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -656,7 +656,7 @@ def test_recipe_evaluation_single_slot_failure(client, project_ctx):
 
     # Evaluate
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -669,7 +669,7 @@ def test_recipe_evaluation_multiple_constraints(client, project_ctx):
 
     # Create material with metal classification and quality >= 70 using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={
             "parameters": [
                 {"domain": "classification", "key": "metal", "value_boolean": True},
@@ -681,7 +681,7 @@ def test_recipe_evaluation_multiple_constraints(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -703,7 +703,7 @@ def test_recipe_evaluation_multiple_constraints(client, project_ctx):
 
     # Evaluate
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()
@@ -716,7 +716,7 @@ def test_recipe_evaluation_multiple_constraints_fail(client, project_ctx):
 
     # Create material with metal classification but low quality using bulk endpoint
     material_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={
             "parameters": [
                 {"domain": "classification", "key": "metal", "value_boolean": True},
@@ -728,7 +728,7 @@ def test_recipe_evaluation_multiple_constraints_fail(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -750,7 +750,7 @@ def test_recipe_evaluation_multiple_constraints_fail(client, project_ctx):
 
     # Evaluate
     eval_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/evaluate", json={"materials": [material_id]}
     )
     assert eval_response.status_code == 200
     data = eval_response.json()

@@ -12,7 +12,7 @@ def test_get_recipe_materials(client, project_ctx):
     
     # Get materials matching the Refining_B recipe's slots
     # Refining_B consumes intermediate_1, produces intermediate_3 AND intermediate_4 (2 produces slots)
-    response = client.get(f"/projects/{project_id}/recipes/{recipes['refining_b']['id']}/materials")
+    response = client.get(f"/api/projects/{project_id}/recipes/{recipes['refining_b']['id']}/materials")
     assert response.status_code == 200
     data = response.json()
     
@@ -53,7 +53,7 @@ def test_get_material_recipes(client, project_ctx):
     # Get recipes matching the intermediate_1 material
     # intermediate_1 is consumed by Refining_A and Refining_B (2 recipes)
     # intermediate_1 is produced by Processing (1 recipe)
-    response = client.get(f"/projects/{project_id}/materials/{materials['intermediate_1']['id']}/recipes")
+    response = client.get(f"/api/projects/{project_id}/materials/{materials['intermediate_1']['id']}/recipes")
     assert response.status_code == 200
     data = response.json()
     

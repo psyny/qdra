@@ -7,20 +7,20 @@ def test_consumed_materials_are_removed(client, project_ctx):
 
     # Create two iron ore materials using bulk endpoint
     material1_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     material1_id = material1_response.json()["id"]
 
     material2_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     material2_id = material2_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -41,7 +41,7 @@ def test_consumed_materials_are_removed(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [material1_id, material2_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [material1_id, material2_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -59,7 +59,7 @@ def test_only_allocated_materials_are_removed(client, project_ctx):
     material_ids = []
     for i in range(3):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
         )
         material_id = material_response.json()["id"]
@@ -67,7 +67,7 @@ def test_only_allocated_materials_are_removed(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -88,7 +88,7 @@ def test_only_allocated_materials_are_removed(client, project_ctx):
 
     # Execute recipe with all 3 materials
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": material_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": material_ids}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -104,21 +104,21 @@ def test_required_materials_remain_available(client, project_ctx):
 
     # Create smelter material using bulk endpoint
     smelter_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "smelter"}]}
     )
     smelter_id = smelter_response.json()["id"]
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -150,7 +150,7 @@ def test_required_materials_remain_available(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -166,7 +166,7 @@ def test_required_materials_can_participate_in_future_executions(client, project
 
     # Create smelter material using bulk endpoint
     smelter_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "smelter"}]}
     )
     smelter_id = smelter_response.json()["id"]
@@ -175,7 +175,7 @@ def test_required_materials_can_participate_in_future_executions(client, project
     ore_ids = []
     for i in range(2):
         ore_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
         )
         ore_id = ore_response.json()["id"]
@@ -183,7 +183,7 @@ def test_required_materials_can_participate_in_future_executions(client, project
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -215,7 +215,7 @@ def test_required_materials_can_participate_in_future_executions(client, project
 
     # Execute recipe with first ore
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_ids[0]]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_ids[0]]}
     )
     assert exec_response.status_code == 200
     data1 = exec_response.json()
@@ -224,7 +224,7 @@ def test_required_materials_can_participate_in_future_executions(client, project
 
     # Execute again with second ore - smelter should still be available
     exec_response2 = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_ids[1]]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id, ore_ids[1]]}
     )
     assert exec_response2.status_code == 200
     data2 = exec_response2.json()
@@ -238,14 +238,14 @@ def test_produced_materials_are_created(client, project_ctx):
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -277,7 +277,7 @@ def test_produced_materials_are_created(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -285,7 +285,7 @@ def test_produced_materials_are_created(client, project_ctx):
     assert len(data["produced_material_ids"]) == 1
     # Verify the produced material has correct parameters
     produced_id = data["produced_material_ids"][0]
-    param_response = client.get(f"/projects/{project_id}/materials/{produced_id}/parameters")
+    param_response = client.get(f"/api/projects/{project_id}/materials/{produced_id}/parameters")
     params = param_response.json()
     assert any(p["domain"] == "identity" and p["key"] == "name" and p["value_string"] == "iron_ingot" for p in params)
 
@@ -296,14 +296,14 @@ def test_produced_material_parameters_are_correct(client, project_ctx):
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -336,7 +336,7 @@ def test_produced_material_parameters_are_correct(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -344,7 +344,7 @@ def test_produced_material_parameters_are_correct(client, project_ctx):
     
     # Verify the produced material has both parameters
     produced_id = data["produced_material_ids"][0]
-    param_response = client.get(f"/projects/{project_id}/materials/{produced_id}/parameters")
+    param_response = client.get(f"/api/projects/{project_id}/materials/{produced_id}/parameters")
     params = param_response.json()
     assert any(p["domain"] == "identity" and p["key"] == "name" and p["value_string"] == "iron_ingot" for p in params)
     assert any(p["domain"] == "classification" and p["key"] == "metal" and p["value_boolean"] is True for p in params)
@@ -356,14 +356,14 @@ def test_multiple_produced_materials_can_be_created(client, project_ctx):
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -395,7 +395,7 @@ def test_multiple_produced_materials_can_be_created(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -409,14 +409,14 @@ def test_execution_failure_does_not_modify_state(client, project_ctx):
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -437,7 +437,7 @@ def test_execution_failure_does_not_modify_state(client, project_ctx):
 
     # Execute recipe - should fail
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -455,7 +455,7 @@ def test_no_materials_removed_on_failure(client, project_ctx):
     material_ids = []
     for i in range(2):
         material_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
         )
         material_id = material_response.json()["id"]
@@ -463,7 +463,7 @@ def test_no_materials_removed_on_failure(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -484,7 +484,7 @@ def test_no_materials_removed_on_failure(client, project_ctx):
 
     # Execute recipe - should fail
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": material_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": material_ids}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -499,14 +499,14 @@ def test_no_materials_created_on_failure(client, project_ctx):
 
     # Create iron ore material using bulk endpoint
     ore_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
     )
     ore_id = ore_response.json()["id"]
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -538,7 +538,7 @@ def test_no_materials_created_on_failure(client, project_ctx):
 
     # Execute recipe - should fail
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [ore_id]}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()
@@ -552,7 +552,7 @@ def test_state_transition_complete(client, project_ctx):
 
     # Create smelter using bulk endpoint
     smelter_response = client.post(
-        f"/projects/{project_id}/materials/bulk",
+        f"/api/projects/{project_id}/materials/bulk",
         json={"parameters": [{"domain": "identity", "key": "name", "value_string": "smelter"}]}
     )
     smelter_id = smelter_response.json()["id"]
@@ -561,7 +561,7 @@ def test_state_transition_complete(client, project_ctx):
     ore_ids = []
     for i in range(2):
         ore_response = client.post(
-            f"/projects/{project_id}/materials/bulk",
+            f"/api/projects/{project_id}/materials/bulk",
             json={"parameters": [{"domain": "identity", "key": "name", "value_string": "iron_ore"}]}
         )
         ore_id = ore_response.json()["id"]
@@ -569,7 +569,7 @@ def test_state_transition_complete(client, project_ctx):
 
     # Create recipe using bulk endpoint
     recipe_response = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "slots": [
                 {
@@ -612,7 +612,7 @@ def test_state_transition_complete(client, project_ctx):
 
     # Execute recipe
     exec_response = client.post(
-        f"/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id] + ore_ids}
+        f"/api/projects/{project_id}/recipes/{recipe_id}/execute", json={"materials": [smelter_id] + ore_ids}
     )
     assert exec_response.status_code == 200
     data = exec_response.json()

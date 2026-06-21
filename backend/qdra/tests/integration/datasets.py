@@ -12,84 +12,84 @@ def create_medium_size_planning_dataset(client, project_id):
     """
     
     # Create materials
-    raw_resource = client.post(f"/projects/{project_id}/materials/bulk", json={
+    raw_resource = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "raw_resource"},
             {"domain": "identity", "key": "category", "value_string": "raw_resource"}
         ]
     }).json()
     
-    intermediate_1 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_1 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_1"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    intermediate_2 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_2 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_2"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    intermediate_3 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_3 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_3"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    intermediate_4 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_4 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_4"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    intermediate_5 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_5 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_5"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    intermediate_6 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    intermediate_6 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_6"},
             {"domain": "identity", "key": "category", "value_string": "intermediate"}
         ]
     }).json()
     
-    final_product_1 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    final_product_1 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "final_product_1"},
             {"domain": "identity", "key": "category", "value_string": "final_product"}
         ]
     }).json()
     
-    final_product_2 = client.post(f"/projects/{project_id}/materials/bulk", json={
+    final_product_2 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "final_product_2"},
             {"domain": "identity", "key": "category", "value_string": "final_product"}
         ]
     }).json()
     
-    byproduct = client.post(f"/projects/{project_id}/materials/bulk", json={
+    byproduct = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "byproduct"},
             {"domain": "identity", "key": "category", "value_string": "byproduct"}
         ]
     }).json()
     
-    partial_test_producer = client.post(f"/projects/{project_id}/materials/bulk", json={
+    partial_test_producer = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "partial_test_producer"},
             {"domain": "identity", "key": "category", "value_string": "partial_test_producer"}
         ]
     }).json()
     
-    partial_test_consumer = client.post(f"/projects/{project_id}/materials/bulk", json={
+    partial_test_consumer = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "partial_test_consumer"},
             {"domain": "identity", "key": "category", "value_string": "partial_test_consumer"}
@@ -98,7 +98,7 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Recipe 1: Extraction - produces raw_resource (no inputs) - root material case
     extraction = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Extraction"}],
             "slots": [
@@ -120,7 +120,7 @@ def create_medium_size_planning_dataset(client, project_id):
     # Recipe 2: Processing - consumes raw_resource, produces intermediate_1 AND byproduct
     # Covers: 2 outputs, one unused (byproduct)
     processing = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Processing"}],
             "slots": [
@@ -164,7 +164,7 @@ def create_medium_size_planning_dataset(client, project_id):
     # Recipe 3: Refining_A - consumes intermediate_1, produces intermediate_2 at rate 1.5
     # Covers: fractional production rate
     refining_a = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_A"}],
             "slots": [
@@ -197,7 +197,7 @@ def create_medium_size_planning_dataset(client, project_id):
     # Recipe 4: Refining_B - consumes intermediate_1, produces intermediate_3 AND intermediate_4
     # Covers: 2 outputs used by different recipes
     refining_b = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_B"}],
             "slots": [
@@ -241,7 +241,7 @@ def create_medium_size_planning_dataset(client, project_id):
     # Recipe 5: Assembly_A - consumes intermediate_4 + intermediate_2, produces intermediate_5
     # Chain depth: Extraction -> Processing -> Refining_A -> Assembly_A -> Refining_C (5 deep)
     assembly_a = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_A"}],
             "slots": [
@@ -284,7 +284,7 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Recipe 6: Refining_C - consumes intermediate_3, produces intermediate_6
     refining_c1 = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C1"}],
             "slots": [
@@ -315,7 +315,7 @@ def create_medium_size_planning_dataset(client, project_id):
     ).json()
 
     refining_c2 = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Refining_C2"}],
             "slots": [
@@ -347,7 +347,7 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Recipe 7: Assembly_B - consumes intermediate_6 + intermediate_5, produces final_product_1
     assembly_b = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_B"}],
             "slots": [
@@ -390,7 +390,7 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Recipe 8: PartialProducer - produces partial_test_producer at rate 10
     partial_producer = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "PartialProducer"}],
             "slots": [
@@ -412,7 +412,7 @@ def create_medium_size_planning_dataset(client, project_id):
     # Recipe 9: PartialConsumer - consumes partial_test_producer at rate 3, produces partial_test_consumer
     # Mismatched rates (10 vs 3) for partial execution testing
     partial_consumer = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "PartialConsumer"}],
             "slots": [
@@ -444,7 +444,7 @@ def create_medium_size_planning_dataset(client, project_id):
     
     # Recipe 10: Assembly_C - consumes intermediate_3 + intermediate_4, produces final_product_2
     assembly_c = client.post(
-        f"/projects/{project_id}/recipes/bulk",
+        f"/api/projects/{project_id}/recipes/bulk",
         json={
             "parameters": [{"domain": "identity", "key": "name", "value_string": "Assembly_C"}],
             "slots": [

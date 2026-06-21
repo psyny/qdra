@@ -1,13 +1,13 @@
 def test_export_import_template(client, db):
     """Test that a template can be exported and imported."""
     # Create a template with some data
-    template_response = client.post("/project-templates", json={"name": "Test Template", "description": "Test description"})
+    template_response = client.post("/api/project-templates", json={"name": "Test Template", "description": "Test description"})
     assert template_response.status_code == 201
     template_id = template_response.json()["id"]
 
     # Add an entity type
     et_response = client.post(
-        f"/project-templates/{template_id}/entity-types",
+        f"/api/project-templates/{template_id}/entity-types",
         json={"kind": "material", "name": "Test Material", "description": "A test material type", "sort_order": 0}
     )
     assert et_response.status_code == 201
@@ -15,7 +15,7 @@ def test_export_import_template(client, db):
 
     # Add a parameter definition
     param_response = client.post(
-        f"/project-templates/{template_id}/entity-types/{entity_type_id}/parameter-definitions",
+        f"/api/project-templates/{template_id}/entity-types/{entity_type_id}/parameter-definitions",
         json={
             "domain": "identity",
             "key": "name",
@@ -34,7 +34,7 @@ def test_export_import_template(client, db):
 
     # Add a view
     view_response = client.post(
-        f"/project-templates/{template_id}/views",
+        f"/api/project-templates/{template_id}/views",
         json={"view_key": "test_view", "label": "Test View", "description": "A test view", "sort_order": 0}
     )
     assert view_response.status_code == 201
@@ -42,7 +42,7 @@ def test_export_import_template(client, db):
 
     # Add a view config
     config_response = client.post(
-        f"/project-templates/{template_id}/views/{view_id}/configs",
+        f"/api/project-templates/{template_id}/views/{view_id}/configs",
         json={
             "entity_type_id": entity_type_id,
             "filter_params": [],
@@ -53,7 +53,7 @@ def test_export_import_template(client, db):
     assert config_response.status_code == 201
 
     # Export the template
-    export_response = client.get(f"/project-templates/{template_id}/export")
+    export_response = client.get(f"/api/project-templates/{template_id}/export")
     assert export_response.status_code == 200
     export_data = export_response.json()["data"]
 
@@ -73,7 +73,7 @@ def test_export_import_template(client, db):
     assert len(export_data["views"][0]["configs"]) == 1
 
     # Import the template
-    import_response = client.post("/project-templates/import", json={"data": export_data})
+    import_response = client.post("/api/project-templates/import", json={"data": export_data})
     assert import_response.status_code == 201
     imported_template = import_response.json()
     assert imported_template["name"] == "Test Template"
@@ -82,7 +82,7 @@ def test_export_import_template(client, db):
 
     # Verify the imported template has the same structure
     # Check entity types
-    et_list_response = client.get(f"/project-templates/{imported_template_id}/entity-types")
+    et_list_response = client.get(f"/api/project-templates/{imported_template_id}/entity-types")
     assert et_list_response.status_code == 200
     imported_entity_types = et_list_response.json()
     assert len(imported_entity_types) == 1
@@ -92,7 +92,7 @@ def test_export_import_template(client, db):
 
     # Check parameter definitions
     param_list_response = client.get(
-        f"/project-templates/{imported_template_id}/entity-types/{imported_et_id}/parameter-definitions"
+        f"/api/project-templates/{imported_template_id}/entity-types/{imported_et_id}/parameter-definitions"
     )
     assert param_list_response.status_code == 200
     imported_params = param_list_response.json()
@@ -102,7 +102,7 @@ def test_export_import_template(client, db):
     assert imported_params[0]["value_type"] == "string"
 
     # Check views
-    views_list_response = client.get(f"/project-templates/{imported_template_id}/views")
+    views_list_response = client.get(f"/api/project-templates/{imported_template_id}/views")
     assert views_list_response.status_code == 200
     imported_views = views_list_response.json()
     assert len(imported_views) == 1
@@ -114,13 +114,13 @@ def test_export_import_template(client, db):
 def test_export_import_template_with_slot_groups(client, db):
     """Test that a template with slot groups can be exported and imported."""
     # Create a template
-    template_response = client.post("/project-templates", json={"name": "Slot Template", "description": "Test with slots"})
+    template_response = client.post("/api/project-templates", json={"name": "Slot Template", "description": "Test with slots"})
     assert template_response.status_code == 201
     template_id = template_response.json()["id"]
 
     # Add an entity type
     et_response = client.post(
-        f"/project-templates/{template_id}/entity-types",
+        f"/api/project-templates/{template_id}/entity-types",
         json={"kind": "recipe", "name": "Test Recipe", "description": "A test recipe type", "sort_order": 0}
     )
     assert et_response.status_code == 201
@@ -142,7 +142,7 @@ def test_export_import_template_with_slot_groups(client, db):
     assert sd_response.status_code == 201
 
     # Export the template
-    export_response = client.get(f"/project-templates/{template_id}/export")
+    export_response = client.get(f"/api/project-templates/{template_id}/export")
     assert export_response.status_code == 200
     export_data = export_response.json()["data"]
 
@@ -154,12 +154,12 @@ def test_export_import_template_with_slot_groups(client, db):
     assert export_data["entity_types"][0]["slot_groups"][0]["slot_definitions"][0]["slot_key"] == "material"
 
     # Import the template
-    import_response = client.post("/project-templates/import", json={"data": export_data})
+    import_response = client.post("/api/project-templates/import", json={"data": export_data})
     assert import_response.status_code == 201
     imported_template_id = import_response.json()["id"]
 
     # Verify slot groups were imported
-    et_list_response = client.get(f"/project-templates/{imported_template_id}/entity-types")
+    et_list_response = client.get(f"/api/project-templates/{imported_template_id}/entity-types")
     assert et_list_response.status_code == 200
     imported_entity_types = et_list_response.json()
     assert len(imported_entity_types) == 1
@@ -172,13 +172,13 @@ def test_export_import_template_with_slot_groups(client, db):
 def test_export_import_template_with_constraints(client, db):
     """Test that a template with slot constraints can be exported and imported."""
     # Create a template
-    template_response = client.post("/project-templates", json={"name": "Constraint Template", "description": "Test with constraints"})
+    template_response = client.post("/api/project-templates", json={"name": "Constraint Template", "description": "Test with constraints"})
     assert template_response.status_code == 201
     template_id = template_response.json()["id"]
 
     # Add an entity type
     et_response = client.post(
-        f"/project-templates/{template_id}/entity-types",
+        f"/api/project-templates/{template_id}/entity-types",
         json={"kind": "recipe", "name": "Test Recipe", "description": "A test recipe type", "sort_order": 0}
     )
     assert et_response.status_code == 201
@@ -215,7 +215,7 @@ def test_export_import_template_with_constraints(client, db):
     assert constraint_response.status_code == 201
 
     # Export the template
-    export_response = client.get(f"/project-templates/{template_id}/export")
+    export_response = client.get(f"/api/project-templates/{template_id}/export")
     assert export_response.status_code == 200
     export_data = export_response.json()["data"]
 
@@ -231,5 +231,5 @@ def test_export_import_template_with_constraints(client, db):
     assert constraint["value_string"] == "iron_ore"
 
     # Import the template
-    import_response = client.post("/project-templates/import", json={"data": export_data})
+    import_response = client.post("/api/project-templates/import", json={"data": export_data})
     assert import_response.status_code == 201
