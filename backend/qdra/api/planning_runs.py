@@ -17,12 +17,14 @@ router = APIRouter(prefix="/api/planning-runs")
 # ---------------------------------------------------------------------------
 
 class CreatePlanningRunRequest(BaseModel):
+    name: Optional[str] = None
     type: str
     status: str = "pending"
 
 
 class PlanningRunResponse(BaseModel):
     id: uuid.UUID
+    name: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     status: str
@@ -34,6 +36,7 @@ class PlanningRunResponse(BaseModel):
 
 class PlanningRunListResponse(BaseModel):
     id: uuid.UUID
+    name: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     status: str
@@ -53,6 +56,7 @@ def create_planning_run(
 ):
     """Create a new planning run."""
     planning_run = PlanningRun(
+        name=request.name,
         type=request.type,
         status=request.status,
     )
@@ -64,10 +68,17 @@ def create_planning_run(
 
 @router.get("", response_model=List[PlanningRunListResponse])
 def list_planning_runs(
+    type: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """List all planning runs without results (to avoid traffic bloat)."""
-    planning_runs = db.query(PlanningRun).all()
+    """List all planning runs without results (to avoid traffic bloat). Can filter by type and status."""
+    query = db.query(PlanningRun)
+    if type is not None:
+        query = query.filter(PlanningRun.type == type)
+    if status is not None:
+        query = query.filter(PlanningRun.status == status)
+    planning_runs = query.all()
     return planning_runs
 
 
