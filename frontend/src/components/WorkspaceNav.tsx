@@ -26,7 +26,6 @@ export function WorkspaceNav({ projectId }: WorkspaceNavProps) {
         
         const materialCatalogView = views.find(v => v.view_key === 'material_catalog');
         const recipeCatalogView = views.find(v => v.view_key === 'recipe_catalog');
-        const planningOutputSolverView = views.find(v => v.view_key === 'planning_output_solver');
         
         setNavItems(baseNavItems.map(item => {
           if (item.path === 'materials' && materialCatalogView) {
@@ -34,9 +33,6 @@ export function WorkspaceNav({ projectId }: WorkspaceNavProps) {
           }
           if (item.path === 'recipes' && recipeCatalogView) {
             return { ...item, label: recipeCatalogView.label };
-          }
-          if (item.path === 'planning' && planningOutputSolverView) {
-            return { ...item, label: planningOutputSolverView.label };
           }
           return item;
         }));

@@ -1,21 +1,39 @@
-import { useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getProjectTemplate } from '../api/projects';
 
 type PlanningOutputSolverPageProps = {
   projectId: string;
 };
 
 export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPageProps) {
+  const [viewLabel, setViewLabel] = useState<string>('Output Solver');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadViewLabel = async () => {
+      try {
+        const template = await getProjectTemplate(projectId);
+        const outputSolverView = template.views.find(v => v.view_key === 'planning_output_solver');
+        if (outputSolverView) {
+          setViewLabel(outputSolverView.label);
+        }
+      } catch (error) {
+        console.error('Failed to load view label:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadViewLabel();
+  }, [projectId]);
+
+  if (loading) {
+    return null;
+  }
+
   return (
-    <div>
-      <h2 className="card-title">Output Solver Configuration</h2>
-      <p className="card-description">
-        Configure and execute the output solver planning algorithm.
-      </p>
-      <div className="card state-message">
-        <p className="state-message__text">
-          Output solver configuration view will be implemented in a future milestone.
-        </p>
-      </div>
+    <div className="page-header">
+      <h1 className="page-title">{viewLabel}</h1>
     </div>
   );
 }
