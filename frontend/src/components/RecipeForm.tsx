@@ -1107,6 +1107,7 @@ export function RecipeForm({
                         options={parameterExistingValues[`${param.domain}:${param.key}`] || []}
                         disabled={isSubmitting}
                         placeholder={`Select or type ${param.label || param.key}...`}
+                        style={{ flex: 1 }}
                       />
                     ) : (
                       <input
