@@ -10,6 +10,7 @@ from api.images import router as images_router
 from api.project_templates import router as project_templates_router
 from api.schema import router as schema_router
 from api.entities import router as entities_router
+from api.planning_runs import router as planning_runs_router
 
 app = FastAPI(title="Qdra")
 
@@ -30,3 +31,4 @@ app.include_router(images_router)
 app.include_router(project_templates_router)
 app.include_router(entities_router)
 app.include_router(schema_router)
+app.include_router(planning_runs_router)

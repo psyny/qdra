@@ -7,7 +7,7 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 import uuid
@@ -125,4 +125,20 @@ class ReasoningJob(Base):
     __table_args__ = (
         Index("idx_reasoning_jobs_project_id", "project_id"),
         Index("idx_reasoning_jobs_status", "status"),
+    )
+
+
+class PlanningRun(Base):
+    __tablename__ = "planning_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    status = Column(String(50), nullable=False, default="pending")  # pending, running, completed, failed
+    type = Column(String(255), nullable=False)  # "output_solver", etc
+    result = Column(JSONB, nullable=True)
+
+    __table_args__ = (
+        Index("idx_planning_runs_status", "status"),
+        Index("idx_planning_runs_type", "type"),
     )
