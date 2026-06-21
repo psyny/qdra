@@ -3,7 +3,7 @@ import { Material, MaterialParameter, CreateMaterialRequest } from '../types/mat
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export async function getMaterials(projectId: string): Promise<Material[]> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`);
   if (!response.ok) {
     throw new Error('Failed to fetch materials');
   }
@@ -11,7 +11,7 @@ export async function getMaterials(projectId: string): Promise<Material[]> {
 }
 
 export async function getMaterial(projectId: string, materialId: string): Promise<Material> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials/${materialId}`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials/${materialId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch material');
   }
@@ -19,7 +19,7 @@ export async function getMaterial(projectId: string, materialId: string): Promis
 }
 
 export async function createMaterial(projectId: string, payload: CreateMaterialRequest): Promise<Material> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ export async function createMaterial(projectId: string, payload: CreateMaterialR
 }
 
 export async function deleteMaterial(projectId: string, materialId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials/${materialId}`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials/${materialId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -46,7 +46,7 @@ export async function addMaterialParameter(
   materialId: string,
   param: { domain: string; key: string; value_string?: string | null; value_number?: number | null; value_boolean?: boolean | null },
 ): Promise<MaterialParameter> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials/${materialId}/parameters`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials/${materialId}/parameters`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(param),
@@ -58,7 +58,7 @@ export async function addMaterialParameter(
 }
 
 export async function getMaterialParameters(projectId: string, materialId: string): Promise<MaterialParameter[]> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/materials/${materialId}/parameters`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/materials/${materialId}/parameters`);
   if (!response.ok) {
     throw new Error('Failed to fetch material parameters');
   }

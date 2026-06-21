@@ -4,7 +4,7 @@ import { ProjectTemplateDetail } from '../types/template';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export async function getProjects(): Promise<Project[]> {
-  const response = await fetch(`${API_URL}/projects`);
+  const response = await fetch(`${API_URL}/api/projects`);
   if (!response.ok) {
     throw new Error('Failed to fetch projects');
   }
@@ -12,7 +12,7 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProject(projectId: string): Promise<Project> {
-  const response = await fetch(`${API_URL}/projects/${projectId}`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch project');
   }
@@ -20,7 +20,7 @@ export async function getProject(projectId: string): Promise<Project> {
 }
 
 export async function getProjectTemplate(projectId: string): Promise<ProjectTemplateDetail> {
-  const response = await fetch(`${API_URL}/projects/${projectId}/template`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/template`);
   if (!response.ok) {
     throw new Error('Failed to fetch project template');
   }
@@ -28,7 +28,7 @@ export async function getProjectTemplate(projectId: string): Promise<ProjectTemp
 }
 
 export async function createProject(payload: CreateProjectRequest): Promise<Project> {
-  const response = await fetch(`${API_URL}/projects`, {
+  const response = await fetch(`${API_URL}/api/projects`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ export async function createProject(payload: CreateProjectRequest): Promise<Proj
 }
 
 export async function updateProject(projectId: string, payload: UpdateProjectRequest): Promise<Project> {
-  const response = await fetch(`${API_URL}/projects/${projectId}`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',

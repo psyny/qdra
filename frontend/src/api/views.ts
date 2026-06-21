@@ -53,13 +53,13 @@ export interface UpdateViewConfigRequest {
 }
 
 export async function getTemplateViews(templateId: string): Promise<View[]> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views`);
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views`);
   if (!response.ok) throw new Error('Failed to fetch views');
   return response.json();
 }
 
 export async function createView(templateId: string, payload: CreateViewRequest): Promise<View> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views`, {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -69,7 +69,7 @@ export async function createView(templateId: string, payload: CreateViewRequest)
 }
 
 export async function updateView(templateId: string, viewId: string, payload: UpdateViewRequest): Promise<View> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views/${viewId}`, {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views/${viewId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -79,7 +79,7 @@ export async function updateView(templateId: string, viewId: string, payload: Up
 }
 
 export async function deleteView(templateId: string, viewId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views/${viewId}`, {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views/${viewId}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
@@ -91,7 +91,7 @@ export async function deleteView(templateId: string, viewId: string): Promise<vo
 }
 
 export async function seedSystemViews(templateId: string): Promise<View[]> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views/seed-system`, {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views/seed-system`, {
     method: 'POST',
   });
   if (!response.ok) throw new Error('Failed to seed system views');
@@ -103,7 +103,7 @@ export async function createViewConfig(
   viewId: string,
   payload: CreateViewConfigRequest,
 ): Promise<ViewConfig> {
-  const response = await fetch(`${API_URL}/project-templates/${templateId}/views/${viewId}/configs`, {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/views/${viewId}/configs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -119,7 +119,7 @@ export async function updateViewConfig(
   payload: UpdateViewConfigRequest,
 ): Promise<ViewConfig> {
   const response = await fetch(
-    `${API_URL}/project-templates/${templateId}/views/${viewId}/configs/${configId}`,
+    `${API_URL}/api/project-templates/${templateId}/views/${viewId}/configs/${configId}`,
     {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -132,7 +132,7 @@ export async function updateViewConfig(
 
 export async function deleteViewConfig(templateId: string, viewId: string, configId: string): Promise<void> {
   const response = await fetch(
-    `${API_URL}/project-templates/${templateId}/views/${viewId}/configs/${configId}`,
+    `${API_URL}/api/project-templates/${templateId}/views/${viewId}/configs/${configId}`,
     { method: 'DELETE' },
   );
   if (!response.ok) throw new Error('Failed to delete view config');

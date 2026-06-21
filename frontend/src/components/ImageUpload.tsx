@@ -154,7 +154,8 @@ export function ImageUpload({
         const height = img.height;
 
         // Request presigned upload URL
-        const presignResponse = await fetch(`/api/entities/${entityId}/images/presign-upload`, {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const presignResponse = await fetch(`${API_URL}/api/entities/${entityId}/images/presign-upload`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -184,7 +185,7 @@ export function ImageUpload({
         }
 
         // Finalize upload
-        const finalizeResponse = await fetch(`/api/image-assets/${presignData.image_asset_id}/finalize`, {
+        const finalizeResponse = await fetch(`${API_URL}/api/image-assets/${presignData.image_asset_id}/finalize`, {
           method: 'POST',
         });
 
@@ -214,7 +215,8 @@ export function ImageUpload({
     
     try {
       // Delete the image via API
-      const response = await fetch(`/api/entities/${entityId}/images`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/entities/${entityId}/images`, {
         method: 'DELETE',
       });
       
