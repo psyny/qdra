@@ -571,6 +571,8 @@ class ProjectTemplateRepository:
 
     def seed_system_views(self, project_template_id: uuid.UUID) -> List[ProjectTemplateView]:
         """Create seeded system views for a project template if they don't already exist."""
+        from sqlalchemy.exc import IntegrityError
+        
         system_views_data = [
             {
                 "view_key": "material_catalog",
@@ -585,28 +587,22 @@ class ProjectTemplateRepository:
                 "sort_order": 1,
             },
             {
-                "view_key": "plan_catalog",
-                "label": "Plan Catalog",
-                "description": "Full catalog of all plans",
-                "sort_order": 2,
-            },
-            {
-                "view_key": "plan_results",
-                "label": "Plan Results",
-                "description": "Results from plan execution",
-                "sort_order": 3,
-            },
-            {
                 "view_key": "material_compact_catalog",
                 "label": "Material Compact Catalog",
                 "description": "Compact view of materials",
-                "sort_order": 4,
+                "sort_order": 2,
             },
             {
                 "view_key": "recipe_compact_catalog",
                 "label": "Recipe Compact Catalog",
                 "description": "Compact view of recipes",
-                "sort_order": 5,
+                "sort_order": 3,
+            },
+            {
+                "view_key": "planning_output_solver",
+                "label": "Output Solver",
+                "description": "Output solver planning configuration",
+                "sort_order": 4,
             },
         ]
         
@@ -617,15 +613,20 @@ class ProjectTemplateRepository:
         created_views = []
         for view_data in system_views_data:
             if view_data["view_key"] not in existing_view_keys:
-                view = self.create_view(
-                    project_template_id=project_template_id,
-                    view_key=view_data["view_key"],
-                    label=view_data["label"],
-                    description=view_data["description"],
-                    is_system=True,
-                    sort_order=view_data["sort_order"],
-                )
-                created_views.append(view)
+                try:
+                    view = self.create_view(
+                        project_template_id=project_template_id,
+                        view_key=view_data["view_key"],
+                        label=view_data["label"],
+                        description=view_data["description"],
+                        is_system=True,
+                        sort_order=view_data["sort_order"],
+                    )
+                    created_views.append(view)
+                except IntegrityError:
+                    # View already exists (race condition or pre-check missed it), skip it
+                    self.db.rollback()
+                    continue
         
         return created_views
 

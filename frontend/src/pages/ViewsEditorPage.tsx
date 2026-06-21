@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getTemplateViews, updateView, deleteView, seedSystemViews, View } from '../api/views';
+import { getTemplateViews, deleteView, seedSystemViews, View } from '../api/views';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 
 export function ViewsEditorPage() {
@@ -43,34 +43,6 @@ export function ViewsEditorPage() {
     }
   };
 
-  const handleReorder = async (viewId: string, direction: 'up' | 'down') => {
-    const index = views.findIndex(v => v.id === viewId);
-    if (index < 0) return;
-
-    const newViews = [...views];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newViews.length) return;
-
-    // Swap
-    [newViews[index], newViews[targetIndex]] = [newViews[targetIndex], newViews[index]];
-    
-    // Update sort_order
-    newViews.forEach((v, i) => {
-      v.sort_order = i;
-    });
-
-    try {
-      // Update each view
-      await Promise.all(newViews.map(v => 
-        updateView(templateId!, v.id, { sort_order: v.sort_order })
-      ));
-      setViews(newViews);
-    } catch (err) {
-      setError('Failed to reorder views');
-      loadViews();
-    }
-  };
-
   if (loading) {
     return (
       <div className="page">
@@ -109,7 +81,7 @@ export function ViewsEditorPage() {
           <p className="state-message__text">No views yet. System views will be seeded automatically.</p>
         ) : (
           <div className="template-grid">
-            {views.map((view, index) => (
+            {views.map((view) => (
               <div key={view.id} className="card template-card">
                 <div className="template-card__content">
                   <div className="template-card__title">
@@ -124,22 +96,6 @@ export function ViewsEditorPage() {
                   </p>
                 </div>
                 <div className="template-card__actions">
-                  <button
-                    onClick={() => handleReorder(view.id, 'up')}
-                    disabled={index === 0}
-                    className="button button--icon"
-                    title="Move up"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => handleReorder(view.id, 'down')}
-                    disabled={index === views.length - 1}
-                    className="button button--icon"
-                    title="Move down"
-                  >
-                    ↓
-                  </button>
                   <button
                     onClick={() => navigate(`/templates/${templateId}/views/${view.id}/edit`)}
                     className="button button--secondary"
