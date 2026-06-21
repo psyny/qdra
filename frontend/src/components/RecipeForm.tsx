@@ -180,7 +180,19 @@ export function RecipeForm({
       }
       // Create a new array to avoid mutation issues
       newConstraints[kind] = [...newConstraints[kind]];
-      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], []];
+
+      // Create a default constraint for system group
+      const defaultConstraint = {
+        origin: 'system' as const,
+        system_key: 'group',
+        entity_type_id: null,
+        domain: null,
+        key: null,
+        operator: '=',
+        value_string: materialEntityTypes[0]?.name || null,
+      };
+
+      newConstraints[kind][slotIndex] = [...newConstraints[kind][slotIndex], [defaultConstraint]];
       return newConstraints;
     });
   };
@@ -486,14 +498,30 @@ export function RecipeForm({
 
                     {/* Box 4: Value input */}
                     {constraint.origin === 'system' ? (
-                      <input
-                        type="text"
-                        value={constraint.value_string || ''}
-                        onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
-                        disabled={isSubmitting}
-                        placeholder="Value"
-                        style={{ padding: '2px', fontSize: '11px', flex: 1 }}
-                      />
+                      constraint.system_key === 'group' ? (
+                        <select
+                          value={constraint.value_string || ''}
+                          onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                          disabled={isSubmitting}
+                          style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                        >
+                          <option value="">Select group</option>
+                          {materialEntityTypes.map((et: any) => (
+                            <option key={et.id} value={et.name}>
+                              {et.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={constraint.value_string || ''}
+                          onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                          disabled={isSubmitting}
+                          placeholder="Value"
+                          style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                        />
+                      )
                     ) : (
                       <Combobox
                         value={constraint.value_string || ''}
