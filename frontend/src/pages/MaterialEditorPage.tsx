@@ -172,6 +172,8 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
       required: def.required,
       sort_order: def.sort_order,
       value: value,
+      is_searchable: def.is_searchable,
+      is_unique: def.is_unique,
     };
   });
 
@@ -190,6 +192,8 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         entityId={materialId || undefined}
         targetImageSize={imageSizePx}
         currentImage={entity?.image?.url || null}
+        projectId={projectId}
+        group={entity?.group || selectedConfig ? template?.entity_types.find(et => et.id === selectedConfig.entity_type_id)?.name : undefined}
       />
     </div>
   );

@@ -9,6 +9,8 @@ export type DraftParameter = {
   required: boolean;
   label?: string;
   description?: string;
+  is_searchable?: boolean;
+  is_unique?: boolean;
 };
 
 type ParameterRowProps = {

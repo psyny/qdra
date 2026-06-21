@@ -89,13 +89,10 @@ export function Combobox({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        className={className}
+        className={`form-input ${className || ''}`}
         style={{
-          padding: '5px 6px',
-          fontSize: '12px',
           flex: 1,
           width: '100%',
-          boxSizing: 'border-box',
           ...style,
         }}
       />
