@@ -443,7 +443,6 @@ def create_entity_type(
                     type=group_type,
                     min_slots=0,
                     max_slots=10,
-                    default_slots_qty=0,
                     sort_order=0,
                 )
             except IntegrityError:
@@ -1062,7 +1061,6 @@ class SlotGroupCreate(BaseModel):
     type: str
     min_slots: int = 0
     max_slots: Optional[int] = None
-    default_slots_qty: int = 0
     sort_order: int = 0
 
 
@@ -1070,7 +1068,6 @@ class SlotGroupUpdate(BaseModel):
     type: Optional[str] = None
     min_slots: Optional[int] = None
     max_slots: Optional[int] = None
-    default_slots_qty: Optional[int] = None
     sort_order: Optional[int] = None
 
 
@@ -1081,7 +1078,6 @@ class SlotGroupResponse(BaseModel):
     type: str
     min_slots: int
     max_slots: Optional[int]
-    default_slots_qty: int
     sort_order: int
     created_at: datetime
     updated_at: datetime
@@ -1204,7 +1200,6 @@ def create_slot_group(
             type=data.type,
             min_slots=data.min_slots,
             max_slots=data.max_slots,
-            default_slots_qty=data.default_slots_qty,
             sort_order=data.sort_order,
         )
     except IntegrityError as e:
@@ -1263,7 +1258,6 @@ def update_slot_group(
         type=data.type,
         min_slots=data.min_slots,
         max_slots=data.max_slots,
-        default_slots_qty=data.default_slots_qty,
         sort_order=data.sort_order,
     )
     

@@ -174,7 +174,6 @@ class ProjectTemplateSlotGroup(Base):
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     min_slots: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_slots: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    default_slots_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -196,7 +195,8 @@ class ProjectTemplateSlotGroup(Base):
         "ProjectTemplateDefaultSlot", backref="slot_group", uselist=False
     )
     per_slots: Mapped[List["ProjectTemplatePerSlot"]] = relationship(
-        "ProjectTemplatePerSlot", backref="slot_group", order_by="ProjectTemplatePerSlot.sort_order"
+        "ProjectTemplatePerSlot", backref="slot_group", order_by="ProjectTemplatePerSlot.sort_order",
+        cascade="all, delete-orphan"
     )
 
 
@@ -231,7 +231,8 @@ class ProjectTemplateDefaultSlot(Base):
     )
 
     options: Mapped[List["ProjectTemplateDefaultOption"]] = relationship(
-        "ProjectTemplateDefaultOption", backref="default_slot", order_by="ProjectTemplateDefaultOption.sort_order"
+        "ProjectTemplateDefaultOption", backref="default_slot", order_by="ProjectTemplateDefaultOption.sort_order",
+        cascade="all, delete-orphan"
     )
 
 
@@ -256,7 +257,8 @@ class ProjectTemplateDefaultOption(Base):
     )
 
     parameter_constraints: Mapped[List["ProjectTemplateDefaultParameterConstraint"]] = relationship(
-        "ProjectTemplateDefaultParameterConstraint", backref="default_option"
+        "ProjectTemplateDefaultParameterConstraint", backref="default_option",
+        cascade="all, delete-orphan"
     )
 
 
@@ -307,7 +309,8 @@ class ProjectTemplatePerSlot(Base):
     )
 
     options: Mapped[List["ProjectTemplatePerOption"]] = relationship(
-        "ProjectTemplatePerOption", backref="per_slot", order_by="ProjectTemplatePerOption.sort_order"
+        "ProjectTemplatePerOption", backref="per_slot", order_by="ProjectTemplatePerOption.sort_order",
+        cascade="all, delete-orphan"
     )
 
 
@@ -332,7 +335,8 @@ class ProjectTemplatePerOption(Base):
     )
 
     parameter_constraints: Mapped[List["ProjectTemplatePerParameterConstraint"]] = relationship(
-        "ProjectTemplatePerParameterConstraint", backref="per_option"
+        "ProjectTemplatePerParameterConstraint", backref="per_option",
+        cascade="all, delete-orphan"
     )
 
 

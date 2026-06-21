@@ -637,7 +637,6 @@ class ProjectTemplateRepository:
         type: str,
         min_slots: int = 0,
         max_slots: Optional[int] = None,
-        default_slots_qty: int = 0,
         sort_order: int = 0,
     ) -> ProjectTemplateSlotGroup:
         slot_group = ProjectTemplateSlotGroup(
@@ -645,7 +644,6 @@ class ProjectTemplateRepository:
             type=type,
             min_slots=min_slots,
             max_slots=max_slots,
-            default_slots_qty=default_slots_qty,
             sort_order=sort_order,
         )
         self.db.add(slot_group)
@@ -674,7 +672,6 @@ class ProjectTemplateRepository:
         type: Optional[str] = None,
         min_slots: Optional[int] = None,
         max_slots: Optional[int] = None,
-        default_slots_qty: Optional[int] = None,
         sort_order: Optional[int] = None,
     ) -> Optional[ProjectTemplateSlotGroup]:
         slot_group = self.get_slot_group_by_id(slot_group_id)
@@ -685,8 +682,6 @@ class ProjectTemplateRepository:
                 slot_group.min_slots = min_slots
             if max_slots is not None:
                 slot_group.max_slots = max_slots
-            if default_slots_qty is not None:
-                slot_group.default_slots_qty = default_slots_qty
             if sort_order is not None:
                 slot_group.sort_order = sort_order
             self.db.commit()
@@ -996,7 +991,6 @@ class ProjectTemplateRepository:
                     "type": sg.type,
                     "min_slots": sg.min_slots,
                     "max_slots": sg.max_slots,
-                    "default_slots_qty": sg.default_slots_qty,
                     "sort_order": sg.sort_order,
                 })
 
@@ -1128,7 +1122,6 @@ class ProjectTemplateRepository:
                     type=sg_data["type"],
                     min_slots=sg_data["min_slots"],
                     max_slots=sg_data.get("max_slots"),
-                    default_slots_qty=sg_data.get("default_slots_qty", 0),
                     sort_order=sg_data["sort_order"],
                 )
 

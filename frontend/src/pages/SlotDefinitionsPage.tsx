@@ -857,16 +857,6 @@ export function SlotDefinitionsPage() {
                   min="0"
                   placeholder="unlimited"
                 />
-
-                <label style={{ fontSize: '12px', color: '#aaa' }}>Default Slots Qty</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  style={{ fontSize: '12px', padding: '4px 8px' }}
-                  value={group.default_slots_qty}
-                  onChange={(e) => handleUpdateGroup(group.id, { default_slots_qty: parseInt(e.target.value) || 0 })}
-                  min="0"
-                />
               </div>
             </div>
 
