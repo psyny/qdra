@@ -28,6 +28,7 @@ export function MaterialForm({
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(currentImage || null);
+  const [hoveredDescription, setHoveredDescription] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,9 +82,48 @@ export function MaterialForm({
       <div className="card mb-6">
         <h3 className="card-title mb-4">Material Parameters</h3>
         {sortedParameters.map((param, index) => (
-          <div key={`${param.domain}:${param.key}`} className="form-field mb-4">
+          <div key={`${param.domain}:${param.key}`} style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
             {param.value_type === 'boolean' ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px' }}>
+              <>
+                <div style={{ position: 'relative' }}>
+                  <label
+                    htmlFor={`param-${index}`}
+                    className="form-label"
+                    style={{ margin: 0, cursor: param.description ? 'help' : 'default' }}
+                    onMouseEnter={() => {
+                      if (param.description) {
+                        setHoveredDescription(param.description);
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredDescription(null);
+                    }}
+                  >
+                    {param.label || param.key}
+                    {param.required && ' *'}
+                  </label>
+                  {hoveredDescription && hoveredDescription === param.description && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: '4px',
+                        backgroundColor: '#333',
+                        color: '#fff',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        maxWidth: '300px',
+                        zIndex: 1000,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {hoveredDescription}
+                    </div>
+                  )}
+                </div>
                 <input
                   id={`param-${index}`}
                   type="checkbox"
@@ -92,25 +132,48 @@ export function MaterialForm({
                   disabled={isSubmitting}
                   style={{ width: '19px', height: '19px' }}
                 />
-                <div>
-                  <label htmlFor={`param-${index}`} className="form-label" style={{ marginBottom: param.description ? '4px' : '0' }}>
+              </>
+            ) : (
+              <>
+                <div style={{ position: 'relative' }}>
+                  <label
+                    htmlFor={`param-${index}`}
+                    className="form-label"
+                    style={{ margin: 0, cursor: param.description ? 'help' : 'default' }}
+                    onMouseEnter={() => {
+                      if (param.description) {
+                        setHoveredDescription(param.description);
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredDescription(null);
+                    }}
+                  >
                     {param.label || param.key}
                     {param.required && ' *'}
                   </label>
-                  {param.description && (
-                    <p className="form-hint">{param.description}</p>
+                  {hoveredDescription && hoveredDescription === param.description && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        marginTop: '4px',
+                        backgroundColor: '#333',
+                        color: '#fff',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        maxWidth: '300px',
+                        zIndex: 1000,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {hoveredDescription}
+                    </div>
                   )}
                 </div>
-              </div>
-            ) : (
-              <>
-                <label htmlFor={`param-${index}`} className="form-label">
-                  {param.label || param.key}
-                  {param.required && ' *'}
-                </label>
-                {param.description && (
-                  <p className="form-hint">{param.description}</p>
-                )}
                 {param.value_type === 'number' && (
                   <input
                     id={`param-${index}`}
@@ -137,6 +200,7 @@ export function MaterialForm({
           </div>
         ))}
       </div>
+
 
       {entityId && (
         <div className="card mb-6">
