@@ -458,7 +458,7 @@ export function SlotDefinitionsPage() {
       )}
 
       {showCreateGroupForm && (
-        <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '16px' }}>
+        <div className="card" style={{ marginBottom: '16px' }}>
           <h3 style={{ marginTop: 0 }}>Create Slot Group</h3>
           <div className="form-field">
             <label className="form-label">Kind *</label>
@@ -512,11 +512,11 @@ export function SlotDefinitionsPage() {
         const group = slotGroups.find(g => g.kind === kind);
         if (!group) {
           return (
-            <div key={kind} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '18px', marginBottom: '12px', border: '1px dashed rgba(255,255,255,0.15)' }}>
+            <div key={kind} className="card" style={{ marginBottom: '12px' }}>
               <p style={{ margin: 0, color: '#666' }}>No {getGroupKindLabel(kind)} group defined</p>
               <button
                 onClick={() => { setShowCreateGroupForm(true); setGroupForm({ ...groupForm, kind }); }}
-                className="button button--secondary"
+                className="button button--primary"
                 style={{ marginTop: '8px', fontSize: '12px' }}
               >
                 Add {getGroupKindLabel(kind)} Group
@@ -526,7 +526,7 @@ export function SlotDefinitionsPage() {
         }
 
         return (
-          <div key={group.id} style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', marginBottom: '12px' }}>
+          <div key={group.id} className="card" style={{ marginBottom: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: '0 0 4px 0' }}>{getGroupKindLabel(group.kind)}</h3>
@@ -546,7 +546,7 @@ export function SlotDefinitionsPage() {
             </div>
 
             {editingGroup?.id === group.id && (
-              <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+              <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
                 <h4 style={{ marginTop: 0 }}>Edit Slot Group</h4>
                 <div className="form-field">
                   <label className="form-label">Kind *</label>
@@ -621,7 +621,7 @@ export function SlotDefinitionsPage() {
                     <p style={{ color: '#666', fontSize: '14px' }}>No slot definitions</p>
                   ) : (
                     group.slot_definitions.map((def) => (
-                      <div key={def.id} style={{ padding: '8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', marginBottom: '8px' }}>
+                      <div key={def.id} className="card" style={{ padding: '16px', marginBottom: '12px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <strong>{def.slot_key}</strong>
@@ -635,7 +635,7 @@ export function SlotDefinitionsPage() {
                           </div>
                         </div>
                         {def.constraints.length > 0 && (
-                          <div style={{ marginTop: '8px', paddingLeft: '12px' }}>
+                          <div className="card" style={{ marginTop: '12px', padding: '12px' }}>
                             <strong style={{ fontSize: '12px' }}>Constraints:</strong>
                             <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', fontSize: '13px' }}>
                               {def.constraints.map((constraint) => (
@@ -648,7 +648,7 @@ export function SlotDefinitionsPage() {
                             </ul>
                           </div>
                         )}
-                        <button onClick={() => startCreateConstraint('definition', def.id)} className="button button--primary" style={{ marginTop: '8px' }}>
+                        <button onClick={() => startCreateConstraint('definition', def.id)} className="button button--primary" style={{ marginTop: '12px' }}>
                           Add Constraint
                         </button>
                       </div>
@@ -657,7 +657,7 @@ export function SlotDefinitionsPage() {
                 </div>
 
                 {showDefinitionForm && (
-                  <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+                  <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
                     <h5 style={{ marginTop: 0 }}>{editingDefinition ? 'Edit' : 'Create'} Slot Definition</h5>
                     <div className="form-field">
                       <label className="form-label">Slot Key *</label>

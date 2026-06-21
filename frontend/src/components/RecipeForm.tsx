@@ -454,7 +454,7 @@ export function RecipeForm({
       const slotOrGroups = slotConstraints[kind][index] || [];
       
       return (
-        <div key={`${kind}-${index}`} className="form-field mb-4" style={{ padding: '12px', border: '1px dashed #ccc', borderRadius: '4px' }}>
+        <div key={`${kind}-${index}`} className="card mb-4">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <p style={{ color: '#999', fontStyle: 'italic', margin: 0 }}>
               {kind.charAt(0).toUpperCase() + kind.slice(1)} slot {index + 1}
@@ -477,13 +477,7 @@ export function RecipeForm({
             </div>
             
             {slotOrGroups.map((orGroup, orGroupIndex) => (
-              <div key={orGroupIndex} style={{ 
-                border: '1px solid #ddd', 
-                borderRadius: '4px', 
-                padding: '8px', 
-                marginBottom: '8px',
-                backgroundColor: '#f9f9f9'
-              }}>
+              <div key={orGroupIndex} className="card" style={{ padding: '12px', marginBottom: '12px' }}>
                 <div style={{ 
                   display: 'flex', 
                   justifyContent: 'space-between', 
@@ -509,11 +503,7 @@ export function RecipeForm({
                     display: 'flex',
                     gap: '4px',
                     alignItems: 'center',
-                    marginBottom: '4px',
-                    padding: '4px',
-                    backgroundColor: '#fff',
-                    border: '1px solid #eee',
-                    borderRadius: '3px'
+                    marginBottom: '8px'
                   }}>
                     {/* Box 1: Type selector */}
                     <select
@@ -531,7 +521,8 @@ export function RecipeForm({
                         }
                       }}
                       disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '80px' }}
+                      className="form-input"
+                      style={{ width: '80px', fontSize: '12px', padding: '5px 6px' }}
                     >
                       <option value="parameter">Parameter</option>
                       <option value="system">System</option>
@@ -555,7 +546,8 @@ export function RecipeForm({
                         }
                       }}
                       disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '200px' }}
+                      className="form-input"
+                      style={{ width: '200px', fontSize: '12px', padding: '5px 6px' }}
                     >
                       {constraint.origin === 'system' ? (
                         <>
@@ -588,7 +580,8 @@ export function RecipeForm({
                       value={constraint.operator || '='}
                       onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'operator', e.target.value)}
                       disabled={isSubmitting}
-                      style={{ padding: '2px', fontSize: '11px', width: '50px' }}
+                      className="form-input"
+                      style={{ width: '50px', fontSize: '12px', padding: '5px 6px' }}
                     >
                       <option value="=">=</option>
                       <option value="<">&lt;</option>
@@ -605,7 +598,8 @@ export function RecipeForm({
                           value={constraint.value_string || ''}
                           onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
                           disabled={isSubmitting}
-                          style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                          className="form-input"
+                          style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                         >
                           {materialEntityTypes.map((et: any) => (
                             <option key={et.id} value={et.name}>
@@ -620,7 +614,8 @@ export function RecipeForm({
                           onChange={(e: any) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
                           disabled={isSubmitting}
                           placeholder="Value"
-                          style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                          className="form-input"
+                          style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                         />
                       )
                     ) : (
@@ -655,7 +650,8 @@ export function RecipeForm({
                               })()}
                               disabled={isSubmitting}
                               placeholder="Value"
-                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                              className="form-input"
+                              style={{ flex: 1 }}
                             />
                           );
                         } else if (valueType === 'number') {
@@ -666,7 +662,8 @@ export function RecipeForm({
                               onChange={(e: any) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_number', e.target.value ? Number(e.target.value) : null)}
                               disabled={isSubmitting}
                               placeholder="Value"
-                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                              className="form-input"
+                              style={{ flex: 1 }}
                             />
                           );
                         } else if (valueType === 'boolean') {
@@ -675,7 +672,8 @@ export function RecipeForm({
                               value={constraint.value_boolean === true ? 'true' : constraint.value_boolean === false ? 'false' : ''}
                               onChange={(e) => updateConstraint(kind, index, orGroupIndex, constraintIndex, 'value_boolean', e.target.value === 'true' ? true : e.target.value === 'false' ? false : null)}
                               disabled={isSubmitting}
-                              style={{ padding: '2px', fontSize: '11px', flex: 1 }}
+                              className="form-input"
+                              style={{ flex: 1 }}
                             >
                               <option value="">Select...</option>
                               <option value="true">True</option>
@@ -703,7 +701,8 @@ export function RecipeForm({
                   type="button"
                   onClick={() => addConstraint(kind, index, orGroupIndex)}
                   disabled={isSubmitting}
-                  style={{ padding: '2px 6px', fontSize: '10px', border: '1px solid #ccc', background: '#fff' }}
+                  className="button button--primary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
                 >
                   + Add Parameter Requirement
                 </button>
@@ -714,7 +713,8 @@ export function RecipeForm({
               type="button"
               onClick={() => addOrGroup(kind, index)}
               disabled={isSubmitting}
-              style={{ padding: '2px 6px', fontSize: '10px', border: '1px solid #ccc', background: '#fff' }}
+              className="button button--primary"
+              style={{ padding: '4px 8px', fontSize: '12px' }}
             >
               + Add Option
             </button>
@@ -739,7 +739,7 @@ export function RecipeForm({
           type="button"
           onClick={() => addSlot(kind)}
           disabled={!canAdd || isSubmitting}
-          className="button button--secondary"
+          className="button button--primary"
           style={{ padding: '4px 8px', fontSize: '12px' }}
         >
           + Add Slot

@@ -7,6 +7,7 @@ type ComboboxProps = {
   placeholder?: string;
   disabled?: boolean;
   style?: React.CSSProperties;
+  className?: string;
 };
 
 export function Combobox({
@@ -16,6 +17,7 @@ export function Combobox({
   placeholder = 'Select or type...',
   disabled = false,
   style,
+  className,
 }: ComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -87,12 +89,14 @@ export function Combobox({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
+        className={className}
         style={{
-          padding: '2px',
-          fontSize: '11px',
+          padding: '5px 6px',
+          fontSize: '12px',
           flex: 1,
           width: '100%',
           boxSizing: 'border-box',
+          ...style,
         }}
       />
       {isOpen && !disabled && (
@@ -102,21 +106,21 @@ export function Combobox({
             top: '100%',
             left: 0,
             right: 0,
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
             maxHeight: '200px',
             overflowY: 'auto',
             zIndex: 1000,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           }}
         >
           {filteredOptions.length === 0 ? (
             <div
               style={{
                 padding: '8px',
-                fontSize: '11px',
-                color: '#999',
+                fontSize: '12px',
+                color: '#8c8c8c',
                 fontStyle: 'italic',
               }}
             >
@@ -129,18 +133,16 @@ export function Combobox({
                 onClick={() => handleOptionClick(option)}
                 onMouseDown={(e) => e.preventDefault()} // Prevent blur from firing before click
                 style={{
-                  padding: '6px 8px',
-                  fontSize: '11px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
                   cursor: 'pointer',
-                  hover: {
-                    backgroundColor: '#f0f0f0',
-                  },
+                  color: '#f5f5f5',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f0';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'white';
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
                 {option}
