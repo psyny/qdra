@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from models.entity import Entity
 from models.entity_parameter import EntityParameter
 from models.slot import Slot
-from models.project_template import ProjectTemplateSlotGroup, ProjectTemplateSlotDefinition, ProjectTemplateSlotConstraint
+from models.project_template import ProjectTemplateSlotGroup
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
@@ -73,58 +73,11 @@ class EntityService:
             group=group,
         )
 
-        # Auto-create slots from template if this is a recipe entity
-        if auto_create_slots and entity_type.kind == "recipe":
-            self._create_slots_from_template(entity)
+        # TODO: Reimplement auto-create slots from template after new slot system is designed
+        # if auto_create_slots and entity_type.kind == "recipe":
+        #     self._create_slots_from_template(entity)
 
         return entity
-
-    def _create_slots_from_template(self, entity: Entity) -> None:
-        """Create slots for a recipe entity based on template slot definitions."""
-        slot_groups = self.template_repository.list_slot_groups(entity.entity_type_id)
-        
-        for slot_group in slot_groups:
-            # Create default_slots_qty slots for this group
-            for slot_idx in range(slot_group.default_slots_qty):
-                slot = self.slot_repository.create(
-                    recipe_entity_id=entity.id,
-                    kind=slot_group.type,
-                    sort_order=slot_idx,
-                )
-                
-                # Get slot definitions for this group
-                slot_definitions = self.template_repository.list_slot_definitions(slot_group.id)
-                
-                # Find the matching slot definition (per-slot or default)
-                matching_def = None
-                for slot_def in slot_definitions:
-                    if slot_def.slot_idx == slot_idx:
-                        matching_def = slot_def
-                        break
-                
-                # If no per-slot definition found, use default (slot_idx is NULL)
-                if matching_def is None:
-                    for slot_def in slot_definitions:
-                        if slot_def.slot_idx is None:
-                            matching_def = slot_def
-                            break
-                
-                # Apply slot definition constraints to the slot
-                if matching_def:
-                    constraints = self.template_repository.list_slot_constraints_for_definition(matching_def.id)
-                    for constraint in constraints:
-                        # Create a default option with the constraint
-                        option = self.option_repository.create(slot_id=slot.id, quantity=1.0)
-                        self.constraint_repository.create(
-                            option_id=option.id,
-                            domain=constraint.domain,
-                            key=constraint.key,
-                            operator=constraint.operator,
-                            value_string=constraint.value_string,
-                            value_number=constraint.value_number,
-                            value_boolean=constraint.value_boolean,
-                            is_wildcard=constraint.is_wildcard,
-                        )
 
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         from datetime import datetime
