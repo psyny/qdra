@@ -822,12 +822,13 @@ export function SlotDefinitionsPage() {
               </button>
             </div>
 
-            <div className="card" style={{ marginTop: '16px', padding: '16px' }}>
-              <h4 style={{ marginTop: 0 }}>Slot Group Settings</h4>
-              <div className="form-field">
-                <label className="form-label">Type *</label>
+            <div className="card" style={{ marginTop: '16px', padding: '12px' }}>
+              <h4 style={{ marginTop: 0, fontSize: '14px' }}>Slot Group Settings</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px', alignItems: 'center' }}>
+                <label style={{ fontSize: '12px', color: '#aaa' }}>Type *</label>
                 <select
                   className="form-input"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                   value={group.type}
                   onChange={(e) => handleUpdateGroup(group.id, { type: e.target.value })}
                 >
@@ -835,32 +836,33 @@ export function SlotDefinitionsPage() {
                   <option value="requires">Requires</option>
                   <option value="produces">Produces</option>
                 </select>
-              </div>
-              <div className="form-field">
-                <label className="form-label">Min Slots</label>
+
+                <label style={{ fontSize: '12px', color: '#aaa' }}>Min Slots</label>
                 <input
                   type="number"
                   className="form-input"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                   value={group.min_slots}
                   onChange={(e) => handleUpdateGroup(group.id, { min_slots: parseInt(e.target.value) || 0 })}
                   min="0"
                 />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Max Slots (leave blank for unlimited)</label>
+
+                <label style={{ fontSize: '12px', color: '#aaa' }}>Max Slots</label>
                 <input
                   type="number"
                   className="form-input"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                   value={group.max_slots || ''}
                   onChange={(e) => handleUpdateGroup(group.id, { max_slots: e.target.value ? parseInt(e.target.value) : null })}
                   min="0"
+                  placeholder="unlimited"
                 />
-              </div>
-              <div className="form-field">
-                <label className="form-label">Default Slots Qty</label>
+
+                <label style={{ fontSize: '12px', color: '#aaa' }}>Default Slots Qty</label>
                 <input
                   type="number"
                   className="form-input"
+                  style={{ fontSize: '12px', padding: '4px 8px' }}
                   value={group.default_slots_qty}
                   onChange={(e) => handleUpdateGroup(group.id, { default_slots_qty: parseInt(e.target.value) || 0 })}
                   min="0"
