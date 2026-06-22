@@ -491,7 +491,7 @@ export function ConstraintBuilder({
                       disabled={disabled}
                       placeholder="Value"
                       className="form-input"
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                       step="any"
                     />
                   );
@@ -502,7 +502,7 @@ export function ConstraintBuilder({
                       onChange={(e) => updateConstraint(index, 'value_boolean', e.target.value === 'true' ? true : e.target.value === 'false' ? false : undefined)}
                       disabled={disabled}
                       className="form-input"
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                     >
                       <option value="">Select...</option>
                       <option value="true">True</option>

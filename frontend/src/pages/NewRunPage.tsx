@@ -42,7 +42,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
     planTarget: true,
-    planOptions: true,
+    planOptions: false,
     searchParameters: false,
     scoreRules: false,
   });
@@ -252,7 +252,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
         {/* Subcard 2: Plan Options (Domain Constraints) */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options (Domain Constraints)</h3>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options</h3>
             <button
               type="button"
               onClick={() => toggleCard('planOptions')}
@@ -274,14 +274,15 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
                   className="form-input"
                 />
               </div>
-              <div className="form-field">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={domainConstraints.allow_partial_recipe_execution}
-                    onChange={(e) => setDomainConstraints({ ...domainConstraints, allow_partial_recipe_execution: e.target.checked })}
-                  /> Allow Partial Recipe Execution
-                </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="allow-partial-recipe-execution" className="form-label">Allow Partial Recipe Execution</label>
+                <input
+                  id="allow-partial-recipe-execution"
+                  type="checkbox"
+                  checked={domainConstraints.allow_partial_recipe_execution}
+                  onChange={(e) => setDomainConstraints({ ...domainConstraints, allow_partial_recipe_execution: e.target.checked })}
+                  style={{ width: '19px', height: '19px' }}
+                />
               </div>
 
               <HorizontalLine />
@@ -482,14 +483,15 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
                   className="form-input"
                 />
               </div>
-              <div className="form-field">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={searchParameters.allow_loops}
-                    onChange={(e) => setSearchParameters({ ...searchParameters, allow_loops: e.target.checked })}
-                  /> Allow Loops
-                </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="allow-loops" className="form-label">Allow Loops</label>
+                <input
+                  id="allow-loops"
+                  type="checkbox"
+                  checked={searchParameters.allow_loops}
+                  onChange={(e) => setSearchParameters({ ...searchParameters, allow_loops: e.target.checked })}
+                  style={{ width: '19px', height: '19px' }}
+                />
               </div>
             </div>
           )}

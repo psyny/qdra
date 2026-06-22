@@ -93,6 +93,8 @@ export function Combobox({
         style={{
           flex: 1,
           width: '100%',
+          fontSize: '12px',
+          padding: '5px 6px',
           ...style,
         }}
       />
