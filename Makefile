@@ -22,11 +22,12 @@ prepare: ## Prepare the application (run migrations after up)
 	docker exec qdra-backend-api-1 sh -c "cd qdra && alembic upgrade head"
 
 down: ## Stop all services
-	docker-compose down
 	docker-compose --profile test down
+	docker-compose down
 
 build: ## Build all services
 	docker-compose build
+	docker-compose --profile test build	
 
 logs: ## Show logs from all services
 	docker-compose logs -f
@@ -49,11 +50,12 @@ restart-hard: ## Hard restart (down, rebuild, up, prepare)
 	$(MAKE) prepare
 
 clean: ## Stop and remove all containers, volumes, and networks
-	docker-compose down -v
 	docker-compose --profile test down -v
+	docker-compose down -v
 
 rebuild: ## Rebuild all services
 	docker-compose build
+	docker-compose --profile test build
 
 ps: ## Show running containers
 	docker-compose ps

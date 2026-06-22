@@ -130,7 +130,6 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.finished_at = datetime.utcnow()
         planning_run.error = None
         db.commit()
-        print(f"Planning run {planning_run.id} completed successfully")
 
     except ValidationError as e:
         # Input validation error
@@ -138,7 +137,6 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.error = f"Input validation error: {str(e)}"
         planning_run.finished_at = datetime.utcnow()
         db.commit()
-        print(f"Planning run {planning_run.id} failed validation: {e}")
 
     except ValueError as e:
         # Business logic error
@@ -146,7 +144,6 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.error = str(e)
         planning_run.finished_at = datetime.utcnow()
         db.commit()
-        print(f"Planning run {planning_run.id} failed: {e}")
 
     except Exception as e:
         # Unexpected error
@@ -154,7 +151,6 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.error = f"Unexpected error: {type(e).__name__}: {str(e)}"
         planning_run.finished_at = datetime.utcnow()
         db.commit()
-        print(f"Planning run {planning_run.id} failed with unexpected error: {e}")
 
 
 def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
@@ -173,7 +169,6 @@ def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.finished_at = datetime.utcnow()
         planning_run.error = None
         db.commit()
-        print(f"Health check run {planning_run.id} completed successfully")
 
     except Exception as e:
         # Unexpected error
@@ -181,7 +176,6 @@ def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.error = f"Unexpected error: {type(e).__name__}: {str(e)}"
         planning_run.finished_at = datetime.utcnow()
         db.commit()
-        print(f"Health check run {planning_run.id} failed with unexpected error: {e}")
 
 
 def claim_pending_run(db: Session) -> PlanningRun | None:
