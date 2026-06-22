@@ -108,26 +108,6 @@ class Relationship(Base):
     )
 
 
-class ReasoningJob(Base):
-    __tablename__ = "reasoning_jobs"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
-    )
-    status = Column(String(50), nullable=False, default="queued")  # queued, running, succeeded, failed
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    finished_at = Column(DateTime(timezone=True), nullable=True)
-    error_message = Column(Text, nullable=True)
-    result = Column(Text, nullable=True)  # JSON string
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        Index("idx_reasoning_jobs_project_id", "project_id"),
-        Index("idx_reasoning_jobs_status", "status"),
-    )
-
-
 class PlanningRun(Base):
     __tablename__ = "planning_runs"
 

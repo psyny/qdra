@@ -42,7 +42,7 @@ services:
       - redis
       - minio
 
-  graph-worker:
+  plan-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker
@@ -51,12 +51,9 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
-      REDIS_URL: redis://redis:6379/0
-      GRAPH_JOB_QUEUE: graph_reasoning_jobs
       WORKER_CONCURRENCY: 1
     depends_on:
       - postgres
-      - redis
 
   postgres:
     image: postgres:16
