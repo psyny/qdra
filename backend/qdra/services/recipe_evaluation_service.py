@@ -307,6 +307,13 @@ class RecipeEvaluationService:
                 return cached
         
         # Compute result
+        # Load material and its parameters once
+        material = self.entity_repo.get_by_id(material_id)
+        if not material:
+            return {"consumes": [], "produces": [], "requires": []}
+        
+        material_params = self.entity_parameter_repo.list_by_entity(material_id)
+        
         # Load all recipes in the project
         recipes = self.entity_repo.list_by_project(project_id, kind="recipe")
         
@@ -330,13 +337,6 @@ class RecipeEvaluationService:
                 
                 for option in options:
                     constraints = self.constraint_repo.list_by_option_as_specs(option.id)
-                    
-                    # Check if this material matches the slot's constraints
-                    material = self.entity_repo.get_by_id(material_id)
-                    if not material:
-                        continue
-                    
-                    material_params = self.entity_parameter_repo.list_by_entity(material_id)
                     
                     if self.constraint_resolution_service._material_matches_constraints(
                         material=material,
