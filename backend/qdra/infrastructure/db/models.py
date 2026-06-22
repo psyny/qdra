@@ -141,6 +141,7 @@ class PlanningRun(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     result = Column(JSONB, nullable=True)
+    error = Column(Text, nullable=True)
 
     __table_args__ = (
         Index("idx_planning_runs_status", "status"),

@@ -34,6 +34,7 @@ class PlanningRunResponse(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -47,6 +48,7 @@ class PlanningRunListResponse(BaseModel):
     type: str
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    error: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -121,9 +123,10 @@ def update_planning_run(
     started_at: Optional[datetime] = None,
     finished_at: Optional[datetime] = None,
     result: Optional[Dict[str, Any]] = None,
+    error: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    """Update a planning run's status, input, timing, and/or result."""
+    """Update a planning run's status, input, timing, result, and/or error."""
     planning_run = db.query(PlanningRun).filter(PlanningRun.id == run_id).first()
     if not planning_run:
         raise HTTPException(status_code=404, detail="Planning run not found")
@@ -138,6 +141,8 @@ def update_planning_run(
         planning_run.finished_at = finished_at
     if result is not None:
         planning_run.result = result
+    if error is not None:
+        planning_run.error = error
     
     db.commit()
     db.refresh(planning_run)
