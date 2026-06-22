@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
 
@@ -6,7 +7,7 @@ type PlanningRunDetailsPageProps = {
   projectId: string;
 };
 
-type SubcardKey = 'runningState' | 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'inputJson' | 'resultJson' | 'results';
+type SubcardKey = 'runningState' | 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'inputJson' | 'resultJson' | 'resultsStats' | 'resultsPlans';
 
 export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProps) {
   const { runId } = useParams<{ runId: string }>();
@@ -24,8 +25,15 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     scoreRules: false,
     inputJson: false,
     resultJson: false,
-    results: true,
+    resultsStats: false,
+    resultsPlans: true,
   });
+
+  // Results tab state
+  const [selectedScores, setSelectedScores] = useState<Record<string, boolean>>({});
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     const loadRun = async () => {
@@ -36,6 +44,16 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
       try {
         const runData = await getPlanningRunWithResults(runId);
         setRun(runData);
+        
+        // Initialize selected scores - first 4 checked by default
+        if (runData.result?.plans && runData.result.plans.length > 0) {
+          const scoreKeys = Object.keys(runData.result.plans[0].score || {});
+          const initialSelectedScores: Record<string, boolean> = {};
+          scoreKeys.forEach((key, index) => {
+            initialSelectedScores[key] = index < 4;
+          });
+          setSelectedScores(initialSelectedScores);
+        }
       } catch (error) {
         setError('Failed to load planning run details');
         console.error('Failed to load run:', error);
@@ -116,6 +134,44 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     navigate(`/projects/${projectId}/planning/planning_output_solver/new`, {
       state: { cloneData: run.input, cloneName: run.name }
     });
+  };
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortedPlans = () => {
+    if (!run.result?.plans) return [];
+    
+    const plans = [...run.result.plans];
+    
+    if (!sortColumn) return plans;
+    
+    plans.sort((a, b) => {
+      let aValue: number;
+      let bValue: number;
+      
+      if (sortColumn === 'id') {
+        aValue = a.id || 0;
+        bValue = b.id || 0;
+      } else {
+        aValue = a.score?.[sortColumn] ?? 0;
+        bValue = b.score?.[sortColumn] ?? 0;
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+    
+    return plans;
   };
 
   if (loading) {
@@ -279,20 +335,160 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
           )}
         </div>
 
-        {/* Subcard 8: Results */}
+        {/* Subcard 8: Results - Stats */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Results</h3>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Results - Stats</h3>
             <button
-              onClick={() => toggleCard('results')}
+              onClick={() => toggleCard('resultsStats')}
               className="button button--secondary"
               style={{ padding: '2px 8px', minWidth: '30px' }}
             >
-              {expandedCards.results ? '-' : '+'}
+              {expandedCards.resultsStats ? '-' : '+'}
             </button>
           </div>
-          {expandedCards.results && (
-            <p className="card-description">Results visualization will be implemented here.</p>
+          {expandedCards.resultsStats && (
+            <div>
+              {run.result?.discarded_plans_stats ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                  {Object.entries(run.result.discarded_plans_stats).map(([key, value]) => (
+                    <React.Fragment key={key}>
+                      <label className="form-label">{key}</label>
+                      <span>{String(value)}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ color: '#666' }}>No stats available</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Subcard 9: Results - Plans */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Results - Plans</h3>
+            <button
+              onClick={() => toggleCard('resultsPlans')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.resultsPlans ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.resultsPlans && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+              {/* Region 1: Scores and Plans - Horizontal Layout */}
+              <div style={{ display: 'flex', gap: '24px' }}>
+                {/* Scores on the left */}
+                <div style={{ width: '200px', flexShrink: 0 }}>
+                  <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>Scores Displayed</h4>
+                  {run.result?.plans && run.result.plans.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {Object.keys(run.result.plans[0].score || {}).map((scoreKey) => (
+                        <div key={scoreKey} style={{ display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="checkbox"
+                            id={`score-${scoreKey}`}
+                            checked={selectedScores[scoreKey] || false}
+                            onChange={(e) => setSelectedScores(prev => ({ ...prev, [scoreKey]: e.target.checked }))}
+                            style={{ marginRight: '8px', verticalAlign: 'middle' }}
+                          />
+                          <label htmlFor={`score-${scoreKey}`} style={{ cursor: 'pointer', fontSize: '13px' }}>{scoreKey}</label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{ color: '#666' }}>No scores available</span>
+                  )}
+                </div>
+
+                {/* Plans on the right */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>Plans Table</h4>
+                  {run.result?.plans && run.result.plans.length > 0 ? (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                            <th 
+                              style={{ padding: '8px', textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontSize: '12px' }}
+                              onClick={() => handleSort('id')}
+                            >
+                              ID {sortColumn === 'id' && (sortDirection === 'asc' ? '↑' : '↓')}
+                            </th>
+                            {Object.keys(selectedScores).filter(key => selectedScores[key]).map(scoreKey => (
+                              <th 
+                                key={scoreKey}
+                                style={{ padding: '8px', textAlign: 'left', cursor: 'pointer', userSelect: 'none', fontSize: '12px' }}
+                                onClick={() => handleSort(scoreKey)}
+                              >
+                                {scoreKey} {sortColumn === scoreKey && (sortDirection === 'asc' ? '↑' : '↓')}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getSortedPlans().map((plan, index) => (
+                            <tr 
+                              key={index}
+                              onClick={() => setSelectedPlanId(index)}
+                              style={{ 
+                                cursor: 'pointer',
+                                backgroundColor: selectedPlanId === index ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                              }}
+                            >
+                              <td style={{ padding: '8px' }}>{index}</td>
+                              {Object.keys(selectedScores).filter(key => selectedScores[key]).map(scoreKey => (
+                                <td key={scoreKey} style={{ padding: '8px' }}>
+                                  {plan.score?.[scoreKey] !== undefined ? plan.score[scoreKey].toFixed(2) : 'N/A'}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <span style={{ color: '#666' }}>No plans available</span>
+                  )}
+                </div>
+              </div>
+
+              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
+
+              {/* Region 3: Solution */}
+              <div>
+                <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
+                  {selectedPlanId !== null ? `Solution of Plan ${selectedPlanId}` : 'Solution'}
+                </h4>
+                {selectedPlanId !== null && run.result?.plans[selectedPlanId] ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                    {Object.entries(run.result.plans[selectedPlanId].score || {}).map(([key, value]) => (
+                      <React.Fragment key={key}>
+                        <label className="form-label">{key}</label>
+                        <span>{typeof value === 'number' ? value.toFixed(2) : String(value)}</span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ color: '#666' }}>Select a plan on the Plans Table to view details</span>
+                )}
+              </div>
+
+              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
+
+              {/* Region 4: Solution Graph */}
+              <div>
+                <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
+                  {selectedPlanId !== null ? `Graph for Plan ${selectedPlanId}` : 'Solution Graph'}
+                </h4>
+                <span style={{ color: '#666' }}>Coming soon...</span>
+              </div>
+            </div>
           )}
         </div>
     </div>
