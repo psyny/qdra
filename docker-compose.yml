@@ -25,6 +25,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      PYTHONUNBUFFERED: 1
       APP_ENV: development
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       REDIS_URL: redis://redis:6379/0
@@ -49,6 +50,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      PYTHONUNBUFFERED: 1
       APP_ENV: development
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       WORKER_CONCURRENCY: 1
@@ -62,6 +64,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      PYTHONUNBUFFERED: 1
       APP_ENV: test
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra_test
       WORKER_CONCURRENCY: 1
