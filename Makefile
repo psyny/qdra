@@ -23,6 +23,7 @@ prepare: ## Prepare the application (run migrations after up)
 
 down: ## Stop all services
 	docker-compose down
+	docker-compose --profile test down
 
 build: ## Build all services
 	docker-compose build
@@ -49,6 +50,7 @@ restart-hard: ## Hard restart (down, rebuild, up, prepare)
 
 clean: ## Stop and remove all containers, volumes, and networks
 	docker-compose down -v
+	docker-compose --profile test down -v
 
 rebuild: ## Rebuild all services
 	docker-compose build
@@ -142,9 +144,9 @@ be-qdra-tests-integration: be-install _be-test-db-setup ## Run backend integrati
 # Worker tests require Docker Postgres and plan-worker running
 # Usage: make be-qdra-tests-workers TARGET=workers/test_plan_workers.py
 be-qdra-tests-workers: be-install _be-test-db-setup ## Run backend worker tests (requires Docker). Optional: TARGET=path/to/test
-	@echo "Starting plan-worker..."
-	@docker compose up -d plan-worker
-	@echo "Waiting for plan-worker to be ready..."
+	@echo "Starting plan-worker-test..."
+	@docker compose --profile test up -d plan-worker-test
+	@echo "Waiting for plan-worker-test to be ready..."
 	@sleep 3
 	@echo "Running worker tests..."
 	@if [ -z "$(TARGET)" ]; then \
@@ -152,8 +154,8 @@ be-qdra-tests-workers: be-install _be-test-db-setup ## Run backend worker tests 
 	else \
 		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
 	fi
-	@echo "Stopping plan-worker..."
-	@docker compose stop plan-worker
+	@echo "Stopping plan-worker-test..."
+	@docker compose --profile test stop plan-worker-test
 
 
 
