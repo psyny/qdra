@@ -109,23 +109,26 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
 
   return (
     <div>
-      <div className="mb-4" style={{ marginBottom: '16px' }}>
-        <Link to={`/projects/${projectId}/planning/planning_output_solver`} className="button button--secondary">
-          ← Back to Runs
-        </Link>
-      </div>
-
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 className="card-title mb-4">{displayName}</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <h2 className="card-title mb-4">{displayName}</h2>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Link 
+            to={`/projects/${projectId}/planning/planning_output_solver`} 
+            className="button button--secondary"
+            style={{ height: '35px', display: 'inline-flex', alignItems: 'center' }}
+          >
+            ← Back to Runs
+          </Link>
           <button
             onClick={handleClone}
             disabled={cloning}
             className="button button--primary"
+            style={{ height: '35px' }}
           >
             {cloning ? 'Cloning...' : 'Clone Run'}
           </button>
         </div>
+      </div>
 
         {/* Subcard 1: Running State */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
@@ -301,7 +304,6 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
             <p className="card-description">Results visualization will be implemented here.</p>
           )}
         </div>
-      </div>
     </div>
   );
 }
