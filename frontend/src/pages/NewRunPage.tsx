@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   createOutputSolverRun,
@@ -8,6 +8,8 @@ import {
   SearchParameters,
   ScoreRules,
 } from '../api/planning';
+import { getProjectTemplate } from '../api/projects';
+import { ConstraintBuilder } from '../components/ConstraintBuilder';
 
 type NewRunPageProps = {
   projectId: string;
@@ -20,6 +22,19 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [template, setTemplate] = useState<any>(null);
+
+  useEffect(() => {
+    const loadTemplate = async () => {
+      try {
+        const templateData = await getProjectTemplate(projectId);
+        setTemplate(templateData);
+      } catch (err) {
+        console.error('Failed to load template:', err);
+      }
+    };
+    loadTemplate();
+  }, [projectId]);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
@@ -73,6 +88,21 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Debug: Print payload before API call
+    const payload = {
+      project_id: projectId,
+      target,
+      domain_constraints: domainConstraints,
+      search_parameters: searchParameters,
+      score_rules: scoreRules.user_variables.length > 0 || scoreRules.score_formulas.length > 0 ? scoreRules : undefined,
+      name: name || undefined,
+    };
+    console.log('Create Output Solver Run Payload:', JSON.stringify(payload, null, 2));
+    
+    // Return early for debugging - don't call API yet
+    setLoading(false);
+    return;
 
     try {
       const result = await createOutputSolverRun({
@@ -164,9 +194,14 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
                 </div>
                 <div className="form-field">
                   <label className="form-label">Constraints</label>
-                  <p className="card-description" style={{ fontSize: '14px' }}>
-                    Constraint editing will be implemented here.
-                  </p>
+                  <ConstraintBuilder
+                    constraints={target.constraints}
+                    onChange={(constraints) => setTarget({ ...target, constraints })}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType={target.target_type}
+                  />
                 </div>
               </div>
             )}
