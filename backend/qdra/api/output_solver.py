@@ -176,10 +176,13 @@ def solve_output(
     """Run the output solver algorithm to produce plan graphs."""
 
     def to_spec(m: ConstraintSpecModel) -> ConstraintSpec:
+        # Handle missing operator field with default
+        operator = getattr(m, 'operator', '=')
+        is_wildcard = getattr(m, 'is_wildcard', False)
         return ConstraintSpec(
-            domain=m.domain, key=m.key, operator=m.operator,
+            domain=m.domain, key=m.key, operator=operator,
             value_string=m.value_string, value_number=m.value_number,
-            value_boolean=m.value_boolean, is_wildcard=m.is_wildcard,
+            value_boolean=m.value_boolean, is_wildcard=is_wildcard,
         )
 
     def to_rule(m: ConstraintRuleModel) -> ConstraintRule:

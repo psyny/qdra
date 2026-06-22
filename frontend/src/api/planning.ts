@@ -131,7 +131,9 @@ export async function createOutputSolverRun(data: {
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error('Failed to create output solver run');
+    const errorText = await response.text();
+    console.error('API Error:', errorText);
+    throw new Error(`Failed to create output solver run: ${errorText}`);
   }
   return response.json();
 }

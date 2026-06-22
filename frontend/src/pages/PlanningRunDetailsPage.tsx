@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getPlanningRunWithResults, createPlanningRun, PlanningRunWithResults } from '../api/planning';
+import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -14,7 +14,6 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [run, setRun] = useState<PlanningRunWithResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cloning, setCloning] = useState(false);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
@@ -65,25 +64,13 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     return JSON.stringify(data, null, 2);
   };
 
-  const handleClone = async () => {
+  const handleClone = () => {
     if (!run) return;
     
-    setCloning(true);
-    setError(null);
-    try {
-      const clonedRun = await createPlanningRun({
-        name: run.name,
-        type: run.type,
-        status: 'pending',
-        input: run.input,
-      });
-      navigate(`/projects/${projectId}/planning/planning_output_solver/${clonedRun.id}`);
-    } catch (err) {
-      setError('Failed to clone run. Please try again.');
-      console.error('Failed to clone run:', err);
-    } finally {
-      setCloning(false);
-    }
+    // Navigate to new run page with cloned data
+    navigate(`/projects/${projectId}/planning/planning_output_solver/new`, {
+      state: { cloneData: run.input, cloneName: run.name }
+    });
   };
 
   if (loading) {
@@ -121,11 +108,10 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
           </Link>
           <button
             onClick={handleClone}
-            disabled={cloning}
             className="button button--primary"
             style={{ height: '35px' }}
           >
-            {cloning ? 'Cloning...' : 'Clone Run'}
+            Clone Run
           </button>
         </div>
       </div>

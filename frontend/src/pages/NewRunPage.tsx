@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   createOutputSolverRun,
   ConstraintSpec,
@@ -24,6 +24,7 @@ type SubcardKey = 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRule
 
 export function NewRunPage({ projectId }: NewRunPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +41,95 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
     };
     loadTemplate();
   }, [projectId]);
+
+  // Pre-fill form if cloning
+  useEffect(() => {
+    const cloneData = location.state?.cloneData;
+    const cloneName = location.state?.cloneName;
+    
+    if (cloneData) {
+      if (cloneName) {
+        setName(`${cloneName} (copy)`);
+      }
+      
+      if (cloneData.target) {
+        // Sanitize target constraints
+        const sanitizedTarget = {
+          ...cloneData.target,
+          constraints: cloneData.target.constraints?.map((constraint: any) => ({
+            ...constraint,
+            operator: constraint.operator || 'eq',
+          })) || []
+        };
+        setTarget(sanitizedTarget);
+      }
+      
+      if (cloneData.domain_constraints) {
+        // Sanitize domain constraints
+        const sanitizedDomainConstraints = {
+          ...cloneData.domain_constraints,
+          do_not_expand_materials_matching: cloneData.domain_constraints.do_not_expand_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          forbidden_materials_matching: cloneData.domain_constraints.forbidden_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          forbidden_recipe_matching: cloneData.domain_constraints.forbidden_recipe_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          required_materials_matching: cloneData.domain_constraints.required_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          required_recipe_matching: cloneData.domain_constraints.required_recipe_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+        };
+        setDomainConstraints(sanitizedDomainConstraints);
+      }
+      
+      if (cloneData.search_parameters) {
+        setSearchParameters(cloneData.search_parameters);
+      }
+      
+      if (cloneData.score_rules) {
+        // Ensure all constraints have required fields
+        const sanitizedScoreRules = {
+          user_variables: cloneData.score_rules.user_variables?.map((variable: any) => ({
+            ...variable,
+            constraints: variable.constraints?.map((rule: any) => ({
+              ...rule,
+              constraints: rule.constraints?.map((constraint: any) => ({
+                ...constraint,
+                operator: constraint.operator || 'eq', // Default to 'eq' if missing
+              })) || []
+            })) || []
+          })) || [],
+          score_formulas: cloneData.score_rules.score_formulas || []
+        };
+        setScoreRules(sanitizedScoreRules);
+      }
+    }
+  }, [location.state]);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({

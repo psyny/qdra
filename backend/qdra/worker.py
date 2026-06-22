@@ -183,11 +183,11 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
                             {
                                 "domain": p.domain,
                                 "key": p.key,
-                                "operator": p.operator,
+                                "operator": getattr(p, 'operator', '='),
                                 "value_string": p.value_string,
                                 "value_number": p.value_number,
                                 "value_boolean": p.value_boolean,
-                                "is_wildcard": p.is_wildcard,
+                                "is_wildcard": getattr(p, 'is_wildcard', False),
                             }
                             for p in v.parameters
                         ]
@@ -203,11 +203,11 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
                             {
                                 "domain": p.domain,
                                 "key": p.key,
-                                "operator": p.operator,
+                                "operator": getattr(p, 'operator', '='),
                                 "value_string": p.value_string,
                                 "value_number": p.value_number,
                                 "value_boolean": p.value_boolean,
-                                "is_wildcard": p.is_wildcard,
+                                "is_wildcard": getattr(p, 'is_wildcard', False),
                             }
                             for p in v.parameters
                         ]
