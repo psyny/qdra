@@ -3,7 +3,7 @@ import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
 
-from infrastructure.storage.image_storage_provider import ImageStorageProvider
+from qdra.infrastructure.storage.image_storage_provider import ImageStorageProvider
 
 
 class S3ImageStorageProvider:

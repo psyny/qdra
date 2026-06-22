@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db.session import get_db
-from qdra.infrastructure.db.models import PlanningRun
+from infrastructure.db.models import PlanningRun
 from domain.planning.output_solver_domain import (
     ConstraintSpec, ConstraintRule, TargetSpec,
     DomainConstraints, SearchParameters, SolverRequest,

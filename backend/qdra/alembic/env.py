@@ -1,11 +1,13 @@
 from logging.config import fileConfig
 import os
+import sys
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
 
+# PYTHONPATH is set to /app/qdra in Docker, so we can use relative imports
 from db.base import Base
 from models.project import Project
 from models.project_template import (

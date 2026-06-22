@@ -13,8 +13,8 @@ from repositories.slot_repository import SlotRepository
 from repositories.option_repository import OptionRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
-from qdra.infrastructure.cache.cache_service import CacheService
-from qdra.infrastructure.cache.relationship_cache import (
+from infrastructure.cache.cache_service import CacheService
+from infrastructure.cache.relationship_cache import (
     get_material_recipes_cache,
     get_recipe_materials_cache,
     get_cache_service,

@@ -10,9 +10,9 @@ from models.entity_parameter import EntityParameter
 from models.project_template import ProjectTemplateEntityType
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
-from qdra.infrastructure.cache.cache_service import CacheService
-from qdra.infrastructure.config.settings import settings
-from qdra.infrastructure.cache.relationship_cache import get_cache_service
+from infrastructure.cache.cache_service import CacheService
+from infrastructure.config.settings import settings
+from infrastructure.cache.relationship_cache import get_cache_service
 from domain.planning.output_solver_domain import ConstraintSpec
 
 from services.constraint_matcher import ConstraintMatcher

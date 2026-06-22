@@ -2,7 +2,7 @@ import os
 from typing import Optional, BinaryIO
 from pathlib import Path
 
-from infrastructure.storage.image_storage_provider import ImageStorageProvider
+from qdra.infrastructure.storage.image_storage_provider import ImageStorageProvider
 
 
 class LocalImageStorageProvider:

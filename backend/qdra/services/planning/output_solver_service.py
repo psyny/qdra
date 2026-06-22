@@ -15,7 +15,7 @@ from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
 from services.recipe_evaluation_service import RecipeEvaluationService
 from services.constraint_resolution_service import ConstraintResolutionService
-from qdra.infrastructure.cache.cache_service import CacheService
+from infrastructure.cache.cache_service import CacheService
 
 from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,

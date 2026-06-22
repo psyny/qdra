@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
-from qdra.infrastructure.db.session import SessionLocal
+from qdra.db.session import SessionLocal
 from qdra.infrastructure.db.models import PlanningRun
 from qdra.services.planning.output_solver_service import OutputSolverService
 from qdra.domain.planning.output_solver_domain import SolverRequest, SolverResponse
@@ -16,6 +16,8 @@ def process_planning_run(planning_run: PlanningRun, db: Session) -> None:
     """Process a single planning run based on its type."""
     if planning_run.type == "output_solver":
         process_output_solver_run(planning_run, db)
+    elif planning_run.type == "health_check_solver":
+        process_health_check_run(planning_run, db)
     else:
         raise ValueError(f"Unsupported planning run type: {planning_run.type}")
 
@@ -153,6 +155,33 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         planning_run.finished_at = datetime.utcnow()
         db.commit()
         print(f"Planning run {planning_run.id} failed with unexpected error: {e}")
+
+
+def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
+    """Process a health check planning run - echoes input as result."""
+    try:
+        # Simply echo the input as the result
+        input_data = planning_run.input or {}
+        result_dict = {
+            "echo": input_data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Update planning run with success
+        planning_run.status = "completed"
+        planning_run.result = result_dict
+        planning_run.finished_at = datetime.utcnow()
+        planning_run.error = None
+        db.commit()
+        print(f"Health check run {planning_run.id} completed successfully")
+
+    except Exception as e:
+        # Unexpected error
+        planning_run.status = "failed"
+        planning_run.error = f"Unexpected error: {type(e).__name__}: {str(e)}"
+        planning_run.finished_at = datetime.utcnow()
+        db.commit()
+        print(f"Health check run {planning_run.id} failed with unexpected error: {e}")
 
 
 def claim_pending_run(db: Session) -> PlanningRun | None:

@@ -1,16 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.health import router as health_router
-from api.projects import router as projects_router
-from api.materials import router as materials_router
-from api.recipes import router as recipes_router
-from api.output_solver import router as output_solver_router
-from api.images import router as images_router
-from api.project_templates import router as project_templates_router
-from api.schema import router as schema_router
-from api.entities import router as entities_router
-from api.planning_runs import router as planning_runs_router
+from qdra.api.health import router as health_router
+from qdra.api.projects import router as projects_router
+from qdra.api.materials import router as materials_router
+from qdra.api.recipes import router as recipes_router
+from qdra.api.output_solver import router as output_solver_router
+from qdra.api.images import router as images_router
+from qdra.api.project_templates import router as project_templates_router
+from qdra.api.schema import router as schema_router
+from qdra.api.entities import router as entities_router
+from qdra.api.planning_runs import router as planning_runs_router
 
 app = FastAPI(title="Qdra")
 

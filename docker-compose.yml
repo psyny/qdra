@@ -55,6 +55,21 @@ services:
     depends_on:
       - postgres
 
+  plan-worker-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_ENV: test
+      DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra_test
+      WORKER_CONCURRENCY: 1
+    depends_on:
+      - postgres
+    profiles:
+      - test
+
   postgres:
     image: postgres:16
     environment:

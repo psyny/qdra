@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
-from qdra.infrastructure.cache.cache_service import CacheService
-from qdra.infrastructure.config.settings import settings
+from infrastructure.cache.cache_service import CacheService
+from infrastructure.config.settings import settings
 
 
 class EntityRepository:

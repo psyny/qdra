@@ -13,7 +13,7 @@ from infrastructure.storage.local_image_storage_provider import LocalImageStorag
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.config.settings import settings
-from qdra.infrastructure.cache.cache_service import CacheService
+from infrastructure.cache.cache_service import CacheService
 
 
 class ImageService:

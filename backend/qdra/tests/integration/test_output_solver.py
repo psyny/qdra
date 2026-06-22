@@ -1,6 +1,6 @@
 import pytest
 import json
-from services.planning.output_solver_service import OutputSolverService
+from qdra.services.planning.output_solver_service import OutputSolverService
 from tests.integration.datasets import create_medium_size_planning_dataset
 from tests.integration.utils import print_pretty
 
