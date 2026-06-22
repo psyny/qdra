@@ -104,8 +104,7 @@ export interface UserVariableDef {
   name: string;
   parameter_domain: string;
   parameter_key: string;
-  variable_type: string;
-  constraints: ConstraintSpec[][];
+  constraints: ConstraintRule[];
 }
 
 export interface ScoreFormulaDef {

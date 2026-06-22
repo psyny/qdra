@@ -13,6 +13,8 @@ import { getProjectTemplate } from '../api/projects';
 import { ConstraintBuilder } from '../components/ConstraintBuilder';
 import { HorizontalLine } from '../components/HorizontalLine';
 import { ConstraintRuleCard } from '../components/ConstraintRuleCard';
+import { UserVariableCard } from '../components/UserVariableCard';
+import { ScoreFormulaCard } from '../components/ScoreFormulaCard';
 
 type NewRunPageProps = {
   projectId: string;
@@ -110,6 +112,71 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
       const rules = [...(prev[field] as ConstraintRule[])];
       rules[ruleIndex] = { constraints };
       return { ...prev, [field]: rules };
+    });
+  };
+
+  // Helper to add a new user variable
+  const addUserVariable = () => {
+    const availableParams = template?.entity_types?.[0]?.parameter_definitions || [];
+    const firstParam = availableParams[0];
+    
+    const newVariable = {
+      name: '',
+      parameter_domain: firstParam?.domain || '',
+      parameter_key: firstParam?.key || '',
+      constraints: [],
+    };
+    
+    setScoreRules((prev: ScoreRules) => ({
+      ...prev,
+      user_variables: [...prev.user_variables, newVariable]
+    }));
+  };
+
+  // Helper to remove a user variable
+  const removeUserVariable = (index: number) => {
+    setScoreRules((prev: ScoreRules) => ({
+      ...prev,
+      user_variables: prev.user_variables.filter((_: any, i: number) => i !== index)
+    }));
+  };
+
+  // Helper to update a user variable
+  const updateUserVariable = (index: number, variable: any) => {
+    setScoreRules((prev: ScoreRules) => {
+      const variables = [...prev.user_variables];
+      variables[index] = variable;
+      return { ...prev, user_variables: variables };
+    });
+  };
+
+  // Helper to add a new score formula
+  const addScoreFormula = () => {
+    const newFormula = {
+      name: '',
+      formula: '',
+    };
+    
+    setScoreRules((prev: ScoreRules) => ({
+      ...prev,
+      score_formulas: [...prev.score_formulas, newFormula]
+    }));
+  };
+
+  // Helper to remove a score formula
+  const removeScoreFormula = (index: number) => {
+    setScoreRules((prev: ScoreRules) => ({
+      ...prev,
+      score_formulas: prev.score_formulas.filter((_: any, i: number) => i !== index)
+    }));
+  };
+
+  // Helper to update a score formula
+  const updateScoreFormula = (index: number, formula: any) => {
+    setScoreRules((prev: ScoreRules) => {
+      const formulas = [...prev.score_formulas];
+      formulas[index] = formula;
+      return { ...prev, score_formulas: formulas };
     });
   };
 
@@ -511,9 +578,65 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
             </button>
           </div>
           {expandedCards.scoreRules && (
-            <p className="card-description" style={{ fontSize: '14px' }}>
-              Score rules (user variables and formulas) will be implemented here.
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* User Variables Section */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>User Variables</h4>
+                <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Define variables that can be used in score formulas. Each variable aggregates parameter values from materials/recipes matching the constraints.
+                </p>
+                {scoreRules.user_variables.map((variable: any, index: number) => (
+                  <div key={index}>
+                    <UserVariableCard
+                      variable={variable}
+                      onChange={(variable) => updateUserVariable(index, variable)}
+                      onRemove={() => removeUserVariable(index)}
+                      projectId={projectId}
+                      template={template}
+                      disabled={loading}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addUserVariable}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add User Variable
+                </button>
+              </div>
+
+              <HorizontalLine />
+
+              {/* Score Formulas Section */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Score Formulas</h4>
+                <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Define formulas to calculate scores for plans. Use variable names from User Variables.
+                </p>
+                {scoreRules.score_formulas.map((formula: any, index: number) => (
+                  <div key={index}>
+                    <ScoreFormulaCard
+                      formula={formula}
+                      onChange={(formula) => updateScoreFormula(index, formula)}
+                      onRemove={() => removeScoreFormula(index)}
+                      disabled={loading}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addScoreFormula}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Score Formula
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
