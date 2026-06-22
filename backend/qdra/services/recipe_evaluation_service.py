@@ -20,7 +20,7 @@ from infrastructure.cache.relationship_cache import (
     get_cache_service,
 )
 
-from services.constraint_matcher import ConstraintMatcher
+from services.constraint_resolution_service import ConstraintResolutionService
 
 from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
 from domain.constraints import ConstraintSpec
@@ -34,6 +34,7 @@ class RecipeEvaluationService:
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
+        self.constraint_resolution_service = ConstraintResolutionService(db)
         from qdra.infrastructure.config.settings import settings
         self.settings = settings
 
@@ -183,48 +184,15 @@ class RecipeEvaluationService:
                 continue
 
             # Check if material matches all constraints
-            if self._material_matches_constraints(
+            material_params = material_params_map.get(material.id, [])
+            if self.constraint_resolution_service._material_matches_constraints(
                 material=material,
-                constraints=constraints,
-                material_params_map=material_params_map
+                material_params=material_params,
+                constraints=constraints
             ):
                 matching_materials.append(material.id)
 
         return matching_materials
-
-    def _material_matches_constraints(
-        self,
-        material: Entity,
-        constraints: List[ConstraintSpec],
-        material_params_map: dict
-    ) -> bool:
-        """
-        Check if a material matches all constraints in an option.
-        """
-        for constraint in constraints:
-            # Special handling for __system__ domain
-            if constraint.domain == "__system__":
-                if constraint.key == "id":
-                    if constraint.operator == "=" and constraint.value_string:
-                        if str(material.id) != constraint.value_string:
-                            return False
-                    else:
-                        return False
-                    continue
-            
-            # Find matching parameter
-            material_params = material_params_map.get(material.id, [])
-            matched = False
-            
-            for param in material_params:
-                if ConstraintMatcher.matches(param, constraint):
-                    matched = True
-                    break
-            
-            if not matched:
-                return False
-        
-        return True
 
     def find_materials_for_recipe_slots(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
         """
@@ -285,10 +253,11 @@ class RecipeEvaluationService:
                 matching_materials = []
 
                 for material in materials:
-                    if self._material_matches_constraints(
+                    material_params = material_params_map.get(material.id, [])
+                    if self.constraint_resolution_service._material_matches_constraints(
                         material=material,
-                        constraints=constraints,
-                        material_params_map=material_params_map
+                        material_params=material_params,
+                        constraints=constraints
                     ):
                         matching_materials.append(str(material.id))
 
@@ -368,12 +337,11 @@ class RecipeEvaluationService:
                         continue
                     
                     material_params = self.entity_parameter_repo.list_by_entity(material_id)
-                    material_params_map = {material_id: material_params}
                     
-                    if self._material_matches_constraints(
+                    if self.constraint_resolution_service._material_matches_constraints(
                         material=material,
-                        constraints=constraints,
-                        material_params_map=material_params_map
+                        material_params=material_params,
+                        constraints=constraints
                     ):
                         # Material matches this slot
                         recipe_matches["slots"].append({
