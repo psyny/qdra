@@ -116,10 +116,8 @@ be-qdra-tests-unit: ## Run backend unit tests (no external dependencies). Option
 		$(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
 	fi
 
-# Integration tests require Docker Postgres running
-# Usage: make be-qdra-tests-integration TARGET=integration/test_output_solver.py
-be-qdra-tests-integration: be-install ## Run backend integration tests (requires Docker). Optional: TARGET=path/to/test
-	@echo "Running integration tests..."
+# Helper target for test database setup
+_be-test-db-setup:
 	@echo "Loading environment variables from $(BE_DIR)/.env..."
 	@if [ -f $(BE_DIR)/.env ]; then \
 		set -a && . $(BE_DIR)/.env && set +a; \
@@ -130,12 +128,32 @@ be-qdra-tests-integration: be-install ## Run backend integration tests (requires
 	docker exec qdra-postgres-1 psql -U qdra -c "CREATE DATABASE qdra_test;" || echo "Database may already exist"
 	@echo "Running migrations on test database..."
 	cd $(BE_DIR)/qdra && DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" ../venv/bin/python -m alembic upgrade head
+
+# Integration tests require Docker Postgres running
+# Usage: make be-qdra-tests-integration TARGET=integration/test_output_solver.py
+be-qdra-tests-integration: be-install _be-test-db-setup ## Run backend integration tests (requires Docker). Optional: TARGET=path/to/test
 	@echo "Running integration tests..."
 	@if [ -z "$(TARGET)" ]; then \
 		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/integration/ -v; \
 	else \
 		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
 	fi
+
+# Worker tests require Docker Postgres and plan-worker running
+# Usage: make be-qdra-tests-workers TARGET=workers/test_plan_workers.py
+be-qdra-tests-workers: be-install _be-test-db-setup ## Run backend worker tests (requires Docker). Optional: TARGET=path/to/test
+	@echo "Starting plan-worker..."
+	@docker compose up -d plan-worker
+	@echo "Waiting for plan-worker to be ready..."
+	@sleep 3
+	@echo "Running worker tests..."
+	@if [ -z "$(TARGET)" ]; then \
+		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/workers/ -v; \
+	else \
+		DATABASE_URL="postgresql+psycopg2://qdra:qdra@localhost:5432/qdra_test" $(BE_PYTEST) $(BE_SRC_DIR)/tests/$(TARGET) -v -s; \
+	fi
+	@echo "Stopping plan-worker..."
+	@docker compose stop plan-worker
 
 
 

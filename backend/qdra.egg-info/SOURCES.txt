@@ -110,7 +110,6 @@ qdra/tests/integration/test_entity_requirements.py
 qdra/tests/integration/test_infrastructure.py
 qdra/tests/integration/test_materials.py
 qdra/tests/integration/test_output_solver.py
-qdra/tests/integration/test_plan_workers.py
 qdra/tests/integration/test_recipe_evaluation.py
 qdra/tests/integration/test_recipe_execution.py
 qdra/tests/integration/test_recipes.py
@@ -118,3 +117,4 @@ qdra/tests/integration/test_template_export_import.py
 qdra/tests/integration/utils.py
 qdra/tests/unit/__init__.py
 qdra/tests/unit/test_constraint_matcher.py
+qdra/tests/workers/test_plan_workers.py
