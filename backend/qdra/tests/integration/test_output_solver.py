@@ -38,6 +38,22 @@ def test_final_product_unrestricted(client, project_ctx):
                 "max_solutions_returned": 10,
                 "optimization_level": 1,
             },
+            "score_rules": {
+                "user_variables": [
+                    {
+                        "name": "TotalQuality",
+                        "parameter_domain": "stat",
+                        "parameter_key": "quality",
+                        "constraints": []
+                    }
+                ],
+                "score_formulas": [
+                    {
+                        "name": "QualityScore",
+                        "formula": "TotalQuality"
+                    }
+                ]
+            }
         },
     )
 

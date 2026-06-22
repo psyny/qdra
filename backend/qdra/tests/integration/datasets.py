@@ -18,84 +18,96 @@ def create_medium_size_planning_dataset(client, project_id):
     raw_resource = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "raw_resource"},
-            {"domain": "identity", "key": "category", "value_string": "raw_resource"}
+            {"domain": "identity", "key": "category", "value_string": "raw_resource"},
+            {"domain": "stat", "key": "quality", "value_number": 3}
         ]
     }).json()
 
     intermediate_1 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_1"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 2}
         ]
     }).json()
     
     intermediate_2 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_2"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 4}
         ]
     }).json()
     
     intermediate_3 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_3"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 1}
         ]
     }).json()
     
     intermediate_4 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_4"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 5}
         ]
     }).json()
     
     intermediate_5 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_5"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 3}
         ]
     }).json()
     
     intermediate_6 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "intermediate_6"},
-            {"domain": "identity", "key": "category", "value_string": "intermediate"}
+            {"domain": "identity", "key": "category", "value_string": "intermediate"},
+            {"domain": "stat", "key": "quality", "value_number": 2}
         ]
     }).json()
     
     final_product_1 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "final_product_1"},
-            {"domain": "identity", "key": "category", "value_string": "final_product"}
+            {"domain": "identity", "key": "category", "value_string": "final_product"},
+            {"domain": "stat", "key": "quality", "value_number": 4}
         ]
     }).json()
     
     final_product_2 = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "final_product_2"},
-            {"domain": "identity", "key": "category", "value_string": "final_product"}
+            {"domain": "identity", "key": "category", "value_string": "final_product"},
+            {"domain": "stat", "key": "quality", "value_number": 5}
         ]
     }).json()
     
     byproduct = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "byproduct"},
-            {"domain": "identity", "key": "category", "value_string": "byproduct"}
+            {"domain": "identity", "key": "category", "value_string": "byproduct"},
+            {"domain": "stat", "key": "quality", "value_number": 1}
         ]
     }).json()
     
     partial_test_producer = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "partial_test_producer"},
-            {"domain": "identity", "key": "category", "value_string": "partial_test_producer"}
+            {"domain": "identity", "key": "category", "value_string": "partial_test_producer"},
+            {"domain": "stat", "key": "quality", "value_number": 2}
         ]
     }).json()
     
     partial_test_consumer = client.post(f"/api/projects/{project_id}/materials/bulk", json={
         "parameters": [
             {"domain": "identity", "key": "name", "value_string": "partial_test_consumer"},
-            {"domain": "identity", "key": "category", "value_string": "partial_test_consumer"}
+            {"domain": "identity", "key": "category", "value_string": "partial_test_consumer"},
+            {"domain": "stat", "key": "quality", "value_number": 3}
         ]
     }).json()
     

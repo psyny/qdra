@@ -1010,15 +1010,18 @@ class OutputSolverService:
     ) -> float:
         total = 0.0
         
-        # Check material nodes
+        # Check material nodes (only input type)
         for node in state.material_nodes.values():
+            if node.type != MaterialNodeType.INPUT:
+                continue
             # Load material parameters from DB to extract parameter value
             material_params = self._list_entity_params_cached(node.material_id)
             if self._node_matches_var_constraints(material_params, var_def.constraints):
                 param_value = self._extract_param_value_from_params(
                     material_params, var_def.parameter_domain, var_def.parameter_key
                 )
-                total += param_value * node.produced_qty
+                contribution = o-po0[] * node.consumed_qty
+                total += contribution
         
         # Check recipe nodes
         for rn in state.recipe_nodes.values():
@@ -1027,7 +1030,8 @@ class OutputSolverService:
                 param_value = self._extract_param_value(
                     params, var_def.parameter_domain, var_def.parameter_key
                 )
-                total += param_value * rn.execution_count
+                contribution = param_value * rn.execution_count
+                total += contribution
         
         return total
 
