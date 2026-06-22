@@ -79,8 +79,7 @@ class UserVariableDefModel(BaseModel):
     name: str
     parameter_domain: str
     parameter_key: str
-    variable_type: str
-    constraints: List[List[ConstraintSpecForVarModel]] = []
+    constraints: List[ConstraintRuleModel] = []
 
 
 class ScoreFormulaDefModel(BaseModel):
@@ -277,19 +276,7 @@ def create_output_solver_run(
                 name=v.name,
                 parameter_domain=v.parameter_domain,
                 parameter_key=v.parameter_key,
-                variable_type=v.variable_type,
-                constraints=[
-                    [
-                        ConstraintSpec(
-                            domain=c.domain, key=c.key, operator="=",
-                            value_string=c.value_string,
-                            value_number=c.value_number,
-                            value_boolean=c.value_boolean,
-                        )
-                        for c in option
-                    ]
-                    for option in v.constraints
-                ],
+                constraints=[to_rule(rule) for rule in v.constraints],
             )
             for v in sr.user_variables
         ]
@@ -431,19 +418,20 @@ def create_output_solver_run(
                     "name": v.name,
                     "parameter_domain": v.parameter_domain,
                     "parameter_key": v.parameter_key,
-                    "variable_type": v.variable_type,
                     "constraints": [
-                        [
-                            {
-                                "domain": c.domain,
-                                "key": c.key,
-                                "value_string": c.value_string,
-                                "value_number": c.value_number,
-                                "value_boolean": c.value_boolean,
-                            }
-                            for c in option
-                        ]
-                        for option in v.constraints
+                        {
+                            "constraints": [
+                                {
+                                    "domain": c.domain,
+                                    "key": c.key,
+                                    "value_string": c.value_string,
+                                    "value_number": c.value_number,
+                                    "value_boolean": c.value_boolean,
+                                }
+                                for c in rule.constraints
+                            ]
+                        }
+                        for rule in v.constraints
                     ],
                 }
                 for v in score_rules.user_variables

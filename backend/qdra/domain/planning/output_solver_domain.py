@@ -123,9 +123,8 @@ class UserVariableDef:
     name: str
     parameter_domain: str
     parameter_key: str
-    variable_type: str  # "material" or "recipe"
-    # list of options (OR semantics); each option is a list of ConstraintSpec (AND semantics)
-    constraints: List[List[ConstraintSpec]] = field(default_factory=list)
+    # list of constraint rules (OR semantics); each rule is a list of ConstraintSpec (AND semantics)
+    constraints: List[ConstraintRule] = field(default_factory=list)
 
 
 @dataclass

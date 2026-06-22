@@ -174,15 +174,17 @@ class OutputSolverService:
         user_var_material_ids: Dict[str, Set[uuid.UUID]] = {}
         if request.score_rules:
             for var_def in request.score_rules.user_variables:
-                if var_def.variable_type == "material":
-                    # Convert constraint options to ConstraintRule format for pre-loading
-                    constraint_rules = [ConstraintRule(constraints=option) for option in var_def.constraints]
-                    var_material_ids = self._preload_constraint_materials(request.project_id, constraint_rules)
+                # Check if constraints target materials by looking at constraint domains
+                if var_def.constraints and any(c.domain == "material" for rule in var_def.constraints for c in rule.constraints):
+                    var_material_ids = self._preload_constraint_materials(request.project_id, var_def.constraints)
                     user_var_material_ids[var_def.name] = var_material_ids
 
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
         # Load recipe params only if needed for score rules (recipe-type user variables)
-        if request.score_rules and any(v.variable_type == "recipe" for v in request.score_rules.user_variables):
+        if request.score_rules and any(
+            v.constraints and any(c.domain == "recipe" for rule in v.constraints for c in rule.constraints)
+            for v in request.score_rules.user_variables
+        ):
             recipe_params = self._load_recipe_params([r.id for r in recipes])
 
         # Initialize state based on target type (material or recipe)
@@ -1016,38 +1018,39 @@ class OutputSolverService:
         self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict, user_var_material_ids: Dict[str, Set[uuid.UUID]]
     ) -> float:
         total = 0.0
-        if var_def.variable_type == "material":
-            # Get pre-loaded material IDs for this variable
-            var_material_ids = user_var_material_ids.get(var_def.name, set())
-            
-            for node in state.material_nodes.values():
-                # Check if material_id matches the pre-loaded set
-                if node.material_id and node.material_id in var_material_ids:
-                    # Load material parameters from DB to extract parameter value
-                    material_params = self._list_entity_params_cached(node.material_id)
+        
+        # Check material nodes
+        var_material_ids = user_var_material_ids.get(var_def.name, set())
+        for node in state.material_nodes.values():
+            if node.material_id and node.material_id in var_material_ids:
+                # Load material parameters from DB to extract parameter value
+                material_params = self._list_entity_params_cached(node.material_id)
+                if self._node_matches_var_constraints(material_params, var_def.constraints):
                     param_value = self._extract_param_value_from_params(
                         material_params, var_def.parameter_domain, var_def.parameter_key
                     )
                     total += param_value * node.produced_qty
-        else:  # "recipe"
-            for rn in state.recipe_nodes.values():
-                params = recipe_params.get(str(rn.recipe_id), [])
-                if self._node_matches_var_constraints(params, var_def.constraints):
-                    param_value = self._extract_param_value(
-                        params, var_def.parameter_domain, var_def.parameter_key
-                    )
-                    total += param_value * rn.execution_count
+        
+        # Check recipe nodes
+        for rn in state.recipe_nodes.values():
+            params = recipe_params.get(str(rn.recipe_id), [])
+            if self._node_matches_var_constraints(params, var_def.constraints):
+                param_value = self._extract_param_value(
+                    params, var_def.parameter_domain, var_def.parameter_key
+                )
+                total += param_value * rn.execution_count
+        
         return total
 
     @staticmethod
     def _node_matches_var_constraints(
         node_constraints: List[ConstraintSpec],
-        var_constraints: List[List[ConstraintSpec]],
+        var_constraints: List[ConstraintRule],
     ) -> bool:
-        """Returns True if node matches any option group (OR of AND groups)."""
+        """Returns True if node matches any constraint rule (OR of AND groups)."""
         if not var_constraints:
             return True
-        for option in var_constraints:
+        for rule in var_constraints:
             if all(
                 any(
                     nc.domain == sc.domain and nc.key == sc.key
@@ -1056,7 +1059,7 @@ class OutputSolverService:
                     and nc.value_boolean == sc.value_boolean
                     for nc in node_constraints
                 )
-                for sc in option
+                for sc in rule.constraints
             ):
                 return True
         return False
