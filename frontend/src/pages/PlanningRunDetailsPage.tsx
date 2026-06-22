@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { getPlanningRunWithResults, createPlanningRun, PlanningRunWithResults } from '../api/planning';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -10,9 +10,11 @@ type SubcardKey = 'runningState' | 'planTarget' | 'planOptions' | 'searchParamet
 
 export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProps) {
   const { runId } = useParams<{ runId: string }>();
+  const navigate = useNavigate();
   const [run, setRun] = useState<PlanningRunWithResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cloning, setCloning] = useState(false);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
@@ -61,6 +63,27 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     return JSON.stringify(data, null, 2);
   };
 
+  const handleClone = async () => {
+    if (!run) return;
+    
+    setCloning(true);
+    setError(null);
+    try {
+      const clonedRun = await createPlanningRun({
+        name: run.name,
+        type: run.type,
+        status: 'pending',
+        input: run.input,
+      });
+      navigate(`/projects/${projectId}/planning/planning_output_solver/${clonedRun.id}`);
+    } catch (err) {
+      setError('Failed to clone run. Please try again.');
+      console.error('Failed to clone run:', err);
+    } finally {
+      setCloning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="card state-message">
@@ -91,7 +114,16 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
       </div>
 
       <div className="card">
-        <h2 className="card-title mb-4">{displayName}</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 className="card-title mb-4">{displayName}</h2>
+          <button
+            onClick={handleClone}
+            disabled={cloning}
+            className="button button--primary"
+          >
+            {cloning ? 'Cloning...' : 'Clone Run'}
+          </button>
+        </div>
 
         {/* Subcard 1: Running State */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>

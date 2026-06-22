@@ -8,8 +8,111 @@ from sqlalchemy.orm import Session
 from qdra.db.session import SessionLocal
 from qdra.infrastructure.db.models import PlanningRun
 from qdra.services.planning.output_solver_service import OutputSolverService
-from qdra.domain.planning.output_solver_domain import SolverRequest, SolverResponse
+from qdra.domain.planning.output_solver_domain import (
+    SolverRequest, SolverResponse, DomainConstraints, TargetSpec,
+    SearchParameters, ScoreRules, UserVariableDef, ScoreFormulaDef
+)
+from qdra.domain.constraints import ConstraintSpec, ConstraintRule
 from pydantic import ValidationError
+
+
+def _deserialize_constraint_spec(data: Dict) -> ConstraintSpec:
+    """Deserialize a dict to ConstraintSpec."""
+    return ConstraintSpec(
+        domain=data["domain"],
+        key=data["key"],
+        operator=data["operator"],
+        value_string=data.get("value_string"),
+        value_number=data.get("value_number"),
+        value_boolean=data.get("value_boolean"),
+        is_wildcard=data.get("is_wildcard", False),
+    )
+
+
+def _deserialize_constraint_rule(data: Dict) -> ConstraintRule:
+    """Deserialize a dict to ConstraintRule."""
+    constraints = [_deserialize_constraint_spec(c) for c in data.get("constraints", [])]
+    return ConstraintRule(constraints=constraints)
+
+
+def _deserialize_target_spec(data: Dict) -> TargetSpec:
+    """Deserialize a dict to TargetSpec."""
+    constraints = [_deserialize_constraint_spec(c) for c in data.get("constraints", [])]
+    return TargetSpec(
+        quantity=data["quantity"],
+        target_type=data.get("target_type", "material"),
+        constraints=constraints,
+    )
+
+
+def _deserialize_domain_constraints(data: Dict) -> DomainConstraints:
+    """Deserialize a dict to DomainConstraints."""
+    return DomainConstraints(
+        do_not_expand_materials_matching=[
+            _deserialize_constraint_rule(r) for r in data.get("do_not_expand_materials_matching", [])
+        ],
+        forbidden_materials_matching=[
+            _deserialize_constraint_rule(r) for r in data.get("forbidden_materials_matching", [])
+        ],
+        forbidden_recipe_matching=[
+            _deserialize_constraint_rule(r) for r in data.get("forbidden_recipe_matching", [])
+        ],
+        required_materials_matching=[
+            _deserialize_constraint_rule(r) for r in data.get("required_materials_matching", [])
+        ],
+        required_recipe_matching=[
+            _deserialize_constraint_rule(r) for r in data.get("required_recipe_matching", [])
+        ],
+        max_recipe_depth=data.get("max_recipe_depth", 10),
+        allow_partial_recipe_execution=data.get("allow_partial_recipe_execution", False),
+    )
+
+
+def _deserialize_search_parameters(data: Dict) -> SearchParameters:
+    """Deserialize a dict to SearchParameters."""
+    return SearchParameters(
+        max_recursion_depth=data.get("max_recursion_depth", 20),
+        max_branch_width=data.get("max_branch_width", 10),
+        allow_loops=data.get("allow_loops", False),
+        max_solutions_returned=data.get("max_solutions_returned", 10),
+        optimization_level=data.get("optimization_level", 0),
+    )
+
+
+def _deserialize_score_rules(data: Dict) -> ScoreRules:
+    """Deserialize a dict to ScoreRules."""
+    user_variables = [
+        UserVariableDef(
+            name=v["name"],
+            parameter_domain=v["parameter_domain"],
+            parameter_key=v["parameter_key"],
+            constraints=[_deserialize_constraint_rule(r) for r in v.get("constraints", [])],
+        )
+        for v in data.get("user_variables", [])
+    ]
+    score_formulas = [
+        ScoreFormulaDef(name=f["name"], formula=f["formula"])
+        for f in data.get("score_formulas", [])
+    ]
+    return ScoreRules(user_variables=user_variables, score_formulas=score_formulas)
+
+
+def _deserialize_solver_request(data: Dict) -> SolverRequest:
+    """Deserialize a dict to SolverRequest with proper nested dataclass conversion."""
+    target = _deserialize_target_spec(data["target"])
+    domain_constraints = _deserialize_domain_constraints(data["domain_constraints"])
+    search_parameters = _deserialize_search_parameters(data["search_parameters"])
+    score_rules = None
+    if data.get("score_rules"):
+        score_rules = _deserialize_score_rules(data["score_rules"])
+
+    return SolverRequest(
+        project_id=uuid.UUID(data["project_id"]),
+        target=target,
+        domain_constraints=domain_constraints,
+        search_parameters=search_parameters,
+        score_rules=score_rules,
+    )
 
 
 def process_planning_run(planning_run: PlanningRun, db: Session) -> None:
@@ -30,8 +133,8 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         if not input_data:
             raise ValueError("Input data is required for output_solver runs")
 
-        # Convert dict to SolverRequest
-        solver_request = SolverRequest(**input_data)
+        # Convert dict to SolverRequest with proper nested dataclass conversion
+        solver_request = _deserialize_solver_request(input_data)
 
         # Execute the solver
         service = OutputSolverService(db)

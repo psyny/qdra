@@ -1010,6 +1010,7 @@ class OutputSolverService:
     ) -> float:
         total = 0.0
         
+
         # Check material nodes (only input type)
         for node in state.material_nodes.values():
             if node.type != MaterialNodeType.INPUT:
@@ -1020,7 +1021,7 @@ class OutputSolverService:
                 param_value = self._extract_param_value_from_params(
                     material_params, var_def.parameter_domain, var_def.parameter_key
                 )
-                contribution = o-po0[] * node.consumed_qty
+                contribution = param_value * node.consumed_qty
                 total += contribution
         
         # Check recipe nodes

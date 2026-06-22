@@ -205,26 +205,11 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
       ),
     };
 
-    // Debug: Print payload before API call
-    const payload = {
-      project_id: projectId,
-      target,
-      domain_constraints: filteredDomainConstraints,
-      search_parameters: searchParameters,
-      score_rules: scoreRules.user_variables.length > 0 || scoreRules.score_formulas.length > 0 ? scoreRules : undefined,
-      name: name || undefined,
-    };
-    console.log('Create Output Solver Run Payload:', JSON.stringify(payload, null, 2));
-    
-    // Return early for debugging - don't call API yet
-    setLoading(false);
-    return;
-
     try {
       const result = await createOutputSolverRun({
         project_id: projectId,
         target,
-        domain_constraints: domainConstraints,
+        domain_constraints: filteredDomainConstraints,
         search_parameters: searchParameters,
         score_rules: scoreRules.user_variables.length > 0 || scoreRules.score_formulas.length > 0 ? scoreRules : undefined,
         name: name || undefined,
