@@ -125,236 +125,228 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
   return (
     <div>
-      <div className="mb-4" style={{ marginBottom: '16px' }}>
-        <Link to={`/projects/${projectId}/planning/planning_output_solver`} className="button button--secondary">
-          ← Back to Runs
-        </Link>
-      </div>
+      <h2 className="card-title mb-4" style={{ marginBottom: '24px' }}>New Output Solver Run</h2>
 
-      <div className="card">
-        <h2 className="card-title mb-4">New Output Solver Run</h2>
+      {error && (
+        <div style={{ color: 'red', marginBottom: '16px', padding: '12px', backgroundColor: '#fee', borderRadius: '4px' }}>
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div style={{ color: 'red', marginBottom: '16px', padding: '12px', backgroundColor: '#fee', borderRadius: '4px' }}>
-            {error}
-          </div>
-        )}
+      <form onSubmit={handleSubmit}>
+        {/* Name field */}
+        <div className="form-field mb-4" style={{ marginBottom: '24px' }}>
+          <label htmlFor="run-name" className="form-label">Name (optional)</label>
+          <input
+            id="run-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="form-input"
+            placeholder="Enter a name for this run"
+          />
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Name field */}
-          <div className="form-field mb-4" style={{ marginBottom: '16px' }}>
-            <label htmlFor="run-name" className="form-label">Name (optional)</label>
-            <input
-              id="run-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="form-input"
-              placeholder="Enter a name for this run"
-            />
-          </div>
-
-          {/* Subcard 1: Plan Target */}
-          <div className="card mb-4" style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Target</h3>
-              <button
-                type="button"
-                onClick={() => toggleCard('planTarget')}
-                className="button button--secondary"
-                style={{ padding: '2px 8px', minWidth: '30px' }}
-              >
-                {expandedCards.planTarget ? '-' : '+'}
-              </button>
-            </div>
-            {expandedCards.planTarget && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="form-field">
-                  <label htmlFor="target-quantity" className="form-label">Quantity</label>
-                  <input
-                    id="target-quantity"
-                    type="number"
-                    value={target.quantity}
-                    onChange={(e) => setTarget({ ...target, quantity: parseFloat(e.target.value) || 0 })}
-                    className="form-input"
-                    step="any"
-                  />
-                </div>
-                <div className="form-field">
-                  <label htmlFor="target-type" className="form-label">Target Type</label>
-                  <select
-                    id="target-type"
-                    value={target.target_type}
-                    onChange={(e) => setTarget({ ...target, target_type: e.target.value })}
-                    className="form-input"
-                  >
-                    <option value="material">Material</option>
-                    <option value="recipe">Recipe</option>
-                  </select>
-                </div>
-                <div className="form-field">
-                  <label className="form-label">Constraints</label>
-                  <ConstraintBuilder
-                    constraints={target.constraints}
-                    onChange={(constraints) => setTarget({ ...target, constraints })}
-                    projectId={projectId}
-                    template={template}
-                    disabled={loading}
-                    targetType={target.target_type}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Subcard 2: Plan Options (Domain Constraints) */}
-          <div className="card mb-4" style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options (Domain Constraints)</h3>
-              <button
-                type="button"
-                onClick={() => toggleCard('planOptions')}
-                className="button button--secondary"
-                style={{ padding: '2px 8px', minWidth: '30px' }}
-              >
-                {expandedCards.planOptions ? '-' : '+'}
-              </button>
-            </div>
-            {expandedCards.planOptions && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="form-field">
-                  <label htmlFor="max-recipe-depth" className="form-label">Max Recipe Depth</label>
-                  <input
-                    id="max-recipe-depth"
-                    type="number"
-                    value={domainConstraints.max_recipe_depth}
-                    onChange={(e) => setDomainConstraints({ ...domainConstraints, max_recipe_depth: parseInt(e.target.value) || 0 })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-field">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={domainConstraints.allow_partial_recipe_execution}
-                      onChange={(e) => setDomainConstraints({ ...domainConstraints, allow_partial_recipe_execution: e.target.checked })}
-                    /> Allow Partial Recipe Execution
-                  </label>
-                </div>
-                <p className="card-description" style={{ fontSize: '14px' }}>
-                  Additional constraint rules will be implemented here.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Subcard 3: Search Parameters */}
-          <div className="card mb-4" style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '18px' }}>Search Parameters</h3>
-              <button
-                type="button"
-                onClick={() => toggleCard('searchParameters')}
-                className="button button--secondary"
-                style={{ padding: '2px 8px', minWidth: '30px' }}
-              >
-                {expandedCards.searchParameters ? '-' : '+'}
-              </button>
-            </div>
-            {expandedCards.searchParameters && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div className="form-field">
-                  <label htmlFor="max-recursion-depth" className="form-label">Max Recursion Depth</label>
-                  <input
-                    id="max-recursion-depth"
-                    type="number"
-                    value={searchParameters.max_recursion_depth}
-                    onChange={(e) => setSearchParameters({ ...searchParameters, max_recursion_depth: parseInt(e.target.value) || 0 })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-field">
-                  <label htmlFor="max-branch-width" className="form-label">Max Branch Width</label>
-                  <input
-                    id="max-branch-width"
-                    type="number"
-                    value={searchParameters.max_branch_width}
-                    onChange={(e) => setSearchParameters({ ...searchParameters, max_branch_width: parseInt(e.target.value) || 0 })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-field">
-                  <label htmlFor="max-solutions-returned" className="form-label">Max Solutions Returned</label>
-                  <input
-                    id="max-solutions-returned"
-                    type="number"
-                    value={searchParameters.max_solutions_returned}
-                    onChange={(e) => setSearchParameters({ ...searchParameters, max_solutions_returned: parseInt(e.target.value) || 0 })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-field">
-                  <label htmlFor="optimization-level" className="form-label">Optimization Level</label>
-                  <input
-                    id="optimization-level"
-                    type="number"
-                    value={searchParameters.optimization_level}
-                    onChange={(e) => setSearchParameters({ ...searchParameters, optimization_level: parseInt(e.target.value) || 0 })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-field">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={searchParameters.allow_loops}
-                      onChange={(e) => setSearchParameters({ ...searchParameters, allow_loops: e.target.checked })}
-                    /> Allow Loops
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Subcard 4: Score Rules */}
-          <div className="card mb-4" style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3 className="card-title" style={{ fontSize: '18px' }}>Score Rules</h3>
-              <button
-                type="button"
-                onClick={() => toggleCard('scoreRules')}
-                className="button button--secondary"
-                style={{ padding: '2px 8px', minWidth: '30px' }}
-              >
-                {expandedCards.scoreRules ? '-' : '+'}
-              </button>
-            </div>
-            {expandedCards.scoreRules && (
-              <p className="card-description" style={{ fontSize: '14px' }}>
-                Score rules (user variables and formulas) will be implemented here.
-              </p>
-            )}
-          </div>
-
-          {/* Form actions */}
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-            <Link
-              to={`/projects/${projectId}/planning/planning_output_solver`}
-              className="button button--secondary"
-              style={{ textDecoration: 'none' }}
-            >
-              Cancel
-            </Link>
+        {/* Subcard 1: Plan Target */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Target</h3>
             <button
-              type="submit"
-              className="button button--primary"
-              disabled={loading}
+              type="button"
+              onClick={() => toggleCard('planTarget')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
             >
-              {loading ? 'Creating...' : 'Create Run'}
+              {expandedCards.planTarget ? '-' : '+'}
             </button>
           </div>
-        </form>
-      </div>
+          {expandedCards.planTarget && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="target-quantity" className="form-label">Quantity</label>
+                <input
+                  id="target-quantity"
+                  type="number"
+                  value={target.quantity}
+                  onChange={(e) => setTarget({ ...target, quantity: parseFloat(e.target.value) || 0 })}
+                  className="form-input"
+                  step="any"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="target-type" className="form-label">Target Type</label>
+                <select
+                  id="target-type"
+                  value={target.target_type}
+                  onChange={(e) => setTarget({ ...target, target_type: e.target.value, constraints: [] })}
+                  className="form-input"
+                >
+                  <option value="material">Material</option>
+                  <option value="recipe">Recipe</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label className="form-label">Constraints</label>
+                <ConstraintBuilder
+                  constraints={target.constraints}
+                  onChange={(constraints) => setTarget({ ...target, constraints })}
+                  projectId={projectId}
+                  template={template}
+                  disabled={loading}
+                  targetType={target.target_type}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Subcard 2: Plan Options (Domain Constraints) */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options (Domain Constraints)</h3>
+            <button
+              type="button"
+              onClick={() => toggleCard('planOptions')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.planOptions ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.planOptions && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="max-recipe-depth" className="form-label">Max Recipe Depth</label>
+                <input
+                  id="max-recipe-depth"
+                  type="number"
+                  value={domainConstraints.max_recipe_depth}
+                  onChange={(e) => setDomainConstraints({ ...domainConstraints, max_recipe_depth: parseInt(e.target.value) || 0 })}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-field">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={domainConstraints.allow_partial_recipe_execution}
+                    onChange={(e) => setDomainConstraints({ ...domainConstraints, allow_partial_recipe_execution: e.target.checked })}
+                  /> Allow Partial Recipe Execution
+                </label>
+              </div>
+              <p className="card-description" style={{ fontSize: '14px' }}>
+                Additional constraint rules will be implemented here.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Subcard 3: Search Parameters */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Search Parameters</h3>
+            <button
+              type="button"
+              onClick={() => toggleCard('searchParameters')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.searchParameters ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.searchParameters && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="max-recursion-depth" className="form-label">Max Recursion Depth</label>
+                <input
+                  id="max-recursion-depth"
+                  type="number"
+                  value={searchParameters.max_recursion_depth}
+                  onChange={(e) => setSearchParameters({ ...searchParameters, max_recursion_depth: parseInt(e.target.value) || 0 })}
+                  className="form-input"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="max-branch-width" className="form-label">Max Branch Width</label>
+                <input
+                  id="max-branch-width"
+                  type="number"
+                  value={searchParameters.max_branch_width}
+                  onChange={(e) => setSearchParameters({ ...searchParameters, max_branch_width: parseInt(e.target.value) || 0 })}
+                  className="form-input"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="max-solutions-returned" className="form-label">Max Solutions Returned</label>
+                <input
+                  id="max-solutions-returned"
+                  type="number"
+                  value={searchParameters.max_solutions_returned}
+                  onChange={(e) => setSearchParameters({ ...searchParameters, max_solutions_returned: parseInt(e.target.value) || 0 })}
+                  className="form-input"
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                <label htmlFor="optimization-level" className="form-label">Optimization Level</label>
+                <input
+                  id="optimization-level"
+                  type="number"
+                  value={searchParameters.optimization_level}
+                  onChange={(e) => setSearchParameters({ ...searchParameters, optimization_level: parseInt(e.target.value) || 0 })}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-field">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={searchParameters.allow_loops}
+                    onChange={(e) => setSearchParameters({ ...searchParameters, allow_loops: e.target.checked })}
+                  /> Allow Loops
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Subcard 4: Score Rules */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Score Rules</h3>
+            <button
+              type="button"
+              onClick={() => toggleCard('scoreRules')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.scoreRules ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.scoreRules && (
+            <p className="card-description" style={{ fontSize: '14px' }}>
+              Score rules (user variables and formulas) will be implemented here.
+            </p>
+          )}
+        </div>
+
+        {/* Form actions */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
+          <Link
+            to={`/projects/${projectId}/planning/planning_output_solver`}
+            className="button button--secondary"
+            style={{ textDecoration: 'none' }}
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            className="button button--primary"
+            disabled={loading}
+          >
+            {loading ? 'Creating...' : 'Create Run'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

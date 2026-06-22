@@ -4,7 +4,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-medium);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(8px);
   padding: 18px;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
