@@ -23,7 +23,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     searchParameters: false,
     scoreRules: false,
     inputJson: false,
-    resultJson: true,
+    resultJson: false,
     results: true,
   });
 
@@ -57,6 +57,51 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
+  };
+
+  const formatDuration = (startDate: string | null, endDate: string | null) => {
+    if (!startDate || !endDate) return 'N/A';
+    
+    const start = new Date(startDate).getTime();
+    const end = new Date(endDate).getTime();
+    const diffMs = end - start;
+    
+    if (diffMs < 0) return 'N/A';
+    
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) {
+      const remainingHours = diffHours % 24;
+      if (remainingHours > 0) {
+        return `${diffDays}d ${remainingHours}h`;
+      }
+      return `${diffDays}d`;
+    }
+    
+    if (diffHours > 0) {
+      const remainingMinutes = diffMinutes % 60;
+      if (remainingMinutes > 0) {
+        return `${diffHours}h ${remainingMinutes}m`;
+      }
+      return `${diffHours}h`;
+    }
+    
+    if (diffMinutes > 0) {
+      const remainingSeconds = diffSeconds % 60;
+      if (remainingSeconds > 0) {
+        return `${diffMinutes}m ${remainingSeconds}s`;
+      }
+      return `${diffMinutes}m`;
+    }
+    
+    if (diffSeconds > 0) {
+      return `${diffSeconds}s`;
+    }
+    
+    return '0s';
   };
 
   const formatJson = (data: any) => {
@@ -129,94 +174,54 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
             </button>
           </div>
           {expandedCards.runningState && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <span><strong>ID:</strong> {run.id}</span>
-                <span><strong>Status:</strong> {run.status}</span>
-                <span><strong>Type:</strong> {run.type}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">ID</label>
+                <span>{run.id}</span>
               </div>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <span><strong>Created:</strong> {formatDate(run.created_at)}</span>
-                <span><strong>Updated:</strong> {formatDate(run.updated_at)}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Status</label>
+                <span>{run.status}</span>
               </div>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <span><strong>Started:</strong> {formatDate(run.started_at)}</span>
-                <span><strong>Finished:</strong> {formatDate(run.finished_at)}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Type</label>
+                <span>{run.type}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Created</label>
+                <span>{formatDate(run.created_at)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Updated</label>
+                <span>{formatDate(run.updated_at)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Started</label>
+                <span>{formatDate(run.started_at)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Finished</label>
+                <span>{formatDate(run.finished_at)}</span>
               </div>
               {run.error && (
-                <div style={{ color: 'red' }}>
-                  <strong>Error:</strong> {run.error}
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                  <label className="form-label" style={{ color: 'red' }}>Error</label>
+                  <span style={{ color: 'red' }}>{run.error}</span>
                 </div>
               )}
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Time to Start</label>
+                <span>{formatDuration(run.created_at, run.started_at)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Time to Complete</label>
+                <span>{formatDuration(run.started_at, run.finished_at)}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label className="form-label">Time to Solve</label>
+                <span>{formatDuration(run.started_at, run.finished_at)}</span>
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Subcard 2: Plan Target */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Target</h3>
-            <button
-              onClick={() => toggleCard('planTarget')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.planTarget ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.planTarget && (
-            <p className="card-description">Plan target contents will be implemented here.</p>
-          )}
-        </div>
-
-        {/* Subcard 3: Plan Options */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options</h3>
-            <button
-              onClick={() => toggleCard('planOptions')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.planOptions ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.planOptions && (
-            <p className="card-description">Plan options (DomainConstraints) will be implemented here.</p>
-          )}
-        </div>
-
-        {/* Subcard 4: Search Parameters */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Search Parameters</h3>
-            <button
-              onClick={() => toggleCard('searchParameters')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.searchParameters ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.searchParameters && (
-            <p className="card-description">Search parameters will be implemented here.</p>
-          )}
-        </div>
-
-        {/* Subcard 5: Score Rules */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Score Rules</h3>
-            <button
-              onClick={() => toggleCard('scoreRules')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.scoreRules ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.scoreRules && (
-            <p className="card-description">Score rules will be implemented here.</p>
           )}
         </div>
 
