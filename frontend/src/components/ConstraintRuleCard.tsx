@@ -22,26 +22,14 @@ export function ConstraintRuleCard({
   targetType,
 }: ConstraintRuleCardProps) {
   return (
-    <div
-      style={{
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '4px',
-        padding: '12px',
-        marginBottom: '8px',
-      }}
-    >
+    <div className="card" style={{ marginBottom: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
         <button
           type="button"
           onClick={onRemove}
           disabled={disabled}
-          style={{
-            padding: '2px 8px',
-            fontSize: '12px',
-            border: '1px solid #ccc',
-            background: '#fff',
-            borderRadius: '3px',
-          }}
+          className="button button--danger"
+          style={{ padding: '2px 8px', fontSize: '12px' }}
         >
           Remove Rule
         </button>

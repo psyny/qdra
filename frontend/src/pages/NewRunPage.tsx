@@ -118,11 +118,31 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
     setLoading(true);
     setError(null);
 
+    // Filter out empty constraint rules before sending to BE
+    const filteredDomainConstraints: DomainConstraints = {
+      ...domainConstraints,
+      do_not_expand_materials_matching: domainConstraints.do_not_expand_materials_matching.filter(
+        (rule: ConstraintRule) => rule.constraints.length > 0
+      ),
+      forbidden_materials_matching: domainConstraints.forbidden_materials_matching.filter(
+        (rule: ConstraintRule) => rule.constraints.length > 0
+      ),
+      forbidden_recipe_matching: domainConstraints.forbidden_recipe_matching.filter(
+        (rule: ConstraintRule) => rule.constraints.length > 0
+      ),
+      required_materials_matching: domainConstraints.required_materials_matching.filter(
+        (rule: ConstraintRule) => rule.constraints.length > 0
+      ),
+      required_recipe_matching: domainConstraints.required_recipe_matching.filter(
+        (rule: ConstraintRule) => rule.constraints.length > 0
+      ),
+    };
+
     // Debug: Print payload before API call
     const payload = {
       project_id: projectId,
       target,
-      domain_constraints: domainConstraints,
+      domain_constraints: filteredDomainConstraints,
       search_parameters: searchParameters,
       score_rules: scoreRules.user_variables.length > 0 || scoreRules.score_formulas.length > 0 ? scoreRules : undefined,
       name: name || undefined,
