@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
+import { PlanningGraph } from '../components/planning/PlanningGraph';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -486,7 +487,26 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
                   {selectedPlanId !== null ? `Graph for Plan ${selectedPlanId}` : 'Solution Graph'}
                 </h4>
-                <span style={{ color: '#666' }}>Coming soon...</span>
+                {selectedPlanId !== null && run.result?.plans[selectedPlanId] && run.result?.entities ? (
+                  <PlanningGraph
+                    graph={{
+                      graph_nodes: run.result.plans[selectedPlanId].graph_nodes || [],
+                      recipe_edges: run.result.plans[selectedPlanId].recipe_edges || [],
+                      material_edges: run.result.plans[selectedPlanId].material_edges || [],
+                    }}
+                    entities={run.result.entities}
+                    recipeDomainName="identity"
+                    recipeKeyName="name"
+                    materialDomainName="identitiy"
+                    materialKeyName="name"
+                    displayImages={false}
+                    simplifyLevel={0}
+                  />
+                ) : (
+                  <span style={{ color: '#666' }}>
+                    {selectedPlanId !== null ? 'No graph data available for this plan' : 'Select a plan on the Plans Table to view the graph'}
+                  </span>
+                )}
               </div>
             </div>
           )}
