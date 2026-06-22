@@ -90,7 +90,7 @@ export function PlanningCatalogPage({ projectId }: PlanningCatalogPageProps) {
               onClick={() => handleSelectPlanning(option)}
               className="button button--primary"
             >
-              Run
+              Plans
             </button>
           </div>
         ))}

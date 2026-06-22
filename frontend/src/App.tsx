@@ -9,6 +9,7 @@ import { RecipeCatalogPage } from './pages/RecipeCatalogPage';
 import { RecipeEditorPage } from './pages/RecipeEditorPage';
 import { PlanningCatalogPage } from './pages/PlanningCatalogPage';
 import { PlanningOutputSolverPage } from './pages/PlanningOutputSolverPage';
+import { PlanningRunDetailsPage } from './pages/PlanningRunDetailsPage';
 import { TemplateListPage } from './pages/TemplateListPage';
 import { TemplateEditorPage } from './pages/TemplateEditorPage';
 import { ViewsEditorPage } from './pages/ViewsEditorPage';
@@ -92,6 +93,14 @@ function App() {
           element={
             <ProjectWorkspaceWrapper>
               {(project) => <PlanningOutputSolverPage projectId={project.id} />}
+            </ProjectWorkspaceWrapper>
+          }
+        />
+        <Route
+          path="/projects/:projectId/planning/planning_output_solver/:runId"
+          element={
+            <ProjectWorkspaceWrapper>
+              {(project) => <PlanningRunDetailsPage projectId={project.id} />}
             </ProjectWorkspaceWrapper>
           }
         />
