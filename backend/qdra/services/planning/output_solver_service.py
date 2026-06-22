@@ -170,15 +170,6 @@ class OutputSolverService:
             request.project_id, request.domain_constraints.required_recipe_matching
         )
 
-        # Pre-load material ID sets for user variable constraints
-        user_var_material_ids: Dict[str, Set[uuid.UUID]] = {}
-        if request.score_rules:
-            for var_def in request.score_rules.user_variables:
-                # Check if constraints target materials by looking at constraint domains
-                if var_def.constraints and any(c.domain == "material" for rule in var_def.constraints for c in rule.constraints):
-                    var_material_ids = self._preload_constraint_materials(request.project_id, var_def.constraints)
-                    user_var_material_ids[var_def.name] = var_material_ids
-
         recipe_params: Dict[str, List[ConstraintSpec]] = {}
         # Load recipe params only if needed for score rules (recipe-type user variables)
         if request.score_rules and any(
@@ -200,7 +191,7 @@ class OutputSolverService:
         # Explore from each initial state (for material targets, there may be multiple matching materials; for recipe targets, there may be multiple matching recipes)
         for initial in initial_states:
             self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
 
         for i, plan in enumerate(plans):
@@ -267,7 +258,7 @@ class OutputSolverService:
         self._apply_node_tags(material_nodes, recipe_nodes, plan.material_edges, plan.recipe_edges)
 
     def _explore(self, state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                 forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                 forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                  forbidden_recipes_ids, required_recipes_by_rule):
         if len(plans) >= request.search_parameters.max_solutions_returned:
             discarded_stats.max_solutions_returned += 1
@@ -283,7 +274,7 @@ class OutputSolverService:
 
         if current_id is None:
             self._emit_plan(state, plans, seen_fps, request.score_rules, recipe_params, request.search_parameters.optimization_level,
-                           request.domain_constraints, required_materials_ids, user_var_material_ids, required_recipes_by_rule)
+                           request.domain_constraints, required_materials_ids, required_recipes_by_rule)
             return
 
         current = state.material_nodes[current_id]
@@ -305,7 +296,7 @@ class OutputSolverService:
             branch = state.clone()
             self._apply_surplus(branch, surplus_id, current_id)
             self._explore(branch, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
             return
 
@@ -313,7 +304,7 @@ class OutputSolverService:
         if current.material_id and current.material_id in do_not_expand_materials_ids:
             discarded_stats.do_not_expand_materials += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
             return
 
@@ -327,7 +318,7 @@ class OutputSolverService:
             # Material not yet resolved - can't find producers
             discarded_stats.no_producers_found += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
             return
 
@@ -339,7 +330,7 @@ class OutputSolverService:
         if not producers:
             discarded_stats.no_producers_found += 1
             self._explore(state, request, plans, seen_fps, ancestor_sigs, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
             return
 
@@ -354,7 +345,7 @@ class OutputSolverService:
             self._apply_recipe(branch, current_id, recipe_id, produces_option, request)
             branch.recipe_depth += 1
             self._explore(branch, request, plans, seen_fps, new_ancestors, recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids, user_var_material_ids,
+                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
                          forbidden_recipes_ids, required_recipes_by_rule)
 
     def _add_recipe_material_nodes(
@@ -567,7 +558,7 @@ class OutputSolverService:
         if nn.type != MaterialNodeType.REQUIRES:
             sn.consumed_qty += qty
 
-    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None, required_materials_ids=None, user_var_material_ids=None, required_recipes_by_rule=None):
+    def _emit_plan(self, state, plans, seen_fps, score_rules, recipe_params, optimization_level: int = 0, domain_constraints=None, required_materials_ids=None, required_recipes_by_rule=None):
         fp = self._fingerprint(state)
         if fp in seen_fps:
             return
@@ -589,7 +580,7 @@ class OutputSolverService:
                 return
 
         all_nodes = list(state.material_nodes.values()) + list(state.recipe_nodes.values())
-        score = self._compute_score(state, score_rules, recipe_params, user_var_material_ids)
+        score = self._compute_score(state, score_rules, recipe_params)
 
         plans.append(SolvedPlan(
             plan_id="",
@@ -960,7 +951,7 @@ class OutputSolverService:
         return True
 
     def _compute_score(
-        self, state: "_State", score_rules, recipe_params: Dict, user_var_material_ids: Dict[str, Set[uuid.UUID]]
+        self, state: "_State", score_rules, recipe_params: Dict
     ) -> Dict[str, float]:
         """Compute all scores for a finished plan state."""
         scores: Dict[str, float] = {}
@@ -1006,7 +997,7 @@ class OutputSolverService:
         if score_rules:
             var_values: Dict[str, float] = dict(scores)
             for var_def in score_rules.user_variables:
-                value = self._compute_user_variable(state, var_def, recipe_params, user_var_material_ids)
+                value = self._compute_user_variable(state, var_def, recipe_params)
                 var_values[var_def.name] = value
                 scores[var_def.name] = value
             for fdef in score_rules.score_formulas:
@@ -1015,21 +1006,19 @@ class OutputSolverService:
         return scores
 
     def _compute_user_variable(
-        self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict, user_var_material_ids: Dict[str, Set[uuid.UUID]]
+        self, state: "_State", var_def: "UserVariableDef", recipe_params: Dict
     ) -> float:
         total = 0.0
         
         # Check material nodes
-        var_material_ids = user_var_material_ids.get(var_def.name, set())
         for node in state.material_nodes.values():
-            if node.material_id and node.material_id in var_material_ids:
-                # Load material parameters from DB to extract parameter value
-                material_params = self._list_entity_params_cached(node.material_id)
-                if self._node_matches_var_constraints(material_params, var_def.constraints):
-                    param_value = self._extract_param_value_from_params(
-                        material_params, var_def.parameter_domain, var_def.parameter_key
-                    )
-                    total += param_value * node.produced_qty
+            # Load material parameters from DB to extract parameter value
+            material_params = self._list_entity_params_cached(node.material_id)
+            if self._node_matches_var_constraints(material_params, var_def.constraints):
+                param_value = self._extract_param_value_from_params(
+                    material_params, var_def.parameter_domain, var_def.parameter_key
+                )
+                total += param_value * node.produced_qty
         
         # Check recipe nodes
         for rn in state.recipe_nodes.values():
