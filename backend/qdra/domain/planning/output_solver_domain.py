@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Union
 from enum import Enum
 
+from domain.constraints import ConstraintSpec, ConstraintRule
+
 
 SYSTEM_VARIABLE_NAMES = {"RecipeExecution", "MaterialSplit", "SourceProduction", "WasteProduced"}
 
@@ -24,27 +26,6 @@ class RecipeEdgeType(Enum):
     PRODUCES = "p"
     CONSUMES = "c"
     REQUIRES = "r"
-
-
-# ---------------------------------------------------------------------------
-# Constraint spec (reused from old model but standalone here)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class ConstraintSpec:
-    domain: str
-    key: str
-    operator: str
-    value_string: Optional[str] = None
-    value_number: Optional[float] = None
-    value_boolean: Optional[bool] = None
-    is_wildcard: bool = False
-
-
-@dataclass
-class ConstraintRule:
-    """Rule for do_not_expand / forbidden checks."""
-    constraints: List[ConstraintSpec]
 
 
 # ---------------------------------------------------------------------------

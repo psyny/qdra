@@ -320,7 +320,7 @@ def get_values_for_parameter(
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import get_cached_data, set_cached_data
     from services.constraint_resolution_service import ConstraintResolutionService
-    from domain.planning.output_solver_domain import ConstraintSpec
+    from domain.constraints import ConstraintSpec
 
     domain = request.domain
     key = request.key

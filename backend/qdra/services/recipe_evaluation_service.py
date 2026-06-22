@@ -23,6 +23,7 @@ from infrastructure.cache.relationship_cache import (
 from services.constraint_matcher import ConstraintMatcher
 
 from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
+from domain.constraints import ConstraintSpec
 
 
 class RecipeEvaluationService:
@@ -173,7 +174,7 @@ class RecipeEvaluationService:
         Find all materials that match the option's constraints
         and are not already allocated.
         """
-        constraints = self.constraint_repo.list_by_option(option.id)
+        constraints = self.constraint_repo.list_by_option_as_specs(option.id)
         matching_materials: List[uuid.UUID] = []
 
         for material in materials:
@@ -194,7 +195,7 @@ class RecipeEvaluationService:
     def _material_matches_constraints(
         self,
         material: Entity,
-        constraints: List[ParameterConstraint],
+        constraints: List[ConstraintSpec],
         material_params_map: dict
     ) -> bool:
         """
@@ -280,7 +281,7 @@ class RecipeEvaluationService:
             }
 
             for option in options:
-                constraints = self.constraint_repo.list_by_option(option.id)
+                constraints = self.constraint_repo.list_by_option_as_specs(option.id)
                 matching_materials = []
 
                 for material in materials:
@@ -359,7 +360,7 @@ class RecipeEvaluationService:
                 options = self.option_repo.list_by_slot(slot.id)
                 
                 for option in options:
-                    constraints = self.constraint_repo.list_by_option(option.id)
+                    constraints = self.constraint_repo.list_by_option_as_specs(option.id)
                     
                     # Check if this material matches the slot's constraints
                     material = self.entity_repo.get_by_id(material_id)

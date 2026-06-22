@@ -1,7 +1,7 @@
 import pytest
 import uuid
 from qdra.services.constraint_resolution_service import ConstraintResolutionService
-from qdra.domain.planning.output_solver_domain import ConstraintSpec
+from qdra.domain.constraints import ConstraintSpec
 from tests.integration.datasets import create_medium_size_planning_dataset
 
 

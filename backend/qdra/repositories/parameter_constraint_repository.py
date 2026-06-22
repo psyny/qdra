@@ -4,6 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from models.parameter_constraint import ParameterConstraint, Operator
+from domain.constraints import ConstraintSpec
 
 
 class ParameterConstraintRepository:
@@ -48,4 +49,37 @@ class ParameterConstraintRepository:
             self.db.query(ParameterConstraint)
             .filter(ParameterConstraint.option_id == option_id)
             .all()
+        )
+
+    def list_by_option_as_specs(self, option_id: uuid.UUID) -> List[ConstraintSpec]:
+        """Return constraints as ConstraintSpec domain models."""
+        constraints = self.list_by_option(option_id)
+        return [self._to_spec(c) for c in constraints]
+
+    def _to_spec(self, model: ParameterConstraint) -> ConstraintSpec:
+        """Convert database model to domain ConstraintSpec."""
+        return ConstraintSpec(
+            domain=model.domain,
+            key=model.key,
+            operator=model.operator.value if isinstance(model.operator, Operator) else model.operator,
+            value_string=model.value_string,
+            value_number=model.value_number,
+            value_boolean=model.value_boolean,
+            is_wildcard=model.is_wildcard,
+        )
+
+    def _from_spec(self, spec: ConstraintSpec, option_id: uuid.UUID) -> ParameterConstraint:
+        """Convert domain ConstraintSpec to database model."""
+        # Convert string operator to Enum if needed
+        operator_enum = Operator(spec.operator) if isinstance(spec.operator, str) else spec.operator
+        
+        return ParameterConstraint(
+            option_id=option_id,
+            domain=spec.domain,
+            key=spec.key,
+            operator=operator_enum,
+            value_string=spec.value_string,
+            value_number=spec.value_number,
+            value_boolean=spec.value_boolean,
+            is_wildcard=spec.is_wildcard,
         )

@@ -13,7 +13,7 @@ from repositories.entity_parameter_repository import EntityParameterRepository
 from infrastructure.cache.cache_service import CacheService
 from infrastructure.config.settings import settings
 from infrastructure.cache.relationship_cache import get_cache_service
-from domain.planning.output_solver_domain import ConstraintSpec
+from domain.constraints import ConstraintSpec
 
 from services.constraint_matcher import ConstraintMatcher
 

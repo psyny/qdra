@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from services.planning.output_solver_service import OutputSolverService
+from domain.constraints import ConstraintSpec, ConstraintRule
 from domain.planning.output_solver_domain import (
-    ConstraintSpec, ConstraintRule, TargetSpec,
+    TargetSpec,
     DomainConstraints, SearchParameters, SolverRequest,
     UserVariableDef, ScoreFormulaDef, ScoreRules,
     MaterialNodeType, RecipeEdgeType,

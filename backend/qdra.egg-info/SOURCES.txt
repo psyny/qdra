@@ -43,6 +43,7 @@ qdra/db/__init__.py
 qdra/db/base.py
 qdra/db/session.py
 qdra/domain/__init__.py
+qdra/domain/constraints.py
 qdra/domain/evaluation.py
 qdra/domain/state.py
 qdra/domain/adapters/__init__.py
