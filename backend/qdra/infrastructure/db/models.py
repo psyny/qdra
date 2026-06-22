@@ -137,6 +137,9 @@ class PlanningRun(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     status = Column(String(50), nullable=False, default="pending")  # pending, running, completed, failed
     type = Column(String(255), nullable=False)  # "output_solver", etc
+    input = Column(JSONB, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    finished_at = Column(DateTime(timezone=True), nullable=True)
     result = Column(JSONB, nullable=True)
 
     __table_args__ = (
