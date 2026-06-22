@@ -6,7 +6,7 @@ type PlanningRunDetailsPageProps = {
   projectId: string;
 };
 
-type SubcardKey = 'runningState' | 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'results';
+type SubcardKey = 'runningState' | 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'inputJson' | 'resultJson' | 'results';
 
 export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProps) {
   const { runId } = useParams<{ runId: string }>();
@@ -23,6 +23,8 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     planOptions: true,
     searchParameters: false,
     scoreRules: false,
+    inputJson: false,
+    resultJson: true,
     results: true,
   });
 
@@ -229,7 +231,61 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
           )}
         </div>
 
-        {/* Subcard 6: Results */}
+        {/* Subcard 6: Input JSON */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Input JSON</h3>
+            <button
+              onClick={() => toggleCard('inputJson')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.inputJson ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.inputJson && (
+            <pre style={{ 
+              backgroundColor: '#1a1a1a', 
+              color: '#ffffff',
+              padding: '12px', 
+              borderRadius: '4px', 
+              overflow: 'auto',
+              maxHeight: '400px',
+              fontSize: '12px'
+            }}>
+              {formatJson(run.input)}
+            </pre>
+          )}
+        </div>
+
+        {/* Subcard 7: Result JSON */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Result JSON</h3>
+            <button
+              onClick={() => toggleCard('resultJson')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.resultJson ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.resultJson && (
+            <pre style={{ 
+              backgroundColor: '#1a1a1a', 
+              color: '#ffffff',
+              padding: '12px', 
+              borderRadius: '4px', 
+              overflow: 'auto',
+              maxHeight: '400px',
+              fontSize: '12px'
+            }}>
+              {formatJson(run.result)}
+            </pre>
+          )}
+        </div>
+
+        {/* Subcard 8: Results */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 className="card-title" style={{ fontSize: '18px' }}>Results</h3>
@@ -242,16 +298,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
             </button>
           </div>
           {expandedCards.results && (
-            <pre style={{ 
-              backgroundColor: '#f5f5f5', 
-              padding: '12px', 
-              borderRadius: '4px', 
-              overflow: 'auto',
-              maxHeight: '400px',
-              fontSize: '12px'
-            }}>
-              {formatJson(run.result)}
-            </pre>
+            <p className="card-description">Results visualization will be implemented here.</p>
           )}
         </div>
       </div>
