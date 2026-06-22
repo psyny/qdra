@@ -61,3 +61,78 @@ export async function createPlanningRun(data: {
   }
   return response.json();
 }
+
+export interface ConstraintSpec {
+  domain: string;
+  key: string;
+  operator: string;
+  value_string?: string;
+  value_number?: number;
+  value_boolean?: boolean;
+  is_wildcard?: boolean;
+}
+
+export interface TargetSpec {
+  quantity: number;
+  target_type: string;
+  constraints: ConstraintSpec[];
+}
+
+export interface ConstraintRule {
+  constraints: ConstraintSpec[];
+}
+
+export interface DomainConstraints {
+  do_not_expand_materials_matching: ConstraintRule[];
+  forbidden_materials_matching: ConstraintRule[];
+  forbidden_recipe_matching: ConstraintRule[];
+  required_materials_matching: ConstraintRule[];
+  required_recipe_matching: ConstraintRule[];
+  max_recipe_depth: number;
+  allow_partial_recipe_execution: boolean;
+}
+
+export interface SearchParameters {
+  max_recursion_depth: number;
+  max_branch_width: number;
+  allow_loops: boolean;
+  max_solutions_returned: number;
+  optimization_level: number;
+}
+
+export interface UserVariableDef {
+  name: string;
+  parameter_domain: string;
+  parameter_key: string;
+  variable_type: string;
+  constraints: ConstraintSpec[][];
+}
+
+export interface ScoreFormulaDef {
+  name: string;
+  formula: string;
+}
+
+export interface ScoreRules {
+  user_variables: UserVariableDef[];
+  score_formulas: ScoreFormulaDef[];
+}
+
+export async function createOutputSolverRun(data: {
+  project_id: string;
+  target: TargetSpec;
+  domain_constraints?: DomainConstraints;
+  search_parameters?: SearchParameters;
+  score_rules?: ScoreRules;
+  name?: string;
+}): Promise<PlanningRunWithResults> {
+  const response = await fetch(`${API_URL}/api/planning-runs/output-solver/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to create output solver run');
+  }
+  return response.json();
+}

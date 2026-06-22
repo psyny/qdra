@@ -116,9 +116,13 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
           <h2 className="card-title">{viewLabel}</h2>
           <p className="card-description">View and manage planning runs.</p>
         </div>
-        <button className="button button--primary" disabled>
+        <Link 
+          to={`/projects/${projectId}/planning/planning_output_solver/new`}
+          className="button button--primary"
+          style={{ textDecoration: 'none' }}
+        >
           + New Run
-        </button>
+        </Link>
       </div>
       <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
 
