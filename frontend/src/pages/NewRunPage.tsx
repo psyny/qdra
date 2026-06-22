@@ -7,9 +7,12 @@ import {
   DomainConstraints,
   SearchParameters,
   ScoreRules,
+  ConstraintRule,
 } from '../api/planning';
 import { getProjectTemplate } from '../api/projects';
 import { ConstraintBuilder } from '../components/ConstraintBuilder';
+import { HorizontalLine } from '../components/HorizontalLine';
+import { ConstraintRuleCard } from '../components/ConstraintRuleCard';
 
 type NewRunPageProps = {
   projectId: string;
@@ -78,10 +81,36 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
   });
 
   const toggleCard = (key: SubcardKey) => {
-    setExpandedCards(prev => ({
+    setExpandedCards((prev: Record<SubcardKey, boolean>) => ({
       ...prev,
       [key]: !prev[key]
     }));
+  };
+
+  // Helper to add a new constraint rule to a list
+  const addConstraintRule = (field: keyof DomainConstraints) => {
+    const newRule: ConstraintRule = { constraints: [] };
+    setDomainConstraints((prev: DomainConstraints) => ({
+      ...prev,
+      [field]: [...(prev[field] as ConstraintRule[]), newRule]
+    }));
+  };
+
+  // Helper to remove a constraint rule from a list
+  const removeConstraintRule = (field: keyof DomainConstraints, index: number) => {
+    setDomainConstraints((prev: DomainConstraints) => ({
+      ...prev,
+      [field]: (prev[field] as ConstraintRule[]).filter((_: ConstraintRule, i: number) => i !== index)
+    }));
+  };
+
+  // Helper to update constraints within a rule
+  const updateRuleConstraints = (field: keyof DomainConstraints, ruleIndex: number, constraints: ConstraintSpec[]) => {
+    setDomainConstraints((prev: DomainConstraints) => {
+      const rules = [...(prev[field] as ConstraintRule[])];
+      rules[ruleIndex] = { constraints };
+      return { ...prev, [field]: rules };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -234,9 +263,146 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
                   /> Allow Partial Recipe Execution
                 </label>
               </div>
-              <p className="card-description" style={{ fontSize: '14px' }}>
-                Additional constraint rules will be implemented here.
-              </p>
+
+              <HorizontalLine />
+
+              {/* Do Not Expand Materials Matching */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Do Not Expand Materials Matching</h4>
+                {domainConstraints.do_not_expand_materials_matching.map((rule: ConstraintRule, index: number) => (
+                  <ConstraintRuleCard
+                    key={index}
+                    constraints={rule.constraints}
+                    onChange={(constraints) => updateRuleConstraints('do_not_expand_materials_matching', index, constraints)}
+                    onRemove={() => removeConstraintRule('do_not_expand_materials_matching', index)}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType="material"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addConstraintRule('do_not_expand_materials_matching')}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Rule
+                </button>
+              </div>
+
+              <HorizontalLine />
+
+              {/* Forbidden Materials Matching */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden Materials Matching</h4>
+                {domainConstraints.forbidden_materials_matching.map((rule: ConstraintRule, index: number) => (
+                  <ConstraintRuleCard
+                    key={index}
+                    constraints={rule.constraints}
+                    onChange={(constraints) => updateRuleConstraints('forbidden_materials_matching', index, constraints)}
+                    onRemove={() => removeConstraintRule('forbidden_materials_matching', index)}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType="material"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addConstraintRule('forbidden_materials_matching')}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Rule
+                </button>
+              </div>
+
+              <HorizontalLine />
+
+              {/* Forbidden Recipe Matching */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden Recipe Matching</h4>
+                {domainConstraints.forbidden_recipe_matching.map((rule: ConstraintRule, index: number) => (
+                  <ConstraintRuleCard
+                    key={index}
+                    constraints={rule.constraints}
+                    onChange={(constraints) => updateRuleConstraints('forbidden_recipe_matching', index, constraints)}
+                    onRemove={() => removeConstraintRule('forbidden_recipe_matching', index)}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType="recipe"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addConstraintRule('forbidden_recipe_matching')}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Rule
+                </button>
+              </div>
+
+              <HorizontalLine />
+
+              {/* Required Materials Matching */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required Materials Matching</h4>
+                {domainConstraints.required_materials_matching.map((rule: ConstraintRule, index: number) => (
+                  <ConstraintRuleCard
+                    key={index}
+                    constraints={rule.constraints}
+                    onChange={(constraints) => updateRuleConstraints('required_materials_matching', index, constraints)}
+                    onRemove={() => removeConstraintRule('required_materials_matching', index)}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType="material"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addConstraintRule('required_materials_matching')}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Rule
+                </button>
+              </div>
+
+              <HorizontalLine />
+
+              {/* Required Recipe Matching */}
+              <div>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required Recipe Matching</h4>
+                {domainConstraints.required_recipe_matching.map((rule: ConstraintRule, index: number) => (
+                  <ConstraintRuleCard
+                    key={index}
+                    constraints={rule.constraints}
+                    onChange={(constraints) => updateRuleConstraints('required_recipe_matching', index, constraints)}
+                    onRemove={() => removeConstraintRule('required_recipe_matching', index)}
+                    projectId={projectId}
+                    template={template}
+                    disabled={loading}
+                    targetType="recipe"
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addConstraintRule('required_recipe_matching')}
+                  disabled={loading}
+                  className="button button--secondary"
+                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                >
+                  + Add Rule
+                </button>
+              </div>
             </div>
           )}
         </div>
