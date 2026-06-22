@@ -35,9 +35,6 @@ export function PlanningGraph({
   displayImages,
   simplifyLevel,
 }: PlanningGraphProps) {
-  console.log('PlanningGraph received entities:', entities);
-  console.log('PlanningGraph received graph:', graph);
-  
   // Map planning graph to React Flow format
   const initialNodes = useMemo(() => {
     return mapNodes(

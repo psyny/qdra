@@ -69,15 +69,8 @@ export function resolveMaterialLabel(
   keyName: string
 ): string {
   const material = entities.materials[materialId];
-  console.log('resolveMaterialLabel - materialId:', materialId, 'material:', material, 'domainName:', domainName, 'keyName:', keyName);
   
-  if (!material) {
-    console.log('Material not found');
-    return 'Unknown Material';
-  }
-  
-  if (!material.parameters) {
-    console.log('Material has no parameters');
+  if (!material || !material.parameters) {
     return 'Unknown Material';
   }
 
@@ -86,7 +79,6 @@ export function resolveMaterialLabel(
   );
 
   if (!param) {
-    console.log('Parameter not found, available params:', material.parameters);
     return 'Unknown Material';
   }
 
@@ -103,15 +95,8 @@ export function resolveRecipeLabel(
   keyName: string
 ): string {
   const recipe = entities.recipes[recipeId];
-  console.log('resolveRecipeLabel - recipeId:', recipeId, 'recipe:', recipe, 'domainName:', domainName, 'keyName:', keyName);
   
-  if (!recipe) {
-    console.log('Recipe not found');
-    return 'Unknown Recipe';
-  }
-  
-  if (!recipe.parameters) {
-    console.log('Recipe has no parameters');
+  if (!recipe || !recipe.parameters) {
     return 'Unknown Recipe';
   }
 
@@ -120,7 +105,6 @@ export function resolveRecipeLabel(
   );
 
   if (!param) {
-    console.log('Parameter not found, available params:', recipe.parameters);
     return 'Unknown Recipe';
   }
 
