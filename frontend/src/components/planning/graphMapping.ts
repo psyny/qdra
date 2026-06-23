@@ -1,4 +1,4 @@
-import { Node, Edge } from 'reactflow';
+import { Node, Edge, MarkerType } from 'reactflow';
 import { Entity, EntityParameter } from '../../types/entity';
 
 // Planning graph types
@@ -73,23 +73,21 @@ export interface NodeStyleConfig {
 }
 
 const MATERIAL_COLORS: Record<string, NodeStyleConfig> = {
-  surplus:  { background: '#ef4444', border: '#f87171', text: '#000000' },
-  target:   { background: '#22c55e', border: '#4ade80', text: '#000000' },
-  output:   { background: '#3b82f6', border: '#60a5fa', text: '#000000' },
-  input:    { background: '#3b82f6', border: '#60a5fa', text: '#000000' },
-  required: { background: '#eab308', border: '#fde047', text: '#000000' },
-  fallback: { background: '#334155', border: '#64748b', text: '#ffffff' },
+  surplus:  { background: '#310a0a', border: '#ff2e2e', text: '#ffffff' },
+  target:   { background: '#13300a', border: '#3bff98', text: '#ffffff' },
+  root:     { background: '#30240a', border: '#ffd73b', text: '#ffffff' },
+  fallback: { background: '#0a2630', border: '#3bcaff', text: '#ffffff' },
 };
 
 export function getMaterialNodeStyle(data: MaterialNodeData): NodeStyleConfig {
   if (data.isTarget) return MATERIAL_COLORS.target;
   if (data.isLeaf) return MATERIAL_COLORS.surplus;
-  if (data.isRoot) return MATERIAL_COLORS.required;
-  return MATERIAL_COLORS.output;
+  if (data.isRoot) return MATERIAL_COLORS.root;
+  return MATERIAL_COLORS.fallback;
 }
 
 export function getRecipeNodeStyle(): NodeStyleConfig {
-  return { background: '#cfcfcf', border: '#ffffff', text: '#000000' };
+  return { background: '#3b3b3b', border: '#ffffff', text: '#ffffff' };
 }
 
 /**
@@ -223,8 +221,8 @@ export function mapNodes(
   });
 }
 
-const EDGE_LABEL_STYLE = { fill: '#000000', fontWeight: 600 } as const;
-const EDGE_LABEL_BG_STYLE = { fill: '#f8fafc', fillOpacity: 0.95 } as const;
+const EDGE_LABEL_STYLE = { fill: '#a7a7a7', fontWeight: 600 } as const;
+const EDGE_LABEL_BG_STYLE = { fill: '#000000', fillOpacity: 0.95 } as const;
 
 /**
  * Convert planning graph edges to React Flow edges
@@ -236,19 +234,32 @@ export function mapEdges(
 ): Edge[] {
   const edges: Edge[] = [];
 
+  const strokeColor = '#ffbb4e';
+
+  const allQtys = [...recipeEdges, ...materialEdges].map(e => e.qty ?? 0);
+  const minQty = allQtys.length > 0 ? Math.min(...allQtys) : 0;
+  const maxQty = allQtys.length > 0 ? Math.max(...allQtys) : 0;
+
+  const interpolate = (qty: number, outMin: number, outMax: number): number => {
+    if (maxQty === minQty) return outMin + ((outMax - outMin) * 0.5); // (outMax - outMin) * 0.5;
+    return outMin + ((qty - minQty) / (maxQty - minQty)) * (outMax - outMin);
+  };
+  const getStrokeWidth = (qty: number) => interpolate(qty, 1, 10);
+  const getMarker = (qty: number) => {
+    const size = interpolate(qty, 15, 6);
+    return { type: MarkerType.ArrowClosed, color: strokeColor, width: size, height: size };
+  };
+
   // Map recipe edges
   recipeEdges.forEach(edge => {
-    const isProduceEdge = recipeNodeIds ? recipeNodeIds.has(edge.from_node_id) : false;
-    const stroke = recipeNodeIds
-      ? (isProduceEdge ? '#22c55e' : '#f97316')
-      : '#d1d5db';
     edges.push({
       id: `recipe-${edge.from_node_id}-${edge.to_node_id}`,
       source: edge.from_node_id,
       target: edge.to_node_id,
       label: String(edge.qty),
       type: 'default',
-      style: { stroke, strokeWidth: 2 },
+      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty) },
+      markerEnd: getMarker(edge.qty),
       labelStyle: EDGE_LABEL_STYLE,
       labelBgStyle: EDGE_LABEL_BG_STYLE,
     });
@@ -262,7 +273,8 @@ export function mapEdges(
       target: edge.to_node_id,
       label: String(edge.qty),
       type: 'default',
-      style: { stroke: '#38bdf8', strokeWidth: 2 },
+      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty) },
+      markerEnd: getMarker(edge.qty),
       labelStyle: EDGE_LABEL_STYLE,
       labelBgStyle: EDGE_LABEL_BG_STYLE,
     });
