@@ -76,10 +76,6 @@ export function EntitySelectorModal({
     setLoading(true);
     try {
       const data = await getEntities(projectId, selectedType);
-      console.log('EntitySelectorModal - Loaded entities:', data);
-      console.log('EntitySelectorModal - Selected group:', selectedGroup);
-      console.log('EntitySelectorModal - Entity groups:', data.map(e => ({ id: e.id, group: e.group })));
-      
       // Load all entities without filtering - filtering happens in display
       setEntities(data);
 
@@ -94,7 +90,7 @@ export function EntitySelectorModal({
               {
                 id: 'sys_id',
                 entity_id: entity.id,
-                domain: 'system',
+                domain: '__system__',
                 key: 'id',
                 value_string: entity.id,
                 created_at: '',
@@ -103,7 +99,7 @@ export function EntitySelectorModal({
               {
                 id: 'sys_group',
                 entity_id: entity.id,
-                domain: 'system',
+                domain: '__system__',
                 key: 'group',
                 value_string: entity.group,
                 created_at: '',
@@ -194,13 +190,6 @@ export function EntitySelectorModal({
     }
     
     return true;
-  });
-
-  console.log('EntitySelectorModal - Rendering:', { 
-    entitiesCount: entities.length, 
-    filteredCount: filteredEntities.length, 
-    loading, 
-    searchQuery 
   });
 
   // Get display parameter value for an entity

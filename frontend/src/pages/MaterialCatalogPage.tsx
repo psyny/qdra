@@ -24,6 +24,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   const [deleteConfirmEntity, setDeleteConfirmEntity] = useState<Entity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectorModalOpen, setSelectorModalOpen] = useState(false);
+  const [selectorModal2Open, setSelectorModal2Open] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -289,6 +290,15 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
             </button>
           )}
           {selectedConfig && (
+            <button
+              onClick={() => setSelectorModal2Open(true)}
+              className="button button--secondary"
+              style={{ fontSize: '12px' }}
+            >
+              Test Entity Selector 2 (No Type)
+            </button>
+          )}
+          {selectedConfig && (
             <Link
               to={`/projects/${projectId}/materials/new?configId=${selectedConfig.id}`}
               className="button button--primary"
@@ -414,6 +424,13 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         onClose={() => setSelectorModalOpen(false)}
         onSelection={handleSelectorSelection}
         initialType="material"
+      />
+      {/* Entity Selector Modal 2 - No Type */}
+      <EntitySelectorModal
+        projectId={projectId}
+        isOpen={selectorModal2Open}
+        onClose={() => setSelectorModal2Open(false)}
+        onSelection={handleSelectorSelection}
       />
     </div>
   );
