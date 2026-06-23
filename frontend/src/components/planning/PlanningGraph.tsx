@@ -141,11 +141,10 @@ export function PlanningGraph({
           nodeColor={(node: any) => {
             if (node.type === 'recipe') return '#cfcfcf';
             const d = node.data;
-            if (d?.producedQty - d?.consumedQty > 0) return '#ef4444';
-            if (d?.nodeType === 't') return '#22c55e';
-            if (d?.nodeType === 'o' || d?.nodeType === 'i') return '#3b82f6';
-            if (d?.nodeType === 'r') return '#eab308';
-            return '#334155';
+            if (d?.isTarget) return '#22c55e';
+            if (d?.isLeaf) return '#ef4444';
+            if (d?.isRoot) return '#eab308';
+            return '#3b82f6';
           }}
           style={{ background: '#111111' }}
           maskColor="rgba(0, 0, 0, 0.6)"

@@ -226,6 +226,8 @@ class OutputSolverService:
 
         for node in material_nodes.values():
             tags: Set[str] = set()
+            if node.type == MaterialNodeType.TARGET:
+                tags.add("target")
             if node.produced_qty > node.consumed_qty:
                 tags.add("excess")
             if not outgoing.get(node.id):

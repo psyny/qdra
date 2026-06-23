@@ -49,6 +49,7 @@ export interface MaterialNodeData {
   consumedQty: number;
   isRoot: boolean;
   isLeaf: boolean;
+  isTarget: boolean;
   materialId: string;
   nodeType?: string;
 }
@@ -81,12 +82,10 @@ const MATERIAL_COLORS: Record<string, NodeStyleConfig> = {
 };
 
 export function getMaterialNodeStyle(data: MaterialNodeData): NodeStyleConfig {
-  if (data.nodeType !== 't' && data.producedQty - data.consumedQty > 0) return MATERIAL_COLORS.surplus;
-  if (data.nodeType === 't') return MATERIAL_COLORS.target;
-  if (data.nodeType === 'o') return MATERIAL_COLORS.output;
-  if (data.nodeType === 'i') return MATERIAL_COLORS.input;
-  if (data.nodeType === 'r') return MATERIAL_COLORS.required;
-  return MATERIAL_COLORS.fallback;
+  if (data.isTarget) return MATERIAL_COLORS.target;
+  if (data.isLeaf) return MATERIAL_COLORS.surplus;
+  if (data.isRoot) return MATERIAL_COLORS.required;
+  return MATERIAL_COLORS.output;
 }
 
 export function getRecipeNodeStyle(): NodeStyleConfig {
@@ -186,6 +185,7 @@ export function mapNodes(
           isRoot,
           isLeaf,
           materialId: node.material_id || '',
+          isTarget: hasTag(node, 'target'),
           nodeType: node.type,
         },
       };
