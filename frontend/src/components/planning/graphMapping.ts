@@ -11,6 +11,7 @@ export interface PlanGraphNode {
   consumed_qty?: number;
   execution_count?: number;
   tags?: string[];
+  type?: string;
 }
 
 export interface PlanGraphEdge {
@@ -49,6 +50,7 @@ export interface MaterialNodeData {
   isRoot: boolean;
   isLeaf: boolean;
   materialId: string;
+  nodeType?: string;
 }
 
 export interface RecipeNodeData {
@@ -57,6 +59,38 @@ export interface RecipeNodeData {
   isRoot: boolean;
   isLeaf: boolean;
   recipeId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Node & edge style helpers
+// ---------------------------------------------------------------------------
+
+export interface NodeStyleConfig {
+  background: string;
+  border: string;
+  text: string;
+}
+
+const MATERIAL_COLORS: Record<string, NodeStyleConfig> = {
+  surplus:  { background: '#ef4444', border: '#f87171', text: '#000000' },
+  target:   { background: '#22c55e', border: '#4ade80', text: '#000000' },
+  output:   { background: '#3b82f6', border: '#60a5fa', text: '#000000' },
+  input:    { background: '#3b82f6', border: '#60a5fa', text: '#000000' },
+  required: { background: '#eab308', border: '#fde047', text: '#000000' },
+  fallback: { background: '#334155', border: '#64748b', text: '#ffffff' },
+};
+
+export function getMaterialNodeStyle(data: MaterialNodeData): NodeStyleConfig {
+  if (data.nodeType !== 't' && data.producedQty - data.consumedQty > 0) return MATERIAL_COLORS.surplus;
+  if (data.nodeType === 't') return MATERIAL_COLORS.target;
+  if (data.nodeType === 'o') return MATERIAL_COLORS.output;
+  if (data.nodeType === 'i') return MATERIAL_COLORS.input;
+  if (data.nodeType === 'r') return MATERIAL_COLORS.required;
+  return MATERIAL_COLORS.fallback;
+}
+
+export function getRecipeNodeStyle(): NodeStyleConfig {
+  return { background: '#cfcfcf', border: '#ffffff', text: '#000000' };
 }
 
 /**
@@ -152,6 +186,7 @@ export function mapNodes(
           isRoot,
           isLeaf,
           materialId: node.material_id || '',
+          nodeType: node.type,
         },
       };
     } else if (node.kind === 'recipe_execution') {
@@ -188,23 +223,34 @@ export function mapNodes(
   });
 }
 
+const EDGE_LABEL_STYLE = { fill: '#000000', fontWeight: 600 } as const;
+const EDGE_LABEL_BG_STYLE = { fill: '#f8fafc', fillOpacity: 0.95 } as const;
+
 /**
  * Convert planning graph edges to React Flow edges
  */
 export function mapEdges(
   recipeEdges: PlanGraphEdge[],
-  materialEdges: PlanGraphEdge[]
+  materialEdges: PlanGraphEdge[],
+  recipeNodeIds?: Set<string>,
 ): Edge[] {
   const edges: Edge[] = [];
 
   // Map recipe edges
   recipeEdges.forEach(edge => {
+    const isProduceEdge = recipeNodeIds ? recipeNodeIds.has(edge.from_node_id) : false;
+    const stroke = recipeNodeIds
+      ? (isProduceEdge ? '#22c55e' : '#f97316')
+      : '#d1d5db';
     edges.push({
       id: `recipe-${edge.from_node_id}-${edge.to_node_id}`,
       source: edge.from_node_id,
       target: edge.to_node_id,
       label: String(edge.qty),
-      type: 'smoothstep',
+      type: 'default',
+      style: { stroke, strokeWidth: 2 },
+      labelStyle: EDGE_LABEL_STYLE,
+      labelBgStyle: EDGE_LABEL_BG_STYLE,
     });
   });
 
@@ -215,7 +261,10 @@ export function mapEdges(
       source: edge.from_node_id,
       target: edge.to_node_id,
       label: String(edge.qty),
-      type: 'smoothstep',
+      type: 'default',
+      style: { stroke: '#38bdf8', strokeWidth: 2 },
+      labelStyle: EDGE_LABEL_STYLE,
+      labelBgStyle: EDGE_LABEL_BG_STYLE,
     });
   });
 

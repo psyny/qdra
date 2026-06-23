@@ -15,6 +15,7 @@ import { MaterialNode } from './MaterialNode';
 import { RecipeNode } from './RecipeNode';
 import {
   PlanningGraphProps,
+  PlanGraphNode,
   mapNodes,
   mapEdges,
 } from './graphMapping';
@@ -59,9 +60,17 @@ export function PlanningGraph({
     recipeKeyName,
   ]);
 
+  const recipeNodeIds = useMemo(() => {
+    return new Set(
+      simplifiedGraph.graph_nodes
+        .filter((n: PlanGraphNode) => n.kind === 'recipe_execution')
+        .map((n: PlanGraphNode) => n.id)
+    );
+  }, [simplifiedGraph.graph_nodes]);
+
   const initialEdges = useMemo(() => {
-    return mapEdges(simplifiedGraph.recipe_edges, simplifiedGraph.material_edges);
-  }, [simplifiedGraph.recipe_edges, simplifiedGraph.material_edges]);
+    return mapEdges(simplifiedGraph.recipe_edges, simplifiedGraph.material_edges, recipeNodeIds);
+  }, [simplifiedGraph.recipe_edges, simplifiedGraph.material_edges, recipeNodeIds]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -114,7 +123,7 @@ export function PlanningGraph({
   }
 
   return (
-    <div style={{ width: '100%', height: '600px' }}>
+    <div style={{ width: '100%', height: '600px', background: '#000000' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -124,16 +133,22 @@ export function PlanningGraph({
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
+        style={{ background: '#000000' }}
       >
-        <Background color="#374151" gap={16} />
+        <Background color="#1a1a1a" gap={32} />
         <Controls />
-        <MiniMap 
+        <MiniMap
           nodeColor={(node: any) => {
-            if (node.type === 'material') return '#1f2937';
-            if (node.type === 'recipe') return '#374151';
-            return '#6b7280';
+            if (node.type === 'recipe') return '#cfcfcf';
+            const d = node.data;
+            if (d?.producedQty - d?.consumedQty > 0) return '#ef4444';
+            if (d?.nodeType === 't') return '#22c55e';
+            if (d?.nodeType === 'o' || d?.nodeType === 'i') return '#3b82f6';
+            if (d?.nodeType === 'r') return '#eab308';
+            return '#334155';
           }}
-          maskColor="rgba(0, 0, 0, 0.5)"
+          style={{ background: '#111111' }}
+          maskColor="rgba(0, 0, 0, 0.6)"
         />
       </ReactFlow>
     </div>

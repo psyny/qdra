@@ -1,12 +1,8 @@
 import { Handle, Position, NodeProps } from 'reactflow';
-import { RecipeNodeData } from './graphMapping';
+import { RecipeNodeData, getRecipeNodeStyle } from './graphMapping';
 
 export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
-  const getBorderColor = () => {
-    if (data.isRoot) return '#22c55e'; // green
-    if (data.isLeaf) return '#3b82f6'; // blue
-    return '#8b5cf6'; // purple for recipes
-  };
+  const style = getRecipeNodeStyle();
 
   return (
     <div
@@ -14,9 +10,9 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
         padding: '12px',
         borderRadius: '8px',
         minWidth: '150px',
-        backgroundColor: '#374151',
-        border: `2px solid ${getBorderColor()}`,
-        color: '#ffffff',
+        backgroundColor: style.background,
+        border: `2px solid ${style.border}`,
+        color: style.text,
         fontSize: '14px',
       }}
     >
@@ -26,7 +22,7 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
         {data.label}
       </div>
       
-      <div style={{ fontSize: '12px', color: '#d1d5db' }}>
+      <div style={{ fontSize: '12px', opacity: 0.7 }}>
         <div>Executions: {data.executionCount}</div>
       </div>
       
