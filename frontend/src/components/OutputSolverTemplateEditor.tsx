@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ConstraintSpec,
   TargetSpec,
@@ -18,7 +18,7 @@ type OutputSolverTemplateEditorProps = {
   template: any;
 };
 
-type SubcardKey = 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules';
+type SubcardKey = 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'planResultsDefaults';
 
 export function OutputSolverTemplateEditor({ templateId, template }: OutputSolverTemplateEditorProps) {
   // Subcard expansion state
@@ -27,6 +27,7 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
     planOptions: false,
     searchParameters: false,
     scoreRules: false,
+    planResultsDefaults: false,
   });
 
   // Target state
@@ -61,6 +62,46 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
     user_variables: [],
     score_formulas: [],
   });
+
+  // Plan Results Defaults state
+  const [mainScoreName, setMainScoreName] = useState<string>('');
+  const [mainScoreDescending, setMainScoreDescending] = useState<boolean>(false);
+  const [defaultScores, setDefaultScores] = useState<string[]>([]);
+  const [materialDisplayParam, setMaterialDisplayParam] = useState<string>('');
+  const [recipeDisplayParam, setRecipeDisplayParam] = useState<string>('');
+  const [simplifyLabel, setSimplifyLabel] = useState<number>(1);
+  const [useImages, setUseImages] = useState<boolean>(true);
+
+  // Helper to get domain:key options from template
+  const getDomainKeyOptions = (kind: 'recipe' | 'material') => {
+    if (!template?.entity_types) return [];
+    
+    const entityType = template.entity_types.find((et: any) => et.kind === kind);
+    if (!entityType?.parameter_definitions) return [];
+    
+    const domainKeySet = new Set<string>();
+    entityType.parameter_definitions.forEach((param: any) => {
+      if (param.domain && param.key) {
+        domainKeySet.add(`${param.domain}:${param.key}`);
+      }
+    });
+    
+    return Array.from(domainKeySet).sort();
+  };
+
+  // Initialize display parameters when template changes
+  useEffect(() => {
+    if (template) {
+      const materialOptions = getDomainKeyOptions('material');
+      const recipeOptions = getDomainKeyOptions('recipe');
+      if (materialOptions.length > 0 && !materialDisplayParam) {
+        setMaterialDisplayParam(materialOptions[0]);
+      }
+      if (recipeOptions.length > 0 && !recipeDisplayParam) {
+        setRecipeDisplayParam(recipeOptions[0]);
+      }
+    }
+  }, [template]);
 
   const toggleCard = (key: SubcardKey) => {
     setExpandedCards((prev: Record<SubcardKey, boolean>) => ({
@@ -157,6 +198,25 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
       const formulas = [...prev.score_formulas];
       formulas[index] = formula;
       return { ...prev, score_formulas: formulas };
+    });
+  };
+
+  // Helper to add a default score
+  const addDefaultScore = () => {
+    setDefaultScores((prev: string[]) => [...prev, '']);
+  };
+
+  // Helper to remove a default score
+  const removeDefaultScore = (index: number) => {
+    setDefaultScores((prev: string[]) => prev.filter((_: string, i: number) => i !== index));
+  };
+
+  // Helper to update a default score
+  const updateDefaultScore = (index: number, value: string) => {
+    setDefaultScores((prev: string[]) => {
+      const scores = [...prev];
+      scores[index] = value;
+      return scores;
     });
   };
 
@@ -530,6 +590,166 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
               >
                 + Add Score Formula
               </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Subcard 5: Plan Results Defaults */}
+      <div className="card mb-4" style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Results Defaults</h3>
+          <button
+            type="button"
+            onClick={() => toggleCard('planResultsDefaults')}
+            className="button button--secondary"
+            style={{ padding: '2px 8px', minWidth: '30px' }}
+          >
+            {expandedCards.planResultsDefaults ? '-' : '+'}
+          </button>
+        </div>
+        {expandedCards.planResultsDefaults && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Main Score */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Main Score</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                  <label htmlFor="main-score-name" className="form-label">Score Name</label>
+                  <input
+                    id="main-score-name"
+                    type="text"
+                    value={mainScoreName}
+                    onChange={(e) => setMainScoreName(e.target.value)}
+                    className="form-input"
+                    placeholder="e.g., total_score"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                  <label htmlFor="main-score-descending" className="form-label">Descending</label>
+                  <input
+                    id="main-score-descending"
+                    type="checkbox"
+                    checked={mainScoreDescending}
+                    onChange={(e) => setMainScoreDescending(e.target.checked)}
+                    style={{ width: '19px', height: '19px' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <HorizontalLine />
+
+            {/* Default Scores */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Default Scores</h4>
+              <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                Define which scores are displayed by default in the results table.
+              </p>
+              {defaultScores.map((score, index) => (
+                <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    value={score}
+                    onChange={(e) => updateDefaultScore(index, e.target.value)}
+                    className="form-input"
+                    placeholder="Score name"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeDefaultScore(index)}
+                    className="button button--danger"
+                    style={{ padding: '4px 8px', fontSize: '12px' }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addDefaultScore}
+                className="button button--secondary"
+                style={{ padding: '4px 8px', fontSize: '12px' }}
+              >
+                + Add Score
+              </button>
+            </div>
+
+            <HorizontalLine />
+
+            {/* Material Display Parameter */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Material Display Parameter</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label htmlFor="material-display-param" className="form-label">Domain:Key</label>
+                <select
+                  id="material-display-param"
+                  value={materialDisplayParam}
+                  onChange={(e) => setMaterialDisplayParam(e.target.value)}
+                  className="form-input"
+                >
+                  {getDomainKeyOptions('material').map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <HorizontalLine />
+
+            {/* Recipe Display Parameter */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Recipe Display Parameter</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label htmlFor="recipe-display-param" className="form-label">Domain:Key</label>
+                <select
+                  id="recipe-display-param"
+                  value={recipeDisplayParam}
+                  onChange={(e) => setRecipeDisplayParam(e.target.value)}
+                  className="form-input"
+                >
+                  {getDomainKeyOptions('recipe').map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <HorizontalLine />
+
+            {/* Simplify Label */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Simplify Label</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label htmlFor="simplify-label" className="form-label">Level</label>
+                <input
+                  id="simplify-label"
+                  type="number"
+                  value={simplifyLabel}
+                  onChange={(e) => setSimplifyLabel(Number(e.target.value))}
+                  className="form-input"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+
+            <HorizontalLine />
+
+            {/* Use Images */}
+            <div>
+              <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Use Images</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                <label htmlFor="use-images" className="form-label">Enabled</label>
+                <input
+                  id="use-images"
+                  type="checkbox"
+                  checked={useImages}
+                  onChange={(e) => setUseImages(e.target.checked)}
+                  style={{ width: '19px', height: '19px' }}
+                />
+              </div>
             </div>
           </div>
         )}
