@@ -201,10 +201,18 @@ async def create_recipe(
     data: RecipeCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
         entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
+        # Invalidate all relationship caches so the solver sees the new recipe
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            clear_pattern(str(project_id))
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -216,6 +224,9 @@ async def create_recipe_bulk(
     recipe_data: RecipeBulkCreate,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     slot_repo = SlotRepository(db)
     option_repo = OptionRepository(db)
@@ -246,6 +257,11 @@ async def create_recipe_bulk(
                         value_boolean=c.value_boolean, is_wildcard=c.is_wildcard,
                     )
 
+        # Invalidate all relationship caches so the solver sees the new recipe
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            clear_pattern(str(project_id))
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -81,6 +81,9 @@ async def create_entity(
     request: CreateEntityRequest,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     try:
         entity = service.create_entity(
@@ -98,6 +101,11 @@ async def create_entity(
                     value_number=param.value_number,
                     value_boolean=param.value_boolean,
                 )
+        # Invalidate all relationship caches so the solver sees the new entity
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            clear_pattern(str(project_id))
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -109,6 +117,9 @@ async def bulk_create_entities(
     request: BulkCreateEntityRequest,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     results = []
     try:
@@ -131,6 +142,11 @@ async def bulk_create_entities(
             results.append(await service.get_entity(entity.id))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    # Invalidate all relationship caches so the solver sees the new entities
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        clear_pattern(str(project_id))
     return results
 
 
@@ -247,9 +263,12 @@ def add_entity_parameter(
     request: ParameterValueModel,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     try:
-        return service.add_parameter(
+        result = service.add_parameter(
             entity_id=entity_id,
             domain=request.domain,
             key=request.key,
@@ -257,6 +276,12 @@ def add_entity_parameter(
             value_number=request.value_number,
             value_boolean=request.value_boolean,
         )
+        # Invalidate all relationship caches so constraint lookups reflect the new parameter
+        if settings.l1_caching:
+            clear_all_caches()
+        if settings.l2_caching:
+            clear_pattern(str(project_id))
+        return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -304,10 +329,18 @@ def delete_entity_parameter(
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
+    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
     service = EntityService(db)
     deleted = service.delete_parameter(parameter_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Parameter not found")
+    # Invalidate all relationship caches so constraint lookups reflect the removed parameter
+    if settings.l1_caching:
+        clear_all_caches()
+    if settings.l2_caching:
+        clear_pattern(str(project_id))
 
 
 @router.post("/projects/{project_id}/parameter-values")
