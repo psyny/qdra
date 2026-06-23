@@ -84,6 +84,16 @@ export function PlanningGraph({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [layouted, setLayouted] = useState(false);
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+  const [graphHeight, setGraphHeight] = useState(window.innerHeight - 200);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setGraphHeight(window.innerHeight - 200);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const onInit = useCallback((instance: ReactFlowInstance) => {
     reactFlowInstance.current = instance;
@@ -139,7 +149,7 @@ export function PlanningGraph({
   }
 
   return (
-    <div style={{ width: '100%', height: '600px', background: '#000000' }}>
+    <div style={{ width: '100%', height: `${graphHeight}px`, background: '#000000' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
