@@ -1,4 +1,4 @@
-import { NodeProps } from 'reactflow';
+import { Handle, Position, NodeProps } from 'reactflow';
 import { RecipeNodeData, getRecipeNodeStyle } from './graphMapping';
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -25,6 +25,11 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
         boxShadow: `0 0 30px ${hexToRgba(style.border, 0.3)}, inset 0 0 15px ${hexToRgba(style.border, 0.15)}`,
       }}
     >
+      <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
+      <Handle type="target" position={Position.Right} style={{ opacity: 0 }} />
+      
       <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
         {data.label}
       </div>
@@ -32,6 +37,11 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
       <div style={{ fontSize: '12px', opacity: 0.7 }}>
         {data.executionCount.toFixed(1)}
       </div>
+      
+      <Handle type="source" position={Position.Top} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Left} style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} style={{ opacity: 0 }} />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import ReactFlow, {
   Connection,
   NodeTypes,
   EdgeTypes,
+  ConnectionMode,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -138,6 +139,7 @@ export function PlanningGraph({
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        connectionMode={ConnectionMode.Loose}
         fitView
         attributionPosition="bottom-left"
         style={{ background: '#000000' }}
