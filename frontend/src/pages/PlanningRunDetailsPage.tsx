@@ -63,45 +63,58 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     return Array.from(domainKeySet).sort();
   };
 
-  useEffect(() => {
-    const loadRun = async () => {
-      if (!runId) return;
-      
-      setLoading(true);
-      setError(null);
-      try {
-        const runData = await getPlanningRunWithResults(runId);
-        setRun(runData);
-        
-        // Load template to get domain:key options
-        const templateData = await getProjectTemplate(projectId);
-        setTemplate(templateData);
-        
-        // Initialize domain keys to first option from template
-        const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
-        const materialOptions = getDomainKeyOptionsFromTemplate(templateData, 'material');
-        if (recipeOptions.length > 0) setRecipeDomainKey(recipeOptions[0]);
-        if (materialOptions.length > 0) setMaterialDomainKey(materialOptions[0]);
-        
-        // Initialize selected scores - first 4 checked by default
-        if (runData.result?.plans && runData.result.plans.length > 0) {
-          const scoreKeys = Object.keys(runData.result.plans[0].score || {});
-          const initialSelectedScores: Record<string, boolean> = {};
-          scoreKeys.forEach((key, index) => {
-            initialSelectedScores[key] = index < 4;
-          });
-          setSelectedScores(initialSelectedScores);
-        }
-      } catch (error) {
-        setError('Failed to load planning run details');
-        console.error('Failed to load run:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadRun = async () => {
+    if (!runId) return;
 
+    setLoading(true);
+    setError(null);
+    try {
+      const runData = await getPlanningRunWithResults(runId);
+      setRun(runData);
+
+      // Load template to get domain:key options
+      const templateData = await getProjectTemplate(projectId);
+      setTemplate(templateData);
+
+      // Initialize domain keys to first option from template
+      const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
+      const materialOptions = getDomainKeyOptionsFromTemplate(templateData, 'material');
+      if (recipeOptions.length > 0) setRecipeDomainKey(recipeOptions[0]);
+      if (materialOptions.length > 0) setMaterialDomainKey(materialOptions[0]);
+
+      // Initialize selected scores - first 4 checked by default
+      if (runData.result?.plans && runData.result.plans.length > 0) {
+        const scoreKeys = Object.keys(runData.result.plans[0].score || {});
+        const initialSelectedScores: Record<string, boolean> = {};
+        scoreKeys.forEach((key, index) => {
+          initialSelectedScores[key] = index < 4;
+        });
+        setSelectedScores(initialSelectedScores);
+      }
+    } catch (error) {
+      setError('Failed to load planning run details');
+      console.error('Failed to load run:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadRun();
   }, [runId, projectId]);
+
+  // Poll for run completion every 2 seconds
+  useEffect(() => {
+    if (!run || run.status === 'completed' || run.status === 'failed') {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      loadRun();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [run]);
 
   // Build imagesMap when useImages is enabled and a plan is selected
   useEffect(() => {
