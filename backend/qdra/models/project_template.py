@@ -366,3 +366,28 @@ class ProjectTemplatePerParameterConstraint(Base):
     )
 
 
+class ProjectTemplatePlanOutputSolver(Base):
+    __tablename__ = "project_templates_plans_output_solver"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_template_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("project_templates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    new_plan_defaults: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    results_view_defaults: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("project_template_id", name="uq_template_plan_output_solver"),
+    )
+
+

@@ -17,6 +17,7 @@ from models.project_template import (
     ProjectTemplatePerSlot,
     ProjectTemplatePerOption,
     ProjectTemplatePerParameterConstraint,
+    ProjectTemplatePlanOutputSolver,
 )
 
 
@@ -1151,3 +1152,54 @@ class ProjectTemplateRepository:
                 )
 
         return template
+
+    # ProjectTemplatePlanOutputSolver CRUD
+
+    def get_plan_output_solver_by_template(
+        self, project_template_id: uuid.UUID
+    ) -> Optional[ProjectTemplatePlanOutputSolver]:
+        return (
+            self.db.query(ProjectTemplatePlanOutputSolver)
+            .filter(ProjectTemplatePlanOutputSolver.project_template_id == project_template_id)
+            .first()
+        )
+
+    def create_plan_output_solver(
+        self,
+        project_template_id: uuid.UUID,
+        new_plan_defaults: Optional[Dict[str, Any]] = None,
+        results_view_defaults: Optional[Dict[str, Any]] = None,
+    ) -> ProjectTemplatePlanOutputSolver:
+        plan_output_solver = ProjectTemplatePlanOutputSolver(
+            project_template_id=project_template_id,
+            new_plan_defaults=new_plan_defaults,
+            results_view_defaults=results_view_defaults,
+        )
+        self.db.add(plan_output_solver)
+        self.db.commit()
+        self.db.refresh(plan_output_solver)
+        return plan_output_solver
+
+    def update_plan_output_solver(
+        self,
+        project_template_id: uuid.UUID,
+        new_plan_defaults: Optional[Dict[str, Any]] = None,
+        results_view_defaults: Optional[Dict[str, Any]] = None,
+    ) -> Optional[ProjectTemplatePlanOutputSolver]:
+        plan_output_solver = self.get_plan_output_solver_by_template(project_template_id)
+        if plan_output_solver:
+            if new_plan_defaults is not None:
+                plan_output_solver.new_plan_defaults = new_plan_defaults
+            if results_view_defaults is not None:
+                plan_output_solver.results_view_defaults = results_view_defaults
+            self.db.commit()
+            self.db.refresh(plan_output_solver)
+        return plan_output_solver
+
+    def delete_plan_output_solver(self, project_template_id: uuid.UUID) -> bool:
+        plan_output_solver = self.get_plan_output_solver_by_template(project_template_id)
+        if plan_output_solver:
+            self.db.delete(plan_output_solver)
+            self.db.commit()
+            return True
+        return False
