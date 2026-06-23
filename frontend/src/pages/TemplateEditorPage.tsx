@@ -4,6 +4,7 @@ import { getTemplate, createTemplate, updateTemplate } from '../api/templates';
 import { ProjectTemplateDraft, ProjectTemplateDetail } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { EntityTypeEditor } from '../components/EntityTypeEditor';
+import { OutputSolverTemplateEditor } from '../components/OutputSolverTemplateEditor';
 
 export function TemplateEditorPage() {
   const { templateId } = useParams<{ templateId?: string }>();
@@ -144,6 +145,8 @@ export function TemplateEditorPage() {
       </div>
 
       {templateId && <EntityTypeEditor templateId={templateId} />}
+
+      {templateId && <OutputSolverTemplateEditor templateId={templateId} template={draft} />}
 
       <div className="card" style={{ marginTop: '24px' }}>
         <h2 className="card-title">Entity Views</h2>
