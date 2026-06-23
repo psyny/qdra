@@ -4,6 +4,7 @@ import { getProjectTemplate } from '../api/projects';
 import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
+import { EntitySelectorModal, EntitySelectorResult } from '../components/EntitySelectorModal';
 
 type MaterialCatalogPageProps = {
   projectId: string;
@@ -22,6 +23,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmEntity, setDeleteConfirmEntity] = useState<Entity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectorModalOpen, setSelectorModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -216,6 +218,10 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     setDeleteConfirmEntity(null);
   };
 
+  const handleSelectorSelection = (result: EntitySelectorResult) => {
+    console.log('MaterialCatalogPage - Entity selector result:', result);
+  };
+
   if (loading && !materialCatalogView) {
     return (
       <div className="card state-message">
@@ -272,14 +278,25 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
           </h2>
           <p className="card-description">Create and manage entities.</p>
         </div>
-        {selectedConfig && (
-          <Link
-            to={`/projects/${projectId}/materials/new?configId=${selectedConfig.id}`}
-            className="button button--primary"
-          >
-            + New {materialCatalogView.label} Entity
-          </Link>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {selectedConfig && (
+            <button
+              onClick={() => setSelectorModalOpen(true)}
+              className="button button--secondary"
+              style={{ fontSize: '12px' }}
+            >
+              Test Entity Selector
+            </button>
+          )}
+          {selectedConfig && (
+            <Link
+              to={`/projects/${projectId}/materials/new?configId=${selectedConfig.id}`}
+              className="button button--primary"
+            >
+              + New {materialCatalogView.label} Entity
+            </Link>
+          )}
+        </div>
       </div>
 
       {materialCatalogView && materialCatalogView.configs.length > 1 && (
@@ -389,6 +406,15 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
           </div>
         </div>
       )}
+
+      {/* Entity Selector Modal */}
+      <EntitySelectorModal
+        projectId={projectId}
+        isOpen={selectorModalOpen}
+        onClose={() => setSelectorModalOpen(false)}
+        onSelection={handleSelectorSelection}
+        initialType="material"
+      />
     </div>
   );
 }

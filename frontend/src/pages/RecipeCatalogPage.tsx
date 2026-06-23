@@ -4,6 +4,7 @@ import { getProjectTemplate } from '../api/projects';
 import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
+import { EntitySelectorModal, EntitySelectorResult } from '../components/EntitySelectorModal';
 
 type RecipeCatalogPageProps = {
   projectId: string;
@@ -22,6 +23,7 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmEntity, setDeleteConfirmEntity] = useState<Entity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectorModalOpen, setSelectorModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -216,6 +218,10 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
     setDeleteConfirmEntity(null);
   };
 
+  const handleSelectorSelection = (result: EntitySelectorResult) => {
+    console.log('RecipeCatalogPage - Entity selector result:', result);
+  };
+
   if (loading && !recipeCatalogView) {
     return (
       <div className="card state-message">
@@ -289,14 +295,25 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
           </h2>
           <p className="card-description">Create and manage entities.</p>
         </div>
-        {selectedConfig && (
-          <Link
-            to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
-            className="button button--primary"
-          >
-            + New {recipeCatalogView.label} Entity
-          </Link>
-        )}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {selectedConfig && (
+            <button
+              onClick={() => setSelectorModalOpen(true)}
+              className="button button--secondary"
+              style={{ fontSize: '12px' }}
+            >
+              Test Entity Selector
+            </button>
+          )}
+          {selectedConfig && (
+            <Link
+              to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
+              className="button button--primary"
+            >
+              + New {recipeCatalogView.label} Entity
+            </Link>
+          )}
+        </div>
       </div>
 
       {recipeCatalogView && recipeCatalogView.configs.length > 1 && (
@@ -406,6 +423,15 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
           </div>
         </div>
       )}
+
+      {/* Entity Selector Modal */}
+      <EntitySelectorModal
+        projectId={projectId}
+        isOpen={selectorModalOpen}
+        onClose={() => setSelectorModalOpen(false)}
+        onSelection={handleSelectorSelection}
+        initialType="recipe"
+      />
     </div>
   );
 }
