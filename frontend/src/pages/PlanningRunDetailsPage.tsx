@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
@@ -26,6 +26,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [materialDomainKey, setMaterialDomainKey] = useState<string>('');
   const [simplifyLevel, setSimplifyLevel] = useState<number>(1);
   const [useImages, setUseImages] = useState<boolean>(false);
+  const graphSectionRef = useRef<HTMLDivElement>(null);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
@@ -196,6 +197,19 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
 
     Promise.all(fetches).then(() => setImagesMap({ ...newMap }));
   }, [useImages, selectedPlanId, run, projectId]);
+
+  // Scroll to graph section when a plan is selected
+  useEffect(() => {
+    if (selectedPlanId !== null && graphSectionRef.current) {
+      graphSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedPlanId]);
+
+  const scrollToGraph = () => {
+    if (graphSectionRef.current) {
+      graphSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const toggleCard = (key: SubcardKey) => {
     setExpandedCards(prev => ({
@@ -550,8 +564,11 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
               )}
 
               {/* Region 3: Solution Graph */}
-              <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '24px' }}>
-                <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
+              <div ref={graphSectionRef} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '24px' }}>
+                <h4 
+                  style={{ fontSize: '16px', marginBottom: '12px', cursor: 'pointer' }}
+                  onClick={scrollToGraph}
+                >
                   {selectedPlanId !== null ? `Graph for Plan ${selectedPlanId}` : 'Solution Graph'}
                 </h4>
                 
