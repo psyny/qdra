@@ -132,39 +132,8 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
 
               for (const option of options) {
                 const constraints = await getRecipeConstraints(projectId, recipeId, slot.id, option.id);
-                // Transform constraints to include origin field
-                const transformedConstraints = constraints.map((c: any) => {
-                  if (c.domain === '__system__') {
-                    // For system origin
-                    return {
-                      ...c,
-                      origin: 'system',
-                      system_key: c.key, // key contains system_key for system
-                      entity_type_id: null,
-                      domain: null,
-                      key: null,
-                    };
-                  } else {
-                    // For parameter origin, try to look up entity_type_id from domain/key
-                    let entityTypeId = null;
-                    if (c.domain === 'entity_type' && template) {
-                      // The key is the entity_type_id when domain is entity_type
-                      const entityType = template?.entity_types?.find((et: any) => et.id === c.key);
-                      if (entityType) {
-                        entityTypeId = entityType.id;
-                      }
-                    }
-                    return {
-                      ...c,
-                      origin: 'parameter',
-                      system_key: null,
-                      entity_type_id: entityTypeId,
-                    };
-                  }
-                });
-                // Create option spec with quantity and constraints
                 slotConstraints[slot.kind][slotIndex].push({
-                  constraints: transformedConstraints,
+                  constraints,
                   quantity: option.quantity || 1,
                 });
               }
@@ -261,17 +230,9 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
           const optionQuantity = option.quantity || 1;
           const recipeOption = await createRecipeOption(projectId, recipeId, slot.id, optionQuantity, 0);
           for (const constraint of option.constraints) {
-            // For system origin, use special domain/key format
-            let domain = constraint.domain;
-            let key = constraint.key;
-            if (constraint.origin === 'system') {
-              domain = '__system__';
-              key = constraint.system_key; // Store system_key in key for system
-            }
-
             await createRecipeConstraint(projectId, recipeId, slot.id, recipeOption.id, {
-              domain: domain,
-              key: key,
+              domain: constraint.domain,
+              key: constraint.key,
               operator: constraint.operator,
               value_string: constraint.value_string,
               value_number: constraint.value_number,
