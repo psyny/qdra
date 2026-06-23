@@ -281,124 +281,146 @@ export function EntitySelectorModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        padding: '50px',
       }}>
         <div className="card" style={{ 
+          width: '100%',
+          height: '100%',
           maxWidth: 'calc(100vw - 100px)', 
           maxHeight: 'calc(100vh - 100px)', 
-          margin: '50px',
-          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: '#000',
           color: '#fff',
+          fontSize: '14px',
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 className="card-title" style={{ color: '#fff' }}>Entity Selector</h2>
-            <button onClick={onClose} className="button button--secondary">Close</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h2 className="card-title" style={{ color: '#fff', fontSize: '18px' }}>Entity Selector</h2>
+            <button onClick={onClose} className="button button--secondary" style={{ fontSize: '14px' }}>Close</button>
           </div>
 
-          {/* Type Selector */}
-          <div style={{ marginBottom: '12px' }}>
-            <label className="form-label" style={{ color: '#fff' }}>Type</label>
-            <select
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value as 'material' | 'recipe')}
-              disabled={!!initialType}
-              className="form-input"
-              style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444' }}
-            >
-              <option value="material">Material</option>
-              <option value="recipe">Recipe</option>
-            </select>
+          {/* Filters - Horizontal Flex Layout */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+            {/* Type Selector */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="form-label" style={{ color: '#fff', margin: 0, fontSize: '12px' }}>Type</label>
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as 'material' | 'recipe')}
+                disabled={!!initialType}
+                className="form-input"
+                style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444', width: '100%', fontSize: '14px', padding: '6px' }}
+              >
+                <option value="material">Material</option>
+                <option value="recipe">Recipe</option>
+              </select>
+            </div>
+
+            {/* Group Selector */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="form-label" style={{ color: '#fff', margin: 0, fontSize: '12px' }}>Group</label>
+              <select
+                value={selectedGroup}
+                onChange={(e) => setSelectedGroup(e.target.value)}
+                disabled={!!initialGroup}
+                className="form-input"
+                style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444', width: '100%', fontSize: '14px', padding: '6px' }}
+              >
+                <option value="">All Groups</option>
+                {availableGroups.map((group) => (
+                  <option key={group} value={group}>
+                    {group}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Display Parameter Selector */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label className="form-label" style={{ color: '#fff', margin: 0, fontSize: '12px' }}>Display Parameter</label>
+              <select
+                value={`${displayParameter.domain}:${displayParameter.key}`}
+                onChange={(e) => {
+                  const [domain, key] = e.target.value.split(':');
+                  setDisplayParameter({ domain, key });
+                }}
+                disabled={!!initialDisplayParameter}
+                className="form-input"
+                style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444', width: '100%', fontSize: '14px', padding: '6px' }}
+              >
+                <option value="">None</option>
+                {availableParameters.map((param) => (
+                  <option key={`${param.domain}:${param.key}`} value={`${param.domain}:${param.key}`}>
+                    {param.domain}:{param.key} ({param.label})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          {/* Group Selector */}
-          <div style={{ marginBottom: '12px' }}>
-            <label className="form-label" style={{ color: '#fff' }}>Group</label>
-            <select
-              value={selectedGroup}
-              onChange={(e) => setSelectedGroup(e.target.value)}
-              disabled={!!initialGroup}
-              className="form-input"
-              style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444' }}
-            >
-              <option value="">All Groups</option>
-              {availableGroups.map((group) => (
-                <option key={group} value={group}>
-                  {group}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Display Parameter Selector */}
-          <div style={{ marginBottom: '12px' }}>
-            <label className="form-label" style={{ color: '#fff' }}>Display Parameter</label>
-            <select
-              value={`${displayParameter.domain}:${displayParameter.key}`}
-              onChange={(e) => {
-                const [domain, key] = e.target.value.split(':');
-                setDisplayParameter({ domain, key });
-              }}
-              disabled={!!initialDisplayParameter}
-              className="form-input"
-              style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444' }}
-            >
-              <option value="">None</option>
-              {availableParameters.map((param) => (
-                <option key={`${param.domain}:${param.key}`} value={`${param.domain}:${param.key}`}>
-                  {param.domain}:{param.key} ({param.label})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Horizontal Divider */}
+          <div style={{ 
+            height: '1px', 
+            backgroundColor: '#444', 
+            marginBottom: '12px' 
+          }}></div>
 
           {/* Search Bar */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '12px' }}>
             <input
               type="text"
               placeholder="Search entities..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="form-input"
-              style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444' }}
+              style={{ backgroundColor: '#222', color: '#fff', border: '1px solid #444', fontSize: '14px', padding: '8px' }}
             />
           </div>
 
-          {/* Entity List */}
-          {loading ? (
-            <div className="state-message" style={{ color: '#fff' }}>
-              <p className="state-message__text">Loading entities...</p>
-            </div>
-          ) : filteredEntities.length === 0 ? (
-            <div className="state-message" style={{ color: '#fff' }}>
-              <p className="state-message__text">
-                {entities.length === 0 ? 'No entities found.' : 'No entities match your search.'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filteredEntities.map((entity) => (
-                <div
-                  key={entity.id}
-                  onClick={() => handleEntityClick(entity)}
-                  className="card"
-                  style={{ 
-                    padding: '12px', 
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                    backgroundColor: '#222',
-                    border: '1px solid #444',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#333'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#222'}
-                >
-                  <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#fff' }}>{entity.id}</div>
-                  <div style={{ fontSize: '14px', color: '#ccc' }}>
-                    {getDisplayParameterValue(entity)}
+          {/* Entity List - Scrollable */}
+          <div style={{ 
+            flex: 1, 
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            {loading ? (
+              <div className="state-message" style={{ color: '#fff' }}>
+                <p className="state-message__text">Loading entities...</p>
+              </div>
+            ) : filteredEntities.length === 0 ? (
+              <div className="state-message" style={{ color: '#fff' }}>
+                <p className="state-message__text">
+                  {entities.length === 0 ? 'No entities found.' : 'No entities match your search.'}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {filteredEntities.map((entity) => (
+                  <div
+                    key={entity.id}
+                    onClick={() => handleEntityClick(entity)}
+                    className="card"
+                    style={{ 
+                      padding: '8px', 
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s',
+                      backgroundColor: '#222',
+                      border: '1px solid #444',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#333'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#222'}
+                  >
+                    <div style={{ fontWeight: 'bold', marginBottom: '2px', color: '#fff', fontSize: '14px' }}>{entity.id}</div>
+                    <div style={{ fontSize: '12px', color: '#ccc' }}>
+                      {getDisplayParameterValue(entity)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

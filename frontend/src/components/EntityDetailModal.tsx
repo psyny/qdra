@@ -100,11 +100,12 @@ export function EntityDetailModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      padding: '50px',
     }}>
       <div className="card" style={{ 
-        maxWidth: 'calc(100vw - 100px)', 
+        width: '500px',
+        height: '100%',
         maxHeight: 'calc(100vh - 100px)', 
-        margin: '50px',
         overflowY: 'auto',
         backgroundColor: '#000',
         color: '#fff',
