@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Combobox } from './Combobox';
 import { getDistinctParameterValues } from '../api/entities';
 import { ConstraintSpec } from '../api/planning';
+import { EntitySelectorModal, EntitySelectorResult } from './EntitySelectorModal';
 
 type InternalConstraintSpec = {
   origin: 'system' | 'parameter';
@@ -34,6 +35,7 @@ export function ConstraintBuilder({
   targetType = 'material',
 }: ConstraintBuilderProps) {
   const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
+  const [entitySelectorOpen, setEntitySelectorOpen] = useState(false);
 
   // Convert API ConstraintSpec to internal format
   const toInternalConstraints = (apiConstraints: ConstraintSpec[]): InternalConstraintSpec[] => {
@@ -325,11 +327,34 @@ export function ConstraintBuilder({
     onChange(toApiConstraints(updated));
   };
 
+  const handleEntitySelectorSelection = (result: EntitySelectorResult) => {
+    // Convert entity selector result to constraints
+    const newConstraints: InternalConstraintSpec[] = result.parameters.map((param) => {
+      const constraint: InternalConstraintSpec = {
+        origin: param.domain === '__system__' ? 'system' : 'parameter',
+        system_key: param.domain === '__system__' ? param.key : null,
+        entity_type_id: null,
+        domain: param.domain === '__system__' ? null : param.domain,
+        key: param.domain === '__system__' ? null : param.key,
+        operator: '=',
+        value_string: param.value_string,
+        value_number: param.value_number,
+        value_boolean: param.value_boolean,
+        is_wildcard: false,
+      };
+      return constraint;
+    });
+
+    setInternalConstraints(newConstraints);
+    onChange(toApiConstraints(newConstraints));
+  };
+
   const materialEntityTypes = getMaterialEntityTypes();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {internalConstraints.map((constraint, index) => {
+    <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {internalConstraints.map((constraint, index) => {
         const paramDef = constraint.origin === 'parameter' 
           ? getParameterDefinition(constraint.domain || '', constraint.key || '')
           : null;
@@ -526,15 +551,37 @@ export function ConstraintBuilder({
         );
       })}
       
-      <button
-        type="button"
-        onClick={addConstraint}
-        disabled={disabled}
-        className="button button--primary"
-        style={{ padding: '4px 8px', fontSize: '12px', alignSelf: 'flex-start' }}
-      >
-        + Add Constraint
-      </button>
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <button
+          type="button"
+          onClick={addConstraint}
+          disabled={disabled}
+          className="button button--primary"
+          style={{ padding: '4px 8px', fontSize: '12px' }}
+        >
+          + New Constraint
+        </button>
+        <button
+          type="button"
+          onClick={() => setEntitySelectorOpen(true)}
+          disabled={disabled}
+          className="button button--primary"
+          style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#c18929', borderColor: 'rgb(217, 119, 6)' }}
+        >
+          Build from Entity Selector
+        </button>
+      </div>
     </div>
+
+    {projectId && (
+      <EntitySelectorModal
+        projectId={projectId}
+        isOpen={entitySelectorOpen}
+        onClose={() => setEntitySelectorOpen(false)}
+        onSelection={handleEntitySelectorSelection}
+        initialType={targetType as 'material' | 'recipe'}
+      />
+    )}
+    </>
   );
 }
