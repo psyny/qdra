@@ -49,7 +49,11 @@ function CustomEdge({
     targetY: tp.y,
   });
 
-  const offsetLabelY = labelY - 20;
+  const absDx = Math.abs(tp.x - sp.x);
+  const absDy = Math.abs(tp.y - sp.y);
+  const maxSize = absDx + absDy;
+  const xOffset = maxSize > 0 ? 20 * (1 - absDx / maxSize) * (tp.x < sp.x ? 1 : -1) : 0;
+  const yOffset = maxSize > 0 ? 20 * (1 - absDy / maxSize) * (tp.y < sp.y ? 1 : -1) : 0;
 
   return (
     <>
@@ -58,7 +62,7 @@ function CustomEdge({
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px, ${offsetLabelY}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX - xOffset}px, ${labelY - yOffset}px)`,
             pointerEvents: 'all',
             ...labelStyle,
           }}
