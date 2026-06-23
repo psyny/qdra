@@ -41,13 +41,11 @@ export interface EntitiesResponse {
 export interface PlanningGraphProps {
   graph: PlanGraph;
   entities: EntitiesResponse;
-  projectId: string;
+  imagesMap?: Record<string, string>;
   recipeDomainName: string;
   recipeKeyName: string;
   materialDomainName: string;
   materialKeyName: string;
-  displayImages: boolean;
-  imageSizePx?: number;
   simplifyLevel: number;
 }
 
@@ -172,8 +170,7 @@ export function mapNodes(
   materialKeyName: string,
   recipeDomainName: string,
   recipeKeyName: string,
-  displayImages?: boolean,
-  imageSizePx?: number,
+  imagesMap?: Record<string, string>,
 ): Node<MaterialNodeData | RecipeNodeData>[] {
   return graphNodes.map(node => {
     const isRoot = hasTag(node, 'root');
@@ -200,10 +197,8 @@ export function mapNodes(
           materialId: node.material_id || '',
           isTarget: hasTag(node, 'target'),
           nodeType: node.type,
-          imageUrl: displayImages
-            ? (entities.materials[node.material_id || '']?.image?.url ?? null)
-            : null,
-          imageSizePx: displayImages ? imageSizePx : undefined,
+          imageUrl: imagesMap?.[node.material_id || ''] ?? null,
+          imageSizePx: imagesMap?.[node.material_id || ''] ? 100 : undefined,
         },
       };
     } else if (node.kind === 'recipe_execution') {
@@ -224,10 +219,8 @@ export function mapNodes(
           isRoot,
           isLeaf,
           recipeId: node.recipe_id || '',
-          imageUrl: displayImages
-            ? (entities.recipes[node.recipe_id || '']?.image?.url ?? null)
-            : null,
-          imageSizePx: displayImages ? imageSizePx : undefined,
+          imageUrl: imagesMap?.[node.recipe_id || ''] ?? null,
+          imageSizePx: imagesMap?.[node.recipe_id || ''] ? 100 : undefined,
         },
       };
     }

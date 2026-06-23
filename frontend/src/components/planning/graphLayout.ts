@@ -19,12 +19,24 @@ const ELK_DIRECTION: Record<string, string> = {
  * Apply ELK layout to React Flow nodes and edges.
  * Returns updated nodes (with positions) and updated edges (with bend points in data.bendPoints).
  */
+const BASE_NODE_WIDTH  = 150;
+const BASE_NODE_HEIGHT = 60;
+const NODE_IMAGE_SIZE_PX = 100;
+
+function getNodeDimensions(node: Node): { width: number; height: number } {
+  if (node.data?.imageUrl) {
+    return {
+      width:  Math.max(BASE_NODE_WIDTH, NODE_IMAGE_SIZE_PX + 24),
+      height: BASE_NODE_HEIGHT + NODE_IMAGE_SIZE_PX + 16,
+    };
+  }
+  return { width: BASE_NODE_WIDTH, height: BASE_NODE_HEIGHT };
+}
+
 export async function applyLayout(
   nodes: Node[],
   edges: Edge[],
   direction: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' = 'RIGHT',
-  nodeWidth: number = 150,
-  nodeHeight: number = 60,
 ): Promise<LayoutResult> {
 
   const graph = {
@@ -38,9 +50,8 @@ export async function applyLayout(
       'elk.layered.unnecessaryBendpoints':          'false',
     },
     children: nodes.map((n) => ({
-      id:     n.id,
-      width:  nodeWidth,
-      height: nodeHeight,
+      id: n.id,
+      ...getNodeDimensions(n),
     })),
     edges: edges.map((e) => ({
       id:      e.id,
@@ -54,11 +65,12 @@ export async function applyLayout(
   const layoutedNodes = nodes.map((node) => {
     const el = layout.children?.find((c: { id: string }) => c.id === node.id) as any;
     if (!el) return node;
+    const dims = getNodeDimensions(node);
     return {
       ...node,
       position: { x: el.x ?? 0, y: el.y ?? 0 },
-      width:  nodeWidth,
-      height: nodeHeight,
+      width:  dims.width,
+      height: dims.height,
     };
   });
 

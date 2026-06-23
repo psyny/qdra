@@ -3,8 +3,8 @@ import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
 import { PlanningGraph } from '../components/planning/PlanningGraph';
-import { getProjectTemplate, getProject } from '../api/projects';
-import { Project } from '../types/project';
+import { getProjectTemplate } from '../api/projects';
+import { getEntity } from '../api/entities';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -19,7 +19,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<any>(null);
-  const [project, setProject] = useState<Project | null>(null);
+  const [imagesMap, setImagesMap] = useState<Record<string, string>>({});
   
   // Graph selector state
   const [recipeDomainKey, setRecipeDomainKey] = useState<string>('');
@@ -74,12 +74,8 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         setRun(runData);
         
         // Load template to get domain:key options
-        const [templateData, projectData] = await Promise.all([
-          getProjectTemplate(projectId),
-          getProject(projectId),
-        ]);
+        const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
-        setProject(projectData);
         
         // Initialize domain keys to first option from template
         const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
@@ -106,6 +102,54 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
 
     loadRun();
   }, [runId, projectId]);
+
+  // Build imagesMap when useImages is enabled and a plan is selected
+  useEffect(() => {
+    if (!useImages || selectedPlanId === null || !run?.result) {
+      setImagesMap({});
+      return;
+    }
+
+    const plan = run.result.plans[selectedPlanId];
+    if (!plan?.graph_nodes) return;
+
+    const entities = run.result.entities;
+    const newMap: Record<string, string> = {};
+    const fetches: Promise<void>[] = [];
+
+    plan.graph_nodes.forEach((node: any) => {
+      if (node.kind === 'material' && node.material_id) {
+        const entity = entities?.materials[node.material_id];
+        if (entity) {
+          if (entity.image?.url) {
+            newMap[entity.id] = entity.image.url;
+          } else {
+            fetches.push(
+              getEntity(projectId, entity.id)
+                .then(fetched => { if (fetched.image?.url) newMap[entity.id] = fetched.image.url; })
+                .catch(() => {})
+            );
+          }
+        }
+      }
+      if (node.kind === 'recipe_execution' && node.recipe_id) {
+        const entity = entities?.recipes[node.recipe_id];
+        if (entity) {
+          if (entity.image?.url) {
+            newMap[entity.id] = entity.image.url;
+          } else {
+            fetches.push(
+              getEntity(projectId, entity.id)
+                .then(fetched => { if (fetched.image?.url) newMap[entity.id] = fetched.image.url; })
+                .catch(() => {})
+            );
+          }
+        }
+      }
+    });
+
+    Promise.all(fetches).then(() => setImagesMap({ ...newMap }));
+  }, [useImages, selectedPlanId, run, projectId]);
 
   const toggleCard = (key: SubcardKey) => {
     setExpandedCards(prev => ({
@@ -593,13 +637,11 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                       material_edges: run.result.plans[selectedPlanId].material_edges || [],
                     }}
                     entities={run.result.entities}
-                    projectId={projectId}
+                    imagesMap={imagesMap}
                     recipeDomainName={recipeDomainKey.split(':')[0]}
                     recipeKeyName={recipeDomainKey.split(':')[1]}
                     materialDomainName={materialDomainKey.split(':')[0]}
                     materialKeyName={materialDomainKey.split(':')[1]}
-                    displayImages={useImages}
-                    imageSizePx={project?.image_size_px}
                     simplifyLevel={simplifyLevel}
                   />
                 ) : (
