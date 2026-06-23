@@ -679,16 +679,28 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                     <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Simplify Level</label>
-                    <input
-                      type="number"
-                      value={simplifyLevel}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSimplifyLevel(Number(e.target.value))}
-                      className="form-input"
-                      style={{ padding: '4px 8px', fontSize: '12px', width: '60px' }}
-                      min="0"
-                      max="2"
-                      step="1"
-                    />
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[0, 1, 2].map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => setSimplifyLevel(level)}
+                          className="button button--secondary"
+                          style={{
+                            width: '30px',
+                            height: '30px',
+                            padding: '0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: simplifyLevel === level ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
+                            color: simplifyLevel === level ? '#000000' : '#ffffff',
+                            border: simplifyLevel === level ? '1px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.2)',
+                          }}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                     <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Use Images</label>
