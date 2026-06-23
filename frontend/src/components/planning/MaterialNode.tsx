@@ -1,4 +1,4 @@
-import { Handle, Position, NodeProps } from 'reactflow';
+import { NodeProps } from 'reactflow';
 import { MaterialNodeData, getMaterialNodeStyle } from './graphMapping';
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -25,8 +25,6 @@ export function MaterialNode({ data }: NodeProps<MaterialNodeData>) {
         boxShadow: `0 0 30px ${hexToRgba(style.border, 0.4)}, inset 0 0 15px ${hexToRgba(style.border, 0.2)}`,
       }}
     >
-      <Handle type="target" position={Position.Left} style={{ background: '#9ca3af' }} />
-      
       <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
         {data.label}
       </div>
@@ -34,8 +32,6 @@ export function MaterialNode({ data }: NodeProps<MaterialNodeData>) {
       <div style={{ fontSize: '12px', opacity: 0.8 }}>
         {data.consumedQty.toFixed(1)} / {data.producedQty.toFixed(1)}
       </div>
-      
-      <Handle type="source" position={Position.Right} style={{ background: '#9ca3af' }} />
     </div>
   );
 }
