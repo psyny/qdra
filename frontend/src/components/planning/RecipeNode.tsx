@@ -14,6 +14,7 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
         border: `2px solid ${style.border}`,
         color: style.text,
         fontSize: '14px',
+        textAlign: 'center',
       }}
     >
       <Handle type="target" position={Position.Left} style={{ background: '#9ca3af' }} />
@@ -23,7 +24,7 @@ export function RecipeNode({ data }: NodeProps<RecipeNodeData>) {
       </div>
       
       <div style={{ fontSize: '12px', opacity: 0.7 }}>
-        <div>Executions: {data.executionCount}</div>
+        {data.executionCount.toFixed(1)}
       </div>
       
       <Handle type="source" position={Position.Right} style={{ background: '#9ca3af' }} />

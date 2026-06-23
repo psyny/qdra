@@ -14,6 +14,7 @@ export function MaterialNode({ data }: NodeProps<MaterialNodeData>) {
         border: `2px solid ${style.border}`,
         color: style.text,
         fontSize: '14px',
+        textAlign: 'center',
       }}
     >
       <Handle type="target" position={Position.Left} style={{ background: '#9ca3af' }} />
@@ -23,8 +24,7 @@ export function MaterialNode({ data }: NodeProps<MaterialNodeData>) {
       </div>
       
       <div style={{ fontSize: '12px', opacity: 0.8 }}>
-        <div>Produced: {data.producedQty}</div>
-        <div>Consumed: {data.consumedQty}</div>
+        {data.consumedQty.toFixed(1)} / {data.producedQty.toFixed(1)}
       </div>
       
       <Handle type="source" position={Position.Right} style={{ background: '#9ca3af' }} />
