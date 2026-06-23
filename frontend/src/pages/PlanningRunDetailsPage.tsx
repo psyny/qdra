@@ -686,6 +686,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                       className="form-input"
                       style={{ padding: '4px 8px', fontSize: '12px', width: '60px' }}
                       min="0"
+                      max="2"
                       step="1"
                     />
                   </div>

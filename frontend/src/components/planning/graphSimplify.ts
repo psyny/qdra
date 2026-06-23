@@ -38,6 +38,121 @@ function toFlatEdges(graph: PlanGraph): FlatEdge[] {
   ];
 }
 
+function mergeEdges(
+  edges: PlanGraphEdge[],
+  nodeMap: Map<string, string>,
+): PlanGraphEdge[] {
+  const map = new Map<string, PlanGraphEdge>();
+  for (const e of edges) {
+    const from = nodeMap.get(e.from_node_id) ?? e.from_node_id;
+    const to   = nodeMap.get(e.to_node_id)   ?? e.to_node_id;
+    if (from === to) continue;
+    const key = `${from}::${to}`;
+    if (map.has(key)) {
+      map.get(key)!.qty += e.qty;
+    } else {
+      map.set(key, { from_node_id: from, to_node_id: to, qty: e.qty });
+    }
+  }
+  return Array.from(map.values());
+}
+
+function collapseRecipesByInput(
+  recipeNodes: PlanGraphNode[],
+  edges: PlanGraphEdge[],
+): { nodes: PlanGraphNode[]; edges: PlanGraphEdge[] } {
+  const inputSrcMap = new Map<string, string>();
+  for (const n of recipeNodes) {
+    const srcs = new Set(edges.filter(e => e.to_node_id === n.id).map(e => e.from_node_id));
+    inputSrcMap.set(n.id, srcs.size === 1 ? Array.from(srcs)[0] : '');
+  }
+
+  const groups = new Map<string, PlanGraphNode[]>();
+  for (const n of recipeNodes) {
+    const src = inputSrcMap.get(n.id)!;
+    if (!src) continue;
+    const key = `${n.recipe_id ?? ''}__IN__${src}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(n);
+  }
+
+  const nodeToCollapsed = new Map<string, string>();
+  const newNodes: PlanGraphNode[] = [];
+  let idx = 0;
+
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      nodeToCollapsed.set(group[0].id, group[0].id);
+      newNodes.push({ ...group[0] });
+    } else {
+      const first = group[0];
+      const cid = `CR_IN${idx++}_${(first.recipe_id ?? 'x').substring(0, 8)}`;
+      const totalExec = group.reduce((s, n) => s + (n.execution_count ?? 0), 0);
+      const tags = new Set<string>(['collapsed']);
+      for (const n of group) for (const t of (n.tags ?? [])) tags.add(t);
+      for (const n of group) nodeToCollapsed.set(n.id, cid);
+      newNodes.push({ id: cid, kind: 'recipe_execution', recipe_id: first.recipe_id, execution_count: totalExec, produced_qty: 0, consumed_qty: 0, tags: Array.from(tags) });
+    }
+  }
+
+  for (const n of recipeNodes) {
+    if (!nodeToCollapsed.has(n.id)) {
+      nodeToCollapsed.set(n.id, n.id);
+      newNodes.push({ ...n });
+    }
+  }
+
+  return { nodes: newNodes, edges: mergeEdges(edges, nodeToCollapsed) };
+}
+
+function collapseRecipesByOutput(
+  recipeNodes: PlanGraphNode[],
+  edges: PlanGraphEdge[],
+): { nodes: PlanGraphNode[]; edges: PlanGraphEdge[] } {
+  const outputTgtMap = new Map<string, string>();
+  for (const n of recipeNodes) {
+    const tgts = new Set(edges.filter(e => e.from_node_id === n.id).map(e => e.to_node_id));
+    outputTgtMap.set(n.id, tgts.size === 1 ? Array.from(tgts)[0] : '');
+  }
+
+  const groups = new Map<string, PlanGraphNode[]>();
+  for (const n of recipeNodes) {
+    const tgt = outputTgtMap.get(n.id)!;
+    if (!tgt) continue;
+    const key = `${n.recipe_id ?? ''}__OUT__${tgt}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(n);
+  }
+
+  const nodeToCollapsed = new Map<string, string>();
+  const newNodes: PlanGraphNode[] = [];
+  let idx = 0;
+
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      nodeToCollapsed.set(group[0].id, group[0].id);
+      newNodes.push({ ...group[0] });
+    } else {
+      const first = group[0];
+      const cid = `CR_OUT${idx++}_${(first.recipe_id ?? 'x').substring(0, 8)}`;
+      const totalExec = group.reduce((s, n) => s + (n.execution_count ?? 0), 0);
+      const tags = new Set<string>(['collapsed']);
+      for (const n of group) for (const t of (n.tags ?? [])) tags.add(t);
+      for (const n of group) nodeToCollapsed.set(n.id, cid);
+      newNodes.push({ id: cid, kind: 'recipe_execution', recipe_id: first.recipe_id, execution_count: totalExec, produced_qty: 0, consumed_qty: 0, tags: Array.from(tags) });
+    }
+  }
+
+  for (const n of recipeNodes) {
+    if (!nodeToCollapsed.has(n.id)) {
+      nodeToCollapsed.set(n.id, n.id);
+      newNodes.push({ ...n });
+    }
+  }
+
+  return { nodes: newNodes, edges: mergeEdges(edges, nodeToCollapsed) };
+}
+
 function simplifyLv0(graph: PlanGraph): PlanGraph {
   return graph;
 }
@@ -200,10 +315,13 @@ function simplifyLv2(graph: PlanGraph): PlanGraph {
 
   recalculateCollapsedQuantities(collapsedNodes, newEdges);
 
-  const allNodes = [...recipeNodes.map(n => ({ ...n })), ...collapsedNodes];
+  const plainEdges = newEdges.map(({ _isMaterialEdge: _, ...e }) => e);
+  const pass1 = collapseRecipesByInput(recipeNodes.map(n => ({ ...n })), plainEdges);
+  const pass2 = collapseRecipesByOutput(pass1.nodes, pass1.edges);
+
   return {
-    graph_nodes: allNodes,
-    recipe_edges: newEdges.map(({ _isMaterialEdge: _, ...e }) => e),
+    graph_nodes: [...collapsedNodes, ...pass2.nodes],
+    recipe_edges: pass2.edges,
     material_edges: [],
   };
 }
