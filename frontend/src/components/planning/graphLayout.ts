@@ -22,10 +22,10 @@ const ELK_DIRECTION: Record<string, string> = {
 export async function applyLayout(
   nodes: Node[],
   edges: Edge[],
-  direction: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' = 'RIGHT'
+  direction: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' = 'RIGHT',
+  nodeWidth: number = 150,
+  nodeHeight: number = 60,
 ): Promise<LayoutResult> {
-  const nodeWidth  = 150;
-  const nodeHeight = 60;
 
   const graph = {
     id: 'root',

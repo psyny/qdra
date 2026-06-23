@@ -20,9 +20,11 @@ import { MemoCustomEdge } from './CustomEdge';
 import {
   PlanningGraphProps,
   PlanGraphNode,
+  EntitiesResponse,
   mapNodes,
   mapEdges,
 } from './graphMapping';
+import { getEntity } from '../../api/entities';
 import { applyLayout } from './graphLayout';
 import { simplifyGraph } from './graphSimplify';
 
@@ -38,34 +40,103 @@ const edgeTypes: EdgeTypes = {
 export function PlanningGraph({
   graph,
   entities,
+  projectId,
   recipeDomainName,
   recipeKeyName,
   materialDomainName,
   materialKeyName,
   displayImages,
+  imageSizePx,
   simplifyLevel,
 }: PlanningGraphProps) {
   const simplifiedGraph = useMemo(() => {
     return simplifyGraph(graph, simplifyLevel);
   }, [graph, simplifyLevel]);
 
+  const [enrichedEntities, setEnrichedEntities] = useState<EntitiesResponse>(entities);
+
+  // Reset enriched entities when the base entities prop changes (new plan selected)
+  useEffect(() => {
+    setEnrichedEntities(entities);
+  }, [entities]);
+
+  // Fetch missing entity images when displayImages is enabled
+  useEffect(() => {
+    if (!displayImages || !projectId) return;
+
+    const materialIds = new Set<string>();
+    const recipeIds = new Set<string>();
+    simplifiedGraph.graph_nodes.forEach((node: PlanGraphNode) => {
+      if (node.kind === 'material' && node.material_id) materialIds.add(node.material_id);
+      if (node.kind === 'recipe_execution' && node.recipe_id) recipeIds.add(node.recipe_id);
+    });
+
+    const updated: EntitiesResponse = {
+      materials: { ...entities.materials },
+      recipes: { ...entities.recipes },
+    };
+    let changed = false;
+
+    const fetches: Promise<void>[] = [];
+
+    materialIds.forEach(id => {
+      const entity = entities.materials[id];
+      if (entity && entity.image == null) {
+        fetches.push(
+          getEntity(projectId, entity.id)
+            .then(fetched => {
+              if (fetched.image) {
+                updated.materials[id] = { ...entity, image: fetched.image };
+                changed = true;
+              }
+            })
+            .catch(() => {})
+        );
+      }
+    });
+
+    recipeIds.forEach(id => {
+      const entity = entities.recipes[id];
+      if (entity && entity.image == null) {
+        fetches.push(
+          getEntity(projectId, entity.id)
+            .then(fetched => {
+              if (fetched.image) {
+                updated.recipes[id] = { ...entity, image: fetched.image };
+                changed = true;
+              }
+            })
+            .catch(() => {})
+        );
+      }
+    });
+
+    Promise.all(fetches).then(() => {
+      if (changed) setEnrichedEntities(updated);
+    });
+  }, [displayImages, entities, projectId, simplifiedGraph.graph_nodes]);
+
   // Map planning graph to React Flow format
   const initialNodes = useMemo(() => {
     return mapNodes(
       simplifiedGraph.graph_nodes,
-      entities,
+      enrichedEntities,
       materialDomainName,
       materialKeyName,
       recipeDomainName,
-      recipeKeyName
+      recipeKeyName,
+      displayImages,
+      imageSizePx,
     );
   }, [
     simplifiedGraph.graph_nodes,
-    entities,
+    enrichedEntities,
     materialDomainName,
     materialKeyName,
     recipeDomainName,
     recipeKeyName,
+    displayImages,
+    imageSizePx,
   ]);
 
   const recipeNodeIds = useMemo(() => {
@@ -99,10 +170,17 @@ export function PlanningGraph({
     reactFlowInstance.current = instance;
   }, []);
 
+  const effectiveNodeWidth = displayImages && imageSizePx
+    ? Math.max(150, imageSizePx + 24)
+    : 150;
+  const effectiveNodeHeight = displayImages && imageSizePx
+    ? 60 + imageSizePx + 16
+    : 60;
+
   // Apply ELK layout on mount
   useEffect(() => {
     const applyElkLayout = async () => {
-      const result = await applyLayout(nodes, edges, 'RIGHT');
+      const result = await applyLayout(nodes, edges, 'RIGHT', effectiveNodeWidth, effectiveNodeHeight);
       setNodes(result.nodes);
       setEdges(result.edges);
       setLayouted(true);
@@ -112,12 +190,12 @@ export function PlanningGraph({
     if (!layouted) {
       applyElkLayout();
     }
-  }, [nodes, edges, setNodes, setEdges, layouted]);
+  }, [nodes, edges, setNodes, setEdges, layouted, effectiveNodeWidth, effectiveNodeHeight]);
 
   // Re-apply layout when graph data changes
   useEffect(() => {
     const applyElkLayout = async () => {
-      const result = await applyLayout(initialNodes, initialEdges, 'RIGHT');
+      const result = await applyLayout(initialNodes, initialEdges, 'RIGHT', effectiveNodeWidth, effectiveNodeHeight);
       setNodes(result.nodes);
       setEdges(result.edges);
       setTimeout(() => reactFlowInstance.current?.fitView(), 0);
@@ -129,6 +207,8 @@ export function PlanningGraph({
     initialEdges,
     setNodes,
     setEdges,
+    effectiveNodeWidth,
+    effectiveNodeHeight,
   ]);
 
   const onConnect = useCallback(

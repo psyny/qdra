@@ -37,6 +37,21 @@ export function MaterialNode({ data }: NodeProps<MaterialNodeData>) {
       <div style={{ fontSize: '12px', opacity: 0.8 }}>
         {data.consumedQty.toFixed(1)} / {data.producedQty.toFixed(1)}
       </div>
+
+      {data.imageUrl && (
+        <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center' }}>
+          <img
+            src={data.imageUrl}
+            alt={data.label}
+            style={{
+              width: `${data.imageSizePx ?? 64}px`,
+              height: `${data.imageSizePx ?? 64}px`,
+              objectFit: 'cover',
+              borderRadius: '4px',
+            }}
+          />
+        </div>
+      )}
       
       <Handle type="source" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />

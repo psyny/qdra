@@ -3,7 +3,8 @@ import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
 import { PlanningGraph } from '../components/planning/PlanningGraph';
-import { getProjectTemplate } from '../api/projects';
+import { getProjectTemplate, getProject } from '../api/projects';
+import { Project } from '../types/project';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -18,6 +19,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
   
   // Graph selector state
   const [recipeDomainKey, setRecipeDomainKey] = useState<string>('');
@@ -72,8 +74,12 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         setRun(runData);
         
         // Load template to get domain:key options
-        const templateData = await getProjectTemplate(projectId);
+        const [templateData, projectData] = await Promise.all([
+          getProjectTemplate(projectId),
+          getProject(projectId),
+        ]);
         setTemplate(templateData);
+        setProject(projectData);
         
         // Initialize domain keys to first option from template
         const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
@@ -587,11 +593,13 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                       material_edges: run.result.plans[selectedPlanId].material_edges || [],
                     }}
                     entities={run.result.entities}
+                    projectId={projectId}
                     recipeDomainName={recipeDomainKey.split(':')[0]}
                     recipeKeyName={recipeDomainKey.split(':')[1]}
                     materialDomainName={materialDomainKey.split(':')[0]}
                     materialKeyName={materialDomainKey.split(':')[1]}
                     displayImages={useImages}
+                    imageSizePx={project?.image_size_px}
                     simplifyLevel={simplifyLevel}
                   />
                 ) : (
