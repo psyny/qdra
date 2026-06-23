@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getProjectTemplate } from '../api/projects';
 import { getEntities, getEntityParameters } from '../api/entities';
 import { ProjectTemplateDetail, EntityType, ParameterDefinition, View, ViewConfig } from '../types/template';
@@ -51,6 +51,7 @@ export function EntitySelectorModal({
   const [loading, setLoading] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const entityListRef = useRef<HTMLDivElement>(null);
 
   // Load template
   useEffect(() => {
@@ -71,6 +72,13 @@ export function EntitySelectorModal({
     if (!isOpen || !template) return;
     loadEntities();
   }, [projectId, selectedType, selectedGroup, template, isOpen]);
+
+  // Auto-focus entity list when modal opens
+  useEffect(() => {
+    if (isOpen && entityListRef.current) {
+      entityListRef.current.focus();
+    }
+  }, [isOpen]);
 
   const loadEntities = async () => {
     setLoading(true);
@@ -316,31 +324,38 @@ export function EntitySelectorModal({
 
   return (
     <>
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '50px',
-      }}>
-        <div className="card" style={{ 
-          width: '100%',
-          height: '100%',
-          maxWidth: 'calc(100vw - 100px)', 
-          maxHeight: 'calc(100vh - 100px)', 
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
           display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: '#000',
-          color: '#fff',
-          fontSize: '14px',
-        }}>
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '50px',
+        }}
+        onClick={onClose}
+      >
+        <div
+          className="card"
+          style={{
+            width: '100%',
+            height: '100%',
+            maxWidth: 'calc(100vw - 100px)',
+            maxHeight: 'calc(100vh - 100px)',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: '#000',
+            color: '#fff',
+            fontSize: '14px',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h2 className="card-title" style={{ color: '#fff', fontSize: '18px' }}>Entity Selector</h2>
             <button onClick={onClose} className="button button--secondary" style={{ fontSize: '14px' }}>Close</button>
@@ -425,13 +440,18 @@ export function EntitySelectorModal({
           </div>
 
           {/* Entity List - Scrollable */}
-          <div style={{ 
-            flex: 1, 
-            overflowY: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-          }}>
+          <div
+            ref={entityListRef}
+            tabIndex={0}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              outline: 'none',
+            }}
+          >
             {loading ? (
               <div className="state-message" style={{ color: '#fff' }}>
                 <p className="state-message__text">Loading entities...</p>
@@ -447,22 +467,52 @@ export function EntitySelectorModal({
                 {filteredEntities.map((entity) => (
                   <div
                     key={entity.id}
-                    onClick={() => handleEntityClick(entity)}
+                    onClick={() => {
+                      // If preselected parameters exist, auto-select without opening details
+                      if (preselectedParameters.length > 0) {
+                        setSelectedEntity(entity);
+                        const params = entityParameters[entity.id] || [];
+                        // Filter to only preselected parameters
+                        const selectedParams = params.filter((p) =>
+                          preselectedParameters.some((pp) => pp.domain === p.domain && pp.key === p.key)
+                        );
+                        handleSelection(selectedParams);
+                      } else {
+                        // Otherwise open details modal
+                        handleEntityClick(entity);
+                      }
+                    }}
                     className="card"
-                    style={{ 
-                      padding: '8px', 
+                    style={{
+                      padding: '8px',
                       cursor: 'pointer',
                       transition: 'background-color 0.2s',
                       backgroundColor: '#222',
                       border: '1px solid #444',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#333'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#222'}
                   >
-                    <div style={{ fontWeight: 'bold', marginBottom: '2px', color: '#fff', fontSize: '14px' }}>{getDisplaySlotValue(entity, 0)}</div>
-                    <div style={{ fontSize: '12px', color: '#ccc' }}>
-                      {getDisplayParameterValue(entity)}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '2px', color: '#fff', fontSize: '14px' }}>{getDisplaySlotValue(entity, 0)}</div>
+                      <div style={{ fontSize: '12px', color: '#ccc' }}>
+                        {getDisplayParameterValue(entity)}
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEntityClick(entity);
+                      }}
+                      className="button button--primary"
+                      style={{ padding: '4px 8px', fontSize: '12px', marginLeft: '8px' }}
+                    >
+                      Details
+                    </button>
                   </div>
                 ))}
               </div>
