@@ -116,6 +116,37 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     return () => clearInterval(interval);
   }, [run]);
 
+  // Dynamically expand/collapse cards based on run status
+  useEffect(() => {
+    if (!run) return;
+
+    if (run.status === 'completed') {
+      setExpandedCards({
+        runningState: false,
+        planTarget: false,
+        planOptions: false,
+        searchParameters: false,
+        scoreRules: false,
+        inputJson: false,
+        resultJson: false,
+        resultsStats: false,
+        resultsPlans: true,
+      });
+    } else {
+      setExpandedCards({
+        runningState: true,
+        planTarget: false,
+        planOptions: false,
+        searchParameters: false,
+        scoreRules: false,
+        inputJson: false,
+        resultJson: false,
+        resultsStats: false,
+        resultsPlans: false,
+      });
+    }
+  }, [run]);
+
   // Build imagesMap when useImages is enabled and a plan is selected
   useEffect(() => {
     if (!useImages || selectedPlanId === null || !run?.result) {
@@ -385,91 +416,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
           )}
         </div>
 
-        {/* Subcard 6: Input JSON */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Input JSON</h3>
-            <button
-              onClick={() => toggleCard('inputJson')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.inputJson ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.inputJson && (
-            <pre style={{ 
-              backgroundColor: '#1a1a1a', 
-              color: '#ffffff',
-              padding: '12px', 
-              borderRadius: '4px', 
-              overflow: 'auto',
-              maxHeight: '400px',
-              fontSize: '12px'
-            }}>
-              {formatJson(run.input)}
-            </pre>
-          )}
-        </div>
-
-        {/* Subcard 7: Result JSON */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Result JSON</h3>
-            <button
-              onClick={() => toggleCard('resultJson')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.resultJson ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.resultJson && (
-            <pre style={{ 
-              backgroundColor: '#1a1a1a', 
-              color: '#ffffff',
-              padding: '12px', 
-              borderRadius: '4px', 
-              overflow: 'auto',
-              maxHeight: '400px',
-              fontSize: '12px'
-            }}>
-              {formatJson(run.result)}
-            </pre>
-          )}
-        </div>
-
-        {/* Subcard 8: Results - Stats */}
-        <div className="card mb-4" style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Results - Stats</h3>
-            <button
-              onClick={() => toggleCard('resultsStats')}
-              className="button button--secondary"
-              style={{ padding: '2px 8px', minWidth: '30px' }}
-            >
-              {expandedCards.resultsStats ? '-' : '+'}
-            </button>
-          </div>
-          {expandedCards.resultsStats && (
-            <div>
-              {run.result?.discarded_plans_stats ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
-                  {Object.entries(run.result.discarded_plans_stats).map(([key, value]) => (
-                    <React.Fragment key={key}>
-                      <label className="form-label">{key}</label>
-                      <span>{String(value)}</span>
-                    </React.Fragment>
-                  ))}
-                </div>
-              ) : (
-                <span style={{ color: '#666' }}>No stats available</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Subcard 9: Results - Plans */}
+        {/* Subcard 2: Results - Plans */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <h3 className="card-title" style={{ fontSize: '18px' }}>Results - Plans</h3>
@@ -664,6 +611,90 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 )}
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Subcard 3: Results - Stats */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Results - Stats</h3>
+            <button
+              onClick={() => toggleCard('resultsStats')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.resultsStats ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.resultsStats && (
+            <div>
+              {run.result?.discarded_plans_stats ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
+                  {Object.entries(run.result.discarded_plans_stats).map(([key, value]) => (
+                    <React.Fragment key={key}>
+                      <label className="form-label">{key}</label>
+                      <span>{String(value)}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+              ) : (
+                <span style={{ color: '#666' }}>No stats available</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Subcard 4: Input JSON */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Input JSON</h3>
+            <button
+              onClick={() => toggleCard('inputJson')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.inputJson ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.inputJson && (
+            <pre style={{ 
+              backgroundColor: '#1a1a1a', 
+              color: '#ffffff',
+              padding: '12px', 
+              borderRadius: '4px', 
+              overflow: 'auto',
+              maxHeight: '400px',
+              fontSize: '12px'
+            }}>
+              {formatJson(run.input)}
+            </pre>
+          )}
+        </div>
+
+        {/* Subcard 5: Result JSON */}
+        <div className="card mb-4" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Result JSON</h3>
+            <button
+              onClick={() => toggleCard('resultJson')}
+              className="button button--secondary"
+              style={{ padding: '2px 8px', minWidth: '30px' }}
+            >
+              {expandedCards.resultJson ? '-' : '+'}
+            </button>
+          </div>
+          {expandedCards.resultJson && (
+            <pre style={{ 
+              backgroundColor: '#1a1a1a', 
+              color: '#ffffff',
+              padding: '12px', 
+              borderRadius: '4px', 
+              overflow: 'auto',
+              maxHeight: '400px',
+              fontSize: '12px'
+            }}>
+              {formatJson(run.result)}
+            </pre>
           )}
         </div>
     </div>
