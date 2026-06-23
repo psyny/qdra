@@ -141,6 +141,7 @@ export function PlanningGraph({
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
+        nodesDraggable={false}
         fitView
         attributionPosition="bottom-left"
         style={{ background: '#000000' }}
