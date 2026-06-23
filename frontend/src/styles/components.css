@@ -583,3 +583,12 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+/* Edge Label */
+.edge-label {
+  transition: transform 0.2s ease, font-size 0.2s ease;
+}
+
+.edge-label:hover {
+  transform: scale(1.5);
+}

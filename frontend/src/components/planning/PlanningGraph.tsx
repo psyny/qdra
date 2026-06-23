@@ -8,11 +8,13 @@ import ReactFlow, {
   addEdge,
   Connection,
   NodeTypes,
+  EdgeTypes,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { MaterialNode } from './MaterialNode';
 import { RecipeNode } from './RecipeNode';
+import { MemoCustomEdge } from './CustomEdge';
 import {
   PlanningGraphProps,
   PlanGraphNode,
@@ -25,6 +27,10 @@ import { simplifyGraph } from './graphSimplify';
 const nodeTypes: NodeTypes = {
   material: MaterialNode,
   recipe: RecipeNode,
+};
+
+const edgeTypes: EdgeTypes = {
+  custom: MemoCustomEdge,
 };
 
 export function PlanningGraph({
@@ -131,6 +137,7 @@ export function PlanningGraph({
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         attributionPosition="bottom-left"
         style={{ background: '#000000' }}
