@@ -520,7 +520,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 {/* Graph selectors */}
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Recipe Domain:Key</label>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Recipe Display Parameter</label>
                     <select
                       value={recipeDomainKey}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRecipeDomainKey(e.target.value)}
@@ -533,7 +533,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Material Domain:Key</label>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Material Display Parameter</label>
                     <select
                       value={materialDomainKey}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMaterialDomainKey(e.target.value)}
