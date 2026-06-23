@@ -135,6 +135,11 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         resultsStats: false,
         resultsPlans: true,
       });
+
+      // Auto-select first plan if available
+      if (run.result?.plans && run.result.plans.length > 0) {
+        setSelectedPlanId(0);
+      }
     } else {
       setExpandedCards({
         runningState: true,
@@ -200,8 +205,14 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
 
   // Scroll to graph section when a plan is selected
   useEffect(() => {
-    if (selectedPlanId !== null && graphSectionRef.current) {
-      graphSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (selectedPlanId !== null) {
+      // Small delay to ensure DOM is rendered
+      const timeout = setTimeout(() => {
+        if (graphSectionRef.current) {
+          graphSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
     }
   }, [selectedPlanId]);
 
