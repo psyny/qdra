@@ -28,6 +28,7 @@ qdra/alembic/versions/20260621_drop_slot_definitions_and_constraints.py
 qdra/alembic/versions/20260622_add_error_field.py
 qdra/alembic/versions/20260622_add_timing_fields.py
 qdra/alembic/versions/20260622_drop_reasoning_jobs.py
+qdra/alembic/versions/20260623_add_project_templates_plans_output_solver.py
 qdra/api/__init__.py
 qdra/api/entities.py
 qdra/api/health.py

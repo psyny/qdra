@@ -289,6 +289,30 @@ class TemplateExportResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Plan Output Solver Models
+# ---------------------------------------------------------------------------
+
+class PlanOutputSolverCreate(BaseModel):
+    new_plan_defaults: Optional[Dict[str, Any]] = None
+    results_view_defaults: Optional[Dict[str, Any]] = None
+
+
+class PlanOutputSolverUpdate(BaseModel):
+    new_plan_defaults: Optional[Dict[str, Any]] = None
+    results_view_defaults: Optional[Dict[str, Any]] = None
+
+
+class PlanOutputSolverResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    project_template_id: uuid.UUID
+    new_plan_defaults: Optional[Dict[str, Any]]
+    results_view_defaults: Optional[Dict[str, Any]]
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
@@ -1600,3 +1624,86 @@ def delete_per_slot(
     repo = ProjectTemplateRepository(db)
     if not repo.delete_per_slot(per_slot_id):
         raise HTTPException(status_code=404, detail="Per slot not found")
+
+
+# ---------------------------------------------------------------------------
+# Plan Output Solver Endpoints
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/project-templates/{project_template_id}/plan-output-solver",
+    response_model=PlanOutputSolverResponse,
+)
+def get_plan_output_solver(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    plan_output_solver = repo.get_plan_output_solver_by_template(project_template_id)
+    if not plan_output_solver:
+        raise HTTPException(status_code=404, detail="Plan output solver configuration not found")
+    return PlanOutputSolverResponse.model_validate(plan_output_solver)
+
+
+@router.post(
+    "/project-templates/{project_template_id}/plan-output-solver",
+    response_model=PlanOutputSolverResponse,
+    status_code=201,
+)
+def create_plan_output_solver(
+    project_template_id: uuid.UUID,
+    data: PlanOutputSolverCreate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    # Check if already exists
+    existing = repo.get_plan_output_solver_by_template(project_template_id)
+    if existing:
+        raise HTTPException(status_code=409, detail="Plan output solver configuration already exists")
+    plan_output_solver = repo.create_plan_output_solver(
+        project_template_id=project_template_id,
+        new_plan_defaults=data.new_plan_defaults,
+        results_view_defaults=data.results_view_defaults,
+    )
+    return PlanOutputSolverResponse.model_validate(plan_output_solver)
+
+
+@router.put(
+    "/project-templates/{project_template_id}/plan-output-solver",
+    response_model=PlanOutputSolverResponse,
+)
+def update_plan_output_solver(
+    project_template_id: uuid.UUID,
+    data: PlanOutputSolverUpdate,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    plan_output_solver = repo.update_plan_output_solver(
+        project_template_id=project_template_id,
+        new_plan_defaults=data.new_plan_defaults,
+        results_view_defaults=data.results_view_defaults,
+    )
+    if not plan_output_solver:
+        raise HTTPException(status_code=404, detail="Plan output solver configuration not found")
+    return PlanOutputSolverResponse.model_validate(plan_output_solver)
+
+
+@router.delete(
+    "/project-templates/{project_template_id}/plan-output-solver",
+    status_code=204,
+)
+def delete_plan_output_solver(
+    project_template_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    repo = ProjectTemplateRepository(db)
+    if not repo.get_by_id(project_template_id):
+        raise HTTPException(status_code=404, detail="Project template not found")
+    if not repo.delete_plan_output_solver(project_template_id):
+        raise HTTPException(status_code=404, detail="Plan output solver configuration not found")
