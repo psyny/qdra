@@ -7,6 +7,7 @@ import {
   ScoreRules,
   ConstraintRule,
 } from '../api/planning';
+import { getPlanOutputSolver, createPlanOutputSolver, updatePlanOutputSolver } from '../api/templates';
 import { ConstraintBuilder } from './ConstraintBuilder';
 import { HorizontalLine } from './HorizontalLine';
 import { ConstraintRuleCard } from './ConstraintRuleCard';
@@ -21,6 +22,11 @@ type OutputSolverTemplateEditorProps = {
 type SubcardKey = 'planTarget' | 'planOptions' | 'searchParameters' | 'scoreRules' | 'planResultsDefaults';
 
 export function OutputSolverTemplateEditor({ templateId, template }: OutputSolverTemplateEditorProps) {
+  // Loading and saving state
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
     planTarget: true,
@@ -102,6 +108,109 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
       }
     }
   }, [template]);
+
+  // Load saved configuration when templateId changes
+  useEffect(() => {
+    if (templateId) {
+      loadSavedConfiguration();
+    }
+  }, [templateId]);
+
+  const loadSavedConfiguration = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const config = await getPlanOutputSolver(templateId);
+      if (config) {
+        // Load new_plan_defaults
+        if (config.new_plan_defaults) {
+          if (config.new_plan_defaults.target) {
+            setTarget(config.new_plan_defaults.target);
+          }
+          if (config.new_plan_defaults.domain_constraints) {
+            setDomainConstraints(config.new_plan_defaults.domain_constraints);
+          }
+          if (config.new_plan_defaults.search_parameters) {
+            setSearchParameters(config.new_plan_defaults.search_parameters);
+          }
+          if (config.new_plan_defaults.score_rules) {
+            setScoreRules(config.new_plan_defaults.score_rules);
+          }
+        }
+        // Load results_view_defaults
+        if (config.results_view_defaults) {
+          if (config.results_view_defaults.main_score_name !== undefined) {
+            setMainScoreName(config.results_view_defaults.main_score_name);
+          }
+          if (config.results_view_defaults.main_score_descending !== undefined) {
+            setMainScoreDescending(config.results_view_defaults.main_score_descending);
+          }
+          if (config.results_view_defaults.default_scores) {
+            setDefaultScores(config.results_view_defaults.default_scores);
+          }
+          if (config.results_view_defaults.material_display_param) {
+            setMaterialDisplayParam(config.results_view_defaults.material_display_param);
+          }
+          if (config.results_view_defaults.recipe_display_param) {
+            setRecipeDisplayParam(config.results_view_defaults.recipe_display_param);
+          }
+          if (config.results_view_defaults.simplify_label !== undefined) {
+            setSimplifyLabel(config.results_view_defaults.simplify_label);
+          }
+          if (config.results_view_defaults.use_images !== undefined) {
+            setUseImages(config.results_view_defaults.use_images);
+          }
+        }
+      }
+    } catch (err) {
+      setError('Failed to load saved configuration');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      // Build new_plan_defaults object (format matches planning_runs API)
+      const newPlanDefaults = {
+        target,
+        domain_constraints: domainConstraints,
+        search_parameters: searchParameters,
+        score_rules: scoreRules,
+      };
+
+      // Build results_view_defaults object
+      const resultsViewDefaults = {
+        main_score_name: mainScoreName,
+        main_score_descending: mainScoreDescending,
+        default_scores: defaultScores,
+        material_display_param: materialDisplayParam,
+        recipe_display_param: recipeDisplayParam,
+        simplify_label: simplifyLabel,
+        use_images: useImages,
+      };
+
+      // Check if config already exists
+      const existing = await getPlanOutputSolver(templateId);
+      if (existing) {
+        await updatePlanOutputSolver(templateId, {
+          new_plan_defaults: newPlanDefaults,
+          results_view_defaults: resultsViewDefaults,
+        });
+      } else {
+        await createPlanOutputSolver(templateId, {
+          new_plan_defaults: newPlanDefaults,
+          results_view_defaults: resultsViewDefaults,
+        });
+      }
+    } catch (err) {
+      setError('Failed to save configuration');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleCard = (key: SubcardKey) => {
     setExpandedCards((prev: Record<SubcardKey, boolean>) => ({
@@ -222,8 +331,28 @@ export function OutputSolverTemplateEditor({ templateId, template }: OutputSolve
 
   return (
     <div className="card" style={{ marginTop: '24px' }}>
-      <h2 className="card-title">Output Solver Template</h2>
-      <p className="card-description">Configure default values for new planning runs.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div>
+          <h2 className="card-title">Output Solver Template</h2>
+          <p className="card-description">Configure default values for new planning runs.</p>
+        </div>
+        <button
+          onClick={handleSave}
+          className="button button--primary"
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="card state-message" style={{ marginBottom: '16px' }}>
+          <p className="state-message__text state-message__text--error">{error}</p>
+          <button onClick={() => setError(null)} className="button button--secondary">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Subcard 1: Plan Target */}
       <div className="card mb-4" style={{ marginBottom: '16px', marginTop: '16px' }}>

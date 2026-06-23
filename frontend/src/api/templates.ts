@@ -589,3 +589,55 @@ export async function deletePerSlot(perSlotId: string): Promise<void> {
   });
   if (!response.ok && response.status !== 404) throw new Error('Failed to delete per slot');
 }
+
+// Plan Output Solver operations
+
+export async function getPlanOutputSolver(templateId: string): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null; // Not found is ok, means no config yet
+    }
+    throw new Error('Failed to fetch plan output solver configuration');
+  }
+  return response.json();
+}
+
+export async function createPlanOutputSolver(
+  templateId: string,
+  payload: {
+    new_plan_defaults?: any;
+    results_view_defaults?: any;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to create plan output solver configuration');
+  return response.json();
+}
+
+export async function updatePlanOutputSolver(
+  templateId: string,
+  payload: {
+    new_plan_defaults?: any;
+    results_view_defaults?: any;
+  },
+): Promise<any> {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error('Failed to update plan output solver configuration');
+  return response.json();
+}
+
+export async function deletePlanOutputSolver(templateId: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
+    method: 'DELETE',
+  });
+  if (!response.ok && response.status !== 404) throw new Error('Failed to delete plan output solver configuration');
+}

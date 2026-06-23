@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getTemplate, createTemplate, updateTemplate } from '../api/templates';
+import { getTemplate, createTemplate, updateTemplate, createPlanOutputSolver } from '../api/templates';
 import { ProjectTemplateDraft, ProjectTemplateDetail } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { EntityTypeEditor } from '../components/EntityTypeEditor';
@@ -55,6 +55,47 @@ export function TemplateEditorPage() {
         const created = await createTemplate({
           name: draft.name,
           description: draft.description,
+        });
+        // Create plan output solver entry with default values for new template
+        const defaultNewPlanDefaults = {
+          target: {
+            quantity: 1,
+            target_type: 'material',
+            constraints: [],
+          },
+          domain_constraints: {
+            do_not_expand_materials_matching: [],
+            forbidden_materials_matching: [],
+            forbidden_recipe_matching: [],
+            required_materials_matching: [],
+            required_recipe_matching: [],
+            max_recipe_depth: 30,
+            allow_partial_recipe_execution: false,
+          },
+          search_parameters: {
+            max_recursion_depth: 50,
+            max_branch_width: 50,
+            allow_loops: true,
+            max_solutions_returned: 30,
+            optimization_level: 1,
+          },
+          score_rules: {
+            user_variables: [],
+            score_formulas: [],
+          },
+        };
+        const defaultResultsViewDefaults = {
+          main_score_name: '',
+          main_score_descending: false,
+          default_scores: [],
+          material_display_param: '',
+          recipe_display_param: '',
+          simplify_label: 1,
+          use_images: true,
+        };
+        await createPlanOutputSolver(created.id, {
+          new_plan_defaults: defaultNewPlanDefaults,
+          results_view_defaults: defaultResultsViewDefaults,
         });
         navigate(`/templates/${created.id}/edit`);
       } else if (templateId) {
