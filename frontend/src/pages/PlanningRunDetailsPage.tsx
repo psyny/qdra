@@ -3,6 +3,7 @@ import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
 import { PlanningGraph } from '../components/planning/PlanningGraph';
+import { getProjectTemplate } from '../api/projects';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -16,6 +17,13 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [run, setRun] = useState<PlanningRunWithResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [template, setTemplate] = useState<any>(null);
+  
+  // Graph selector state
+  const [recipeDomainKey, setRecipeDomainKey] = useState<string>('identity:name');
+  const [materialDomainKey, setMaterialDomainKey] = useState<string>('identity:name');
+  const [simplifyLevel, setSimplifyLevel] = useState<number>(0);
+  const [useImages, setUseImages] = useState<boolean>(false);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({
@@ -46,6 +54,10 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         const runData = await getPlanningRunWithResults(runId);
         setRun(runData);
         
+        // Load template to get domain:key options
+        const templateData = await getProjectTemplate(projectId);
+        setTemplate(templateData);
+        
         // Initialize selected scores - first 4 checked by default
         if (runData.result?.plans && runData.result.plans.length > 0) {
           const scoreKeys = Object.keys(runData.result.plans[0].score || {});
@@ -64,7 +76,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     };
 
     loadRun();
-  }, [runId]);
+  }, [runId, projectId]);
 
   const toggleCard = (key: SubcardKey) => {
     setExpandedCards(prev => ({
@@ -173,6 +185,23 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     });
     
     return plans;
+  };
+
+  // Helper to get domain:key options from template
+  const getDomainKeyOptions = (kind: 'recipe' | 'material') => {
+    if (!template?.entity_types) return [];
+    
+    const entityType = template.entity_types.find((et: any) => et.kind === kind);
+    if (!entityType?.parameter_definitions) return [];
+    
+    const domainKeySet = new Set<string>();
+    entityType.parameter_definitions.forEach((param: any) => {
+      if (param.domain && param.key) {
+        domainKeySet.add(`${param.domain}:${param.key}`);
+      }
+    });
+    
+    return Array.from(domainKeySet).sort();
   };
 
   if (loading) {
@@ -487,6 +516,58 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
                   {selectedPlanId !== null ? `Graph for Plan ${selectedPlanId}` : 'Solution Graph'}
                 </h4>
+                
+                {/* Graph selectors */}
+                <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Recipe Domain:Key</label>
+                    <select
+                      value={recipeDomainKey}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRecipeDomainKey(e.target.value)}
+                      className="form-input"
+                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                    >
+                      {getDomainKeyOptions('recipe').map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Material Domain:Key</label>
+                    <select
+                      value={materialDomainKey}
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMaterialDomainKey(e.target.value)}
+                      className="form-input"
+                      style={{ padding: '4px 8px', fontSize: '12px' }}
+                    >
+                      {getDomainKeyOptions('material').map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Simplify Level</label>
+                    <input
+                      type="number"
+                      value={simplifyLevel}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSimplifyLevel(Number(e.target.value))}
+                      className="form-input"
+                      style={{ padding: '4px 8px', fontSize: '12px', width: '60px' }}
+                      min="0"
+                      step="1"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Use Images</label>
+                    <input
+                      type="checkbox"
+                      checked={useImages}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUseImages(e.target.checked)}
+                      style={{ width: '19px', height: '19px' }}
+                    />
+                  </div>
+                </div>
+                
                 {selectedPlanId !== null && run.result?.plans[selectedPlanId] && run.result?.entities ? (
                   <PlanningGraph
                     graph={{
@@ -495,12 +576,12 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                       material_edges: run.result.plans[selectedPlanId].material_edges || [],
                     }}
                     entities={run.result.entities}
-                    recipeDomainName="identity"
-                    recipeKeyName="name"
-                    materialDomainName="identitiy"
-                    materialKeyName="name"
-                    displayImages={false}
-                    simplifyLevel={0}
+                    recipeDomainName={recipeDomainKey.split(':')[0]}
+                    recipeKeyName={recipeDomainKey.split(':')[1]}
+                    materialDomainName={materialDomainKey.split(':')[0]}
+                    materialKeyName={materialDomainKey.split(':')[1]}
+                    displayImages={useImages}
+                    simplifyLevel={simplifyLevel}
                   />
                 ) : (
                   <span style={{ color: '#666' }}>
