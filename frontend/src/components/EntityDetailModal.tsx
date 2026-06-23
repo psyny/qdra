@@ -106,45 +106,49 @@ export function EntityDetailModal({
         width: '500px',
         height: '100%',
         maxHeight: 'calc(100vh - 100px)', 
-        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
         backgroundColor: '#000',
         color: '#fff',
+        fontSize: '14px',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h2 className="card-title" style={{ color: '#fff' }}>Entity Details</h2>
-          <button onClick={onClose} className="button button--secondary">Close</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h2 className="card-title" style={{ color: '#fff', fontSize: '18px' }}>Entity Details</h2>
+          <button onClick={onClose} className="button button--secondary" style={{ fontSize: '14px' }}>Close</button>
         </div>
 
         {/* Entity Image */}
         {entity.image && (
-          <div style={{ marginBottom: '16px', textAlign: 'center' }}>
+          <div style={{ marginBottom: '12px', textAlign: 'center' }}>
             <img
               src={entity.image.url}
               alt={entity.image.alt_text || entity.id}
-              style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
+              style={{ maxWidth: '100%', maxHeight: '150px', objectFit: 'contain' }}
             />
           </div>
         )}
 
         {/* Entity Info */}
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '8px' }}>{entity.id}</div>
           <div style={{ color: '#666', marginBottom: '4px' }}>
             <strong>Type:</strong> {entity.kind}
           </div>
           <div style={{ color: '#666', marginBottom: '4px' }}>
             <strong>Group:</strong> {entity.group}
           </div>
-          <div style={{ color: '#666' }}>
-            <strong>Entity Type ID:</strong> {entity.entity_type_id}
-          </div>
-        </div>
+        </div>        
 
-        {/* Parameters List */}
-        <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Parameters</h3>
+        {/* Parameters List - Scrollable */}
+        <div style={{ 
+          flex: 1, 
+          overflowY: 'auto',
+          marginBottom: '12px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          <h3 style={{ fontSize: '16px', marginBottom: '12px', color: '#fff' }}>Parameters</h3>
           {parameters.length === 0 ? (
-            <p style={{ color: '#666' }}>No parameters available.</p>
+            <p style={{ color: '#ccc' }}>No parameters available.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {parameters.map((param) => {
@@ -160,7 +164,7 @@ export function EntityDetailModal({
                       alignItems: 'center',
                       gap: '12px',
                       padding: '8px',
-                      backgroundColor: isSelected ? '#f0f8ff' : 'transparent',
+                      backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                       borderRadius: '4px',
                     }}
                   >
@@ -172,11 +176,11 @@ export function EntityDetailModal({
                       style={{ width: '18px', height: '18px' }}
                     />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                      <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#fff' }}>
                         {param.domain}:{param.key}
-                        {isLocked && <span style={{ color: '#666', fontSize: '12px', marginLeft: '8px' }}>(locked)</span>}
+                        {isLocked && <span style={{ color: '#888', fontSize: '12px', marginLeft: '8px' }}>(locked)</span>}
                       </div>
-                      <div style={{ fontSize: '14px', color: '#333' }}>
+                      <div style={{ fontSize: '14px', color: '#ccc' }}>
                         {getParamValue(param)}
                       </div>
                     </div>
@@ -189,13 +193,14 @@ export function EntityDetailModal({
 
         {/* Select Button */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-          <button onClick={onClose} className="button button--secondary">
+          <button onClick={onClose} className="button button--secondary" style={{ fontSize: '14px' }}>
             Cancel
           </button>
           <button
             onClick={handleSelect}
             className="button button--primary"
             disabled={selectedParams.size === 0}
+            style={{ fontSize: '14px' }}
           >
             Select ({selectedParams.size} parameters)
           </button>
