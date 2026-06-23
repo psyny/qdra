@@ -19,6 +19,7 @@ import {
   mapEdges,
 } from './graphMapping';
 import { applyLayout } from './graphLayout';
+import { simplifyGraph } from './graphSimplify';
 
 const nodeTypes: NodeTypes = {
   material: MaterialNode,
@@ -35,10 +36,14 @@ export function PlanningGraph({
   displayImages,
   simplifyLevel,
 }: PlanningGraphProps) {
+  const simplifiedGraph = useMemo(() => {
+    return simplifyGraph(graph, simplifyLevel);
+  }, [graph, simplifyLevel]);
+
   // Map planning graph to React Flow format
   const initialNodes = useMemo(() => {
     return mapNodes(
-      graph.graph_nodes,
+      simplifiedGraph.graph_nodes,
       entities,
       materialDomainName,
       materialKeyName,
@@ -46,7 +51,7 @@ export function PlanningGraph({
       recipeKeyName
     );
   }, [
-    graph.graph_nodes,
+    simplifiedGraph.graph_nodes,
     entities,
     materialDomainName,
     materialKeyName,
@@ -55,8 +60,8 @@ export function PlanningGraph({
   ]);
 
   const initialEdges = useMemo(() => {
-    return mapEdges(graph.recipe_edges, graph.material_edges);
-  }, [graph.recipe_edges, graph.material_edges]);
+    return mapEdges(simplifiedGraph.recipe_edges, simplifiedGraph.material_edges);
+  }, [simplifiedGraph.recipe_edges, simplifiedGraph.material_edges]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -80,6 +85,7 @@ export function PlanningGraph({
     const applyElkLayout = async () => {
       const layoutedNodes = await applyLayout(initialNodes, initialEdges, 'RIGHT');
       setNodes(layoutedNodes);
+      setEdges(initialEdges);
     };
 
     applyElkLayout();
@@ -87,6 +93,7 @@ export function PlanningGraph({
     initialNodes,
     initialEdges,
     setNodes,
+    setEdges,
   ]);
 
   const onConnect = useCallback(
@@ -94,7 +101,7 @@ export function PlanningGraph({
     [setEdges]
   );
 
-  if (!graph.graph_nodes || graph.graph_nodes.length === 0) {
+  if (!simplifiedGraph.graph_nodes || simplifiedGraph.graph_nodes.length === 0) {
     return (
       <div style={{ 
         padding: '24px', 
