@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -10,6 +10,7 @@ import ReactFlow, {
   NodeTypes,
   EdgeTypes,
   ConnectionMode,
+  ReactFlowInstance,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -82,6 +83,11 @@ export function PlanningGraph({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [layouted, setLayouted] = useState(false);
+  const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
+
+  const onInit = useCallback((instance: ReactFlowInstance) => {
+    reactFlowInstance.current = instance;
+  }, []);
 
   // Apply ELK layout on mount
   useEffect(() => {
@@ -90,6 +96,7 @@ export function PlanningGraph({
       setNodes(result.nodes);
       setEdges(result.edges);
       setLayouted(true);
+      setTimeout(() => reactFlowInstance.current?.fitView(), 0);
     };
 
     if (!layouted) {
@@ -103,6 +110,7 @@ export function PlanningGraph({
       const result = await applyLayout(initialNodes, initialEdges, 'RIGHT');
       setNodes(result.nodes);
       setEdges(result.edges);
+      setTimeout(() => reactFlowInstance.current?.fitView(), 0);
     };
 
     applyElkLayout();
@@ -138,6 +146,7 @@ export function PlanningGraph({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onInit={onInit}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
