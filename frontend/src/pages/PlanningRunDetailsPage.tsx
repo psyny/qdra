@@ -79,19 +79,85 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
       const templateData = await getProjectTemplate(projectId);
       setTemplate(templateData);
 
-      // Initialize domain keys to first option from template
+      // Initialize domain keys from template defaults
       const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
       const materialOptions = getDomainKeyOptionsFromTemplate(templateData, 'material');
-      if (recipeOptions.length > 0) setRecipeDomainKey(recipeOptions[0]);
-      if (materialOptions.length > 0) setMaterialDomainKey(materialOptions[0]);
+      
+      // Apply template defaults for graph display if available
+      const resultsDefaults = templateData?.plan_output_solver?.results_view_defaults;
+      if (resultsDefaults) {
+        if (resultsDefaults.recipe_display_param && recipeOptions.includes(resultsDefaults.recipe_display_param)) {
+          setRecipeDomainKey(resultsDefaults.recipe_display_param);
+        } else if (recipeOptions.length > 0) {
+          setRecipeDomainKey(recipeOptions[0]);
+        }
+        
+        if (resultsDefaults.material_display_param && materialOptions.includes(resultsDefaults.material_display_param)) {
+          setMaterialDomainKey(resultsDefaults.material_display_param);
+        } else if (materialOptions.length > 0) {
+          setMaterialDomainKey(materialOptions[0]);
+        }
+        
+        if (resultsDefaults.simplify_label !== undefined) {
+          setSimplifyLevel(resultsDefaults.simplify_label);
+        }
+        
+        if (resultsDefaults.use_images !== undefined) {
+          setUseImages(resultsDefaults.use_images);
+        }
+      } else {
+        // Fallback to first option if no template defaults
+        if (recipeOptions.length > 0) setRecipeDomainKey(recipeOptions[0]);
+        if (materialOptions.length > 0) setMaterialDomainKey(materialOptions[0]);
+      }
 
-      // Initialize selected scores - first 4 checked by default
+      // Initialize selected scores and sorting based on template defaults
       if (runData.result?.plans && runData.result.plans.length > 0) {
         const scoreKeys = Object.keys(runData.result.plans[0].score || {});
         const initialSelectedScores: Record<string, boolean> = {};
-        scoreKeys.forEach((key, index) => {
-          initialSelectedScores[key] = index < 4;
+        
+        // Start with all unchecked
+        scoreKeys.forEach(key => {
+          initialSelectedScores[key] = false;
         });
+        
+        // Apply template defaults if available
+        const resultsDefaults = templateData?.plan_output_solver?.results_view_defaults;
+        if (resultsDefaults) {
+          // Mark main score if it exists in the scores list
+          if (resultsDefaults.main_score_name && scoreKeys.includes(resultsDefaults.main_score_name)) {
+            initialSelectedScores[resultsDefaults.main_score_name] = true;
+          }
+          
+          // Mark default scores if they exist in the scores list
+          if (resultsDefaults.default_scores && Array.isArray(resultsDefaults.default_scores)) {
+            resultsDefaults.default_scores.forEach((scoreName: string) => {
+              if (scoreKeys.includes(scoreName)) {
+                initialSelectedScores[scoreName] = true;
+              }
+            });
+          }
+          
+          // Set initial sorting based on main score
+          if (resultsDefaults.main_score_name && scoreKeys.includes(resultsDefaults.main_score_name)) {
+            setSortColumn(resultsDefaults.main_score_name);
+            setSortDirection(resultsDefaults.main_score_descending ? 'desc' : 'asc');
+          }
+        }
+        
+        // If we have fewer than 4 marked scores, mark additional scores until we have 4
+        const markedCount = Object.values(initialSelectedScores).filter(v => v).length;
+        if (markedCount < 4) {
+          let additionalNeeded = 4 - markedCount;
+          for (const key of scoreKeys) {
+            if (!initialSelectedScores[key]) {
+              initialSelectedScores[key] = true;
+              additionalNeeded--;
+              if (additionalNeeded === 0) break;
+            }
+          }
+        }
+        
         setSelectedScores(initialSelectedScores);
       }
     } catch (error) {
