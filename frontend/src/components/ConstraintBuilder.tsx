@@ -36,6 +36,7 @@ export function ConstraintBuilder({
 }: ConstraintBuilderProps) {
   const [existingValues, setExistingValues] = useState<Record<string, string[]>>({});
   const [entitySelectorOpen, setEntitySelectorOpen] = useState(false);
+  const [preselectedParameters, setPreselectedParameters] = useState<Array<{ domain: string; key: string }>>([]);
 
   // Convert API ConstraintSpec to internal format
   const toInternalConstraints = (apiConstraints: ConstraintSpec[]): InternalConstraintSpec[] => {
@@ -563,7 +564,14 @@ export function ConstraintBuilder({
         </button>
         <button
           type="button"
-          onClick={() => setEntitySelectorOpen(true)}
+          onClick={() => {
+            // Extract existing parameter constraints as preselected parameters
+            const existingParams = internalConstraints
+              .filter((c: InternalConstraintSpec) => c.origin === 'parameter' && c.domain && c.key)
+              .map((c: InternalConstraintSpec) => ({ domain: c.domain!, key: c.key! }));
+            setPreselectedParameters(existingParams);
+            setEntitySelectorOpen(true);
+          }}
           disabled={disabled}
           className="button button--primary"
           style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#c18929', borderColor: 'rgb(217, 119, 6)' }}
@@ -580,6 +588,7 @@ export function ConstraintBuilder({
         onClose={() => setEntitySelectorOpen(false)}
         onSelection={handleEntitySelectorSelection}
         initialType={targetType as 'material' | 'recipe'}
+        preselectedParameters={preselectedParameters}
       />
     )}
     </>
