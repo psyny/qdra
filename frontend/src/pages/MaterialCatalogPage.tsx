@@ -424,6 +424,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         onClose={() => setSelectorModalOpen(false)}
         onSelection={handleSelectorSelection}
         initialType="material"
+        preselectedParameters={[{ domain: 'identitiy', key: 'name' }]}
       />
       {/* Entity Selector Modal 2 - No Type */}
       <EntitySelectorModal
