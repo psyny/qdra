@@ -81,11 +81,21 @@ export type View = {
   updated_at: string;
 };
 
+export type PlanOutputSolver = {
+  id: string;
+  project_template_id: string;
+  new_plan_defaults?: Record<string, any> | null;
+  results_view_defaults?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProjectTemplateDetail = {
   template: ProjectTemplate;
   entity_types: EntityType[];
   parameter_definitions: ParameterDefinition[];
   views: View[];
+  plan_output_solver?: PlanOutputSolver | null;
 };
 
 export type EntityTypeDefinition = {

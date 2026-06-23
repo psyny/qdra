@@ -272,22 +272,6 @@ class ViewWithConfigsResponse(BaseModel):
     updated_at: datetime
 
 
-class ProjectTemplateDetailResponse(BaseModel):
-    template: ProjectTemplateResponse
-    entity_types: List[EntityTypeResponse]
-    parameter_definitions: List[ParameterDefinitionResponse]
-    views: List[ViewWithConfigsResponse]
-
-
-class TemplateImportRequest(BaseModel):
-    data: Dict[str, Any]
-    name: Optional[str] = None
-
-
-class TemplateExportResponse(BaseModel):
-    data: Dict[str, Any]
-
-
 # ---------------------------------------------------------------------------
 # Plan Output Solver Models
 # ---------------------------------------------------------------------------
@@ -310,6 +294,23 @@ class PlanOutputSolverResponse(BaseModel):
     results_view_defaults: Optional[Dict[str, Any]]
     created_at: datetime
     updated_at: datetime
+
+
+class ProjectTemplateDetailResponse(BaseModel):
+    template: ProjectTemplateResponse
+    entity_types: List[EntityTypeResponse]
+    parameter_definitions: List[ParameterDefinitionResponse]
+    views: List[ViewWithConfigsResponse]
+    plan_output_solver: Optional[PlanOutputSolverResponse] = None
+
+
+class TemplateImportRequest(BaseModel):
+    data: Dict[str, Any]
+    name: Optional[str] = None
+
+
+class TemplateExportResponse(BaseModel):
+    data: Dict[str, Any]
 
 
 # ---------------------------------------------------------------------------

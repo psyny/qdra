@@ -130,6 +130,90 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
       }
     }
   }, [location.state]);
+
+  // Pre-fill form from template defaults when not cloning
+  useEffect(() => {
+    const cloneData = location.state?.cloneData;
+    
+    // Only apply template defaults if not cloning
+    if (!cloneData && template?.plan_output_solver?.new_plan_defaults) {
+      const defaults = template.plan_output_solver.new_plan_defaults;
+      
+      if (defaults.target) {
+        const sanitizedTarget = {
+          ...defaults.target,
+          constraints: defaults.target.constraints?.map((constraint: any) => ({
+            ...constraint,
+            operator: constraint.operator || 'eq',
+          })) || []
+        };
+        setTarget(sanitizedTarget);
+      }
+      
+      if (defaults.domain_constraints) {
+        const sanitizedDomainConstraints = {
+          ...defaults.domain_constraints,
+          do_not_expand_materials_matching: defaults.domain_constraints.do_not_expand_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          forbidden_materials_matching: defaults.domain_constraints.forbidden_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          forbidden_recipe_matching: defaults.domain_constraints.forbidden_recipe_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          required_materials_matching: defaults.domain_constraints.required_materials_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+          required_recipe_matching: defaults.domain_constraints.required_recipe_matching?.map((rule: any) => ({
+            ...rule,
+            constraints: rule.constraints?.map((constraint: any) => ({
+              ...constraint,
+              operator: constraint.operator || 'eq',
+            })) || []
+          })) || [],
+        };
+        setDomainConstraints(sanitizedDomainConstraints);
+      }
+      
+      if (defaults.search_parameters) {
+        setSearchParameters(defaults.search_parameters);
+      }
+      
+      if (defaults.score_rules) {
+        const sanitizedScoreRules = {
+          user_variables: defaults.score_rules.user_variables?.map((variable: any) => ({
+            ...variable,
+            constraints: variable.constraints?.map((rule: any) => ({
+              ...rule,
+              constraints: rule.constraints?.map((constraint: any) => ({
+                ...constraint,
+                operator: constraint.operator || 'eq',
+              })) || []
+            })) || []
+          })) || [],
+          score_formulas: defaults.score_rules.score_formulas || []
+        };
+        setScoreRules(sanitizedScoreRules);
+      }
+    }
+  }, [template, location.state]);
   
   // Subcard expansion state
   const [expandedCards, setExpandedCards] = useState<Record<SubcardKey, boolean>>({

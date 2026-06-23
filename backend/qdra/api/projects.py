@@ -112,11 +112,19 @@ def get_project_template(project_id: uuid.UUID, db: Session = Depends(get_db)):
     
     views = template_repo.list_views(template.id)
     
+    # Get plan output solver configuration if it exists
+    from api.project_templates import PlanOutputSolverResponse
+    plan_output_solver = template_repo.get_plan_output_solver_by_template(template.id)
+    plan_output_solver_response = None
+    if plan_output_solver:
+        plan_output_solver_response = PlanOutputSolverResponse.model_validate(plan_output_solver)
+    
     return ProjectTemplateDetailResponse(
         template=template,
         entity_types=entity_types,
         parameter_definitions=parameter_definitions,
         views=views,
+        plan_output_solver=plan_output_solver_response,
     )
 
 
