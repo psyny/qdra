@@ -43,6 +43,8 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   // Results tab state
   const [selectedScores, setSelectedScores] = useState<Record<string, boolean>>({});
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [hoveredPlanId, setHoveredPlanId] = useState<number | null>(null);
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -486,6 +488,19 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                             <tr 
                               key={index}
                               onClick={() => setSelectedPlanId(index)}
+                              onMouseEnter={(e: React.MouseEvent) => {
+                                setHoveredPlanId(index);
+                                setMousePosition({ x: e.clientX, y: e.clientY });
+                              }}
+                              onMouseMove={(e: React.MouseEvent) => {
+                                if (hoveredPlanId === index) {
+                                  setMousePosition({ x: e.clientX, y: e.clientY });
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredPlanId(null);
+                                setMousePosition(null);
+                              }}
                               style={{ 
                                 cursor: 'pointer',
                                 backgroundColor: selectedPlanId === index ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
@@ -509,31 +524,33 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 </div>
               </div>
 
-              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
+              {/* Tooltip for hovered plan */}
+              {hoveredPlanId !== null && run.result?.plans[hoveredPlanId] && mousePosition && (
+                <div style={{
+                  position: 'fixed',
+                  left: mousePosition.x + 10,
+                  top: mousePosition.y + 10,
+                  backgroundColor: '#1a1a1a',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '4px',
+                  padding: '8px',
+                  minWidth: '200px',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+                  fontSize: '11px',
+                  pointerEvents: 'none',
+                }}>
+                  {Object.entries(run.result.plans[hoveredPlanId].score || {}).map(([key, value]) => (
+                    <div key={key} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', marginBottom: '2px' }}>
+                      <span style={{ opacity: 0.7 }}>{key}:</span>
+                      <span>{typeof value === 'number' ? value.toFixed(2) : String(value)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-              {/* Region 3: Solution */}
-              <div>
-                <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
-                  {selectedPlanId !== null ? `Solution of Plan ${selectedPlanId}` : 'Solution'}
-                </h4>
-                {selectedPlanId !== null && run.result?.plans[selectedPlanId] ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
-                    {Object.entries(run.result.plans[selectedPlanId].score || {}).map(([key, value]) => (
-                      <React.Fragment key={key}>
-                        <label className="form-label">{key}</label>
-                        <span>{typeof value === 'number' ? value.toFixed(2) : String(value)}</span>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                ) : (
-                  <span style={{ color: '#666' }}>Select a plan on the Plans Table to view details</span>
-                )}
-              </div>
-
-              <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
-
-              {/* Region 4: Solution Graph */}
-              <div>
+              {/* Region 3: Solution Graph */}
+              <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '24px' }}>
                 <h4 style={{ fontSize: '16px', marginBottom: '12px' }}>
                   {selectedPlanId !== null ? `Graph for Plan ${selectedPlanId}` : 'Solution Graph'}
                 </h4>
