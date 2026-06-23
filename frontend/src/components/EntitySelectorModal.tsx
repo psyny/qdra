@@ -287,6 +287,27 @@ export function EntitySelectorModal({
     setDetailModalOpen(true);
   };
 
+  // Handle direct selection (entity passed explicitly, no state dependency)
+  const handleDirectSelection = (entity: Entity, selectedParams: EntityParameter[]) => {
+    const result: EntitySelectorResult = {
+      entity_id: entity.id,
+      type: selectedType,
+      group: entity.group,
+      parameters: selectedParams.map((p) => ({
+        domain: p.domain,
+        key: p.key,
+        value_string: p.value_string,
+        value_number: p.value_number,
+        value_boolean: p.value_boolean,
+      })),
+    };
+    console.log('EntitySelectorModal - Selection result:', result);
+    onSelection(result);
+    setDetailModalOpen(false);
+    setSelectedEntity(null);
+    onClose();
+  };
+
   // Handle selection from detail modal
   const handleSelection = (selectedParams: EntityParameter[]) => {
     if (!selectedEntity) return;
@@ -470,15 +491,12 @@ export function EntitySelectorModal({
                     onClick={() => {
                       // If preselected parameters exist, auto-select without opening details
                       if (preselectedParameters.length > 0) {
-                        setSelectedEntity(entity);
                         const params = entityParameters[entity.id] || [];
-                        // Filter to only preselected parameters
-                        const selectedParams = params.filter((p) =>
+                        const selectedParams = params.filter((p: EntityParameter) =>
                           preselectedParameters.some((pp) => pp.domain === p.domain && pp.key === p.key)
                         );
-                        handleSelection(selectedParams);
+                        handleDirectSelection(entity, selectedParams);
                       } else {
-                        // Otherwise open details modal
                         handleEntityClick(entity);
                       }
                     }}
