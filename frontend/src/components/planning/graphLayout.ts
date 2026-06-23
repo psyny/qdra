@@ -1,50 +1,83 @@
-import dagre from 'dagre';
+import ELK from 'elkjs/lib/elk.bundled.js';
 import { Node, Edge } from 'reactflow';
 
+const elk = new ELK();
+
+export interface LayoutResult {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+const ELK_DIRECTION: Record<string, string> = {
+  RIGHT: 'RIGHT',
+  LEFT:  'LEFT',
+  DOWN:  'DOWN',
+  UP:    'UP',
+};
+
 /**
- * Apply Dagre layout to React Flow nodes and edges
+ * Apply ELK layout to React Flow nodes and edges.
+ * Returns updated nodes (with positions) and updated edges (with bend points in data.bendPoints).
  */
 export async function applyLayout(
   nodes: Node[],
   edges: Edge[],
   direction: 'RIGHT' | 'LEFT' | 'DOWN' | 'UP' = 'RIGHT'
-): Promise<Node[]> {
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
+): Promise<LayoutResult> {
+  const nodeWidth  = 150;
+  const nodeHeight = 60;
 
-  const isHorizontal = direction === 'RIGHT' || direction === 'LEFT';
-  
-  dagreGraph.setGraph({
-    rankdir: isHorizontal ? 'LR' : 'TB',
-    nodesep: 50,
-    ranksep: 100,
-  });
+  const graph = {
+    id: 'root',
+    layoutOptions: {
+      'elk.algorithm':                              'layered',
+      'elk.direction':                              ELK_DIRECTION[direction],
+      'elk.layered.spacing.nodeNodeBetweenLayers':  '100',
+      'elk.spacing.nodeNode':                       '60',
+      'elk.edgeRouting':                            'ORTHOGONAL',
+      'elk.layered.unnecessaryBendpoints':          'false',
+    },
+    children: nodes.map((n) => ({
+      id:     n.id,
+      width:  nodeWidth,
+      height: nodeHeight,
+    })),
+    edges: edges.map((e) => ({
+      id:      e.id,
+      sources: [e.source],
+      targets: [e.target],
+    })),
+  };
 
-  // Add nodes to dagre graph
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, {
-      width: node.data?.width || 150,
-      height: node.data?.height || 60,
-    });
-  });
+  const layout = await elk.layout(graph);
 
-  // Add edges to dagre graph
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
-  // Calculate layout
-  dagre.layout(dagreGraph);
-
-  // Apply layout positions to React Flow nodes
-  return nodes.map((node) => {
-    const nodeWithPosition = dagreGraph.node(node.id);
+  const layoutedNodes = nodes.map((node) => {
+    const el = layout.children?.find((c: { id: string }) => c.id === node.id) as any;
+    if (!el) return node;
     return {
       ...node,
-      position: {
-        x: nodeWithPosition.x - (node.data?.width || 150) / 2,
-        y: nodeWithPosition.y - (node.data?.height || 60) / 2,
-      },
+      position: { x: el.x ?? 0, y: el.y ?? 0 },
+      width:  nodeWidth,
+      height: nodeHeight,
     };
   });
+
+  const layoutedEdges = edges.map((edge) => {
+    const el = layout.edges?.find((e: { id: string }) => e.id === edge.id) as any;
+    if (!el || !el.sections || el.sections.length === 0) return edge;
+
+    const section = el.sections[0];
+    const points: { x: number; y: number }[] = [
+      section.startPoint,
+      ...(section.bendPoints ?? []),
+      section.endPoint,
+    ];
+
+    return {
+      ...edge,
+      data: { ...edge.data, bendPoints: points },
+    };
+  });
+
+  return { nodes: layoutedNodes, edges: layoutedEdges };
 }

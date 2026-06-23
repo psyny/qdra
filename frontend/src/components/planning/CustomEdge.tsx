@@ -1,7 +1,9 @@
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getStraightPath, useNodes, Node } from 'reactflow';
 import { memo } from 'react';
 
-function getNodeBorderPoint(node: Node, toward: { x: number; y: number }) {
+interface Point { x: number; y: number; }
+
+function getNodeBorderPoint(node: Node, toward: Point): Point {
   const cx = node.position.x + (node.width ?? 150) / 2;
   const cy = node.position.y + (node.height ?? 60) / 2;
   const hw = (node.width ?? 150) / 2;
@@ -16,10 +18,24 @@ function getNodeBorderPoint(node: Node, toward: { x: number; y: number }) {
   return { x: cx + dx * scale, y: cy + dy * scale };
 }
 
+function buildPolylinePath(points: Point[]): string {
+  if (points.length < 2) return '';
+  const [first, ...rest] = points;
+  return `M ${first.x} ${first.y} ` + rest.map((p) => `L ${p.x} ${p.y}`).join(' ');
+}
+
+function midpoint(points: Point[]): Point {
+  const mid = Math.floor((points.length - 1) / 2);
+  const a = points[mid];
+  const b = points[mid + 1];
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
 function CustomEdge({
   id,
   source,
   target,
+  data,
   style = {},
   markerEnd,
   label,
@@ -30,24 +46,38 @@ function CustomEdge({
   const sourceNode = nodes.find((n: Node) => n.id === source);
   const targetNode = nodes.find((n: Node) => n.id === target);
 
-  const sourceCx = sourceNode ? sourceNode.position.x + (sourceNode.width ?? 150) / 2 : 0;
-  const sourceCy = sourceNode ? sourceNode.position.y + (sourceNode.height ?? 60) / 2 : 0;
-  const targetCx = targetNode ? targetNode.position.x + (targetNode.width ?? 150) / 2 : 0;
-  const targetCy = targetNode ? targetNode.position.y + (targetNode.height ?? 60) / 2 : 0;
+  const bendPoints: Point[] | undefined = data?.bendPoints;
 
-  const sp = sourceNode
-    ? getNodeBorderPoint(sourceNode, { x: targetCx, y: targetCy })
-    : { x: sourceCx, y: sourceCy };
-  const tp = targetNode
-    ? getNodeBorderPoint(targetNode, { x: sourceCx, y: sourceCy })
-    : { x: targetCx, y: targetCy };
+  let path: string;
+  let labelX: number;
+  let labelY: number;
+  let sp: Point;
+  let tp: Point;
 
-  const [path, labelX, labelY] = getStraightPath({
-    sourceX: sp.x,
-    sourceY: sp.y,
-    targetX: tp.x,
-    targetY: tp.y,
-  });
+  if (bendPoints && bendPoints.length >= 2) {
+    // Use ELK-computed bend points directly
+    path = buildPolylinePath(bendPoints);
+    const lp = midpoint(bendPoints);
+    labelX = lp.x;
+    labelY = lp.y;
+    sp = bendPoints[0];
+    tp = bendPoints[bendPoints.length - 1];
+  } else {
+    // Fallback: straight line between node border intersection points
+    const sourceCx = sourceNode ? sourceNode.position.x + (sourceNode.width ?? 150) / 2 : 0;
+    const sourceCy = sourceNode ? sourceNode.position.y + (sourceNode.height ?? 60) / 2 : 0;
+    const targetCx = targetNode ? targetNode.position.x + (targetNode.width ?? 150) / 2 : 0;
+    const targetCy = targetNode ? targetNode.position.y + (targetNode.height ?? 60) / 2 : 0;
+
+    sp = sourceNode
+      ? getNodeBorderPoint(sourceNode, { x: targetCx, y: targetCy })
+      : { x: sourceCx, y: sourceCy };
+    tp = targetNode
+      ? getNodeBorderPoint(targetNode, { x: sourceCx, y: sourceCy })
+      : { x: targetCx, y: targetCy };
+
+    [path, labelX, labelY] = getStraightPath({ sourceX: sp.x, sourceY: sp.y, targetX: tp.x, targetY: tp.y });
+  }
 
   const absDx = Math.abs(tp.x - sp.x);
   const absDy = Math.abs(tp.y - sp.y);
@@ -62,7 +92,7 @@ function CustomEdge({
         <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX - xOffset}px, ${labelY - yOffset}px)`,
+            transform: `translate(-50%, -50%) translate(${labelX! - xOffset}px, ${labelY! - yOffset}px)`,
             pointerEvents: 'all',
             ...labelStyle,
           }}

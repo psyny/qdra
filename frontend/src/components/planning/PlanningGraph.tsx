@@ -86,22 +86,23 @@ export function PlanningGraph({
   // Apply ELK layout on mount
   useEffect(() => {
     const applyElkLayout = async () => {
-      const layoutedNodes = await applyLayout(nodes, edges, 'RIGHT');
-      setNodes(layoutedNodes);
+      const result = await applyLayout(nodes, edges, 'RIGHT');
+      setNodes(result.nodes);
+      setEdges(result.edges);
       setLayouted(true);
     };
 
     if (!layouted) {
       applyElkLayout();
     }
-  }, [nodes, edges, setNodes, layouted]);
+  }, [nodes, edges, setNodes, setEdges, layouted]);
 
   // Re-apply layout when graph data changes
   useEffect(() => {
     const applyElkLayout = async () => {
-      const layoutedNodes = await applyLayout(initialNodes, initialEdges, 'RIGHT');
-      setNodes(layoutedNodes);
-      setEdges(initialEdges);
+      const result = await applyLayout(initialNodes, initialEdges, 'RIGHT');
+      setNodes(result.nodes);
+      setEdges(result.edges);
     };
 
     applyElkLayout();
