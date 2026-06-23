@@ -1,6 +1,13 @@
 import { Node, Edge, MarkerType } from 'reactflow';
 import { Entity, EntityParameter } from '../../types/entity';
 
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Planning graph types
 export interface PlanGraphNode {
   id: string;
@@ -258,7 +265,7 @@ export function mapEdges(
       target: edge.to_node_id,
       label: edge.qty.toFixed(1),
       type: 'default',
-      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty) },
+      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty), filter: `drop-shadow(0 0 8px ${hexToRgba(strokeColor, 0.5)})` },
       markerEnd: getMarker(edge.qty),
       labelStyle: EDGE_LABEL_STYLE,
       labelBgStyle: EDGE_LABEL_BG_STYLE,
@@ -273,7 +280,7 @@ export function mapEdges(
       target: edge.to_node_id,
       label: edge.qty.toFixed(1),
       type: 'default',
-      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty) },
+      style: { stroke: strokeColor, strokeWidth: getStrokeWidth(edge.qty), filter: `drop-shadow(0 0 8px ${hexToRgba(strokeColor, 0.5)})` },
       markerEnd: getMarker(edge.qty),
       labelStyle: EDGE_LABEL_STYLE,
       labelBgStyle: EDGE_LABEL_BG_STYLE,
