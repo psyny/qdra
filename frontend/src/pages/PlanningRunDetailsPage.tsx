@@ -382,7 +382,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         {/* Subcard 1: Running State */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Running State</h3>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Run Stats</h3>
             <button
               onClick={() => toggleCard('runningState')}
               className="button button--secondary"
