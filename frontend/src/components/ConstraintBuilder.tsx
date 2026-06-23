@@ -567,8 +567,21 @@ export function ConstraintBuilder({
           onClick={() => {
             // Extract existing parameter constraints as preselected parameters
             const existingParams = internalConstraints
-              .filter((c: InternalConstraintSpec) => c.origin === 'parameter' && c.domain && c.key)
-              .map((c: InternalConstraintSpec) => ({ domain: c.domain!, key: c.key! }));
+              .filter((c: InternalConstraintSpec) => {
+                if (c.origin === 'parameter' && c.domain && c.key) {
+                  return true;
+                }
+                if (c.origin === 'system' && c.system_key) {
+                  return true;
+                }
+                return false;
+              })
+              .map((c: InternalConstraintSpec) => {
+                if (c.origin === 'system') {
+                  return { domain: '__system__', key: c.system_key! };
+                }
+                return { domain: c.domain!, key: c.key! };
+              });
             setPreselectedParameters(existingParams);
             setEntitySelectorOpen(true);
           }}
