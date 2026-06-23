@@ -25,10 +25,8 @@ const NODE_IMAGE_SIZE_PX = 100;
 
 function getNodeDimensions(node: Node): { width: number; height: number } {
   if (node.data?.imageUrl) {
-    return {
-      width:  Math.max(BASE_NODE_WIDTH, NODE_IMAGE_SIZE_PX + 24),
-      height: BASE_NODE_HEIGHT + NODE_IMAGE_SIZE_PX + 16,
-    };
+    const size = (node.data?.imageSizePx ?? NODE_IMAGE_SIZE_PX) + 10;
+    return { width: size, height: size };
   }
   return { width: BASE_NODE_WIDTH, height: BASE_NODE_HEIGHT };
 }
