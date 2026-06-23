@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getProjectTemplate } from '../api/projects';
 import { getEntities, getEntityParameters } from '../api/entities';
-import { ProjectTemplateDetail, EntityType, ParameterDefinition } from '../types/template';
+import { ProjectTemplateDetail, EntityType, ParameterDefinition, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { EntityDetailModal } from './EntityDetailModal';
 
@@ -192,16 +192,51 @@ export function EntitySelectorModal({
     return true;
   });
 
-  // Get display parameter value for an entity
-  const getDisplayParameterValue = (entity: Entity): string => {
-    if (!displayParameter.domain || !displayParameter.key) {
+  // Get the appropriate view config for the current type and group
+  const getViewConfig = (): ViewConfig | null => {
+    if (!template) return null;
+    
+    const viewKey = selectedType === 'material' ? 'material_catalog' : 'recipe_catalog';
+    const view = template.views.find(v => v.view_key === viewKey);
+    if (!view) return null;
+    
+    // Find config matching the selected group, or use the first config if no group selected
+    if (selectedGroup) {
+      const config = view.configs.find(c => c.entity_type_id === selectedGroup);
+      if (config) return config;
+    }
+    
+    // Return first config if no group selected or no match found
+    return view.configs[0] || null;
+  };
+
+  // Helper to get display slot value from entity parameters
+  const getDisplaySlotValue = (entity: Entity, slotIndex: number): string => {
+    const viewConfig = getViewConfig();
+    const displaySlots = viewConfig?.display_slots;
+    if (!displaySlots || !Array.isArray(displaySlots) || slotIndex >= displaySlots.length) {
       return entity.id;
     }
+
+    const slot = displaySlots[slotIndex];
+    if (!slot || typeof slot !== 'object') {
+      return entity.id;
+    }
+
+    const source = (slot as any).source || 'parameter';
+    const domain = (slot as any).domain;
+    const key = (slot as any).key;
+
+    if (source !== 'parameter' || !domain || !key) {
+      return entity.id;
+    }
+
     const params = entityParameters[entity.id] || [];
-    const param = params.find((p: EntityParameter) => 
-      p.domain === displayParameter.domain && p.key === displayParameter.key
-    );
-    if (!param) return entity.id;
+    const param = params.find((p: EntityParameter) => p.domain === domain && p.key === key);
+    
+    if (!param) {
+      return entity.id;
+    }
     
     if (param.value_string !== null && param.value_string !== undefined) {
       return param.value_string;
@@ -212,7 +247,30 @@ export function EntitySelectorModal({
     if (param.value_boolean !== null && param.value_boolean !== undefined) {
       return String(param.value_boolean);
     }
+    
     return entity.id;
+  };
+
+  // Get display parameter value for an entity (for subtitle)
+  const getDisplayParameterValue = (entity: Entity): string => {
+    if (!displayParameter.domain || !displayParameter.key) {
+      return '';
+    }
+    const params = entityParameters[entity.id] || [];
+    const param = params.find((p: EntityParameter) => 
+      p.domain === displayParameter.domain && p.key === displayParameter.key
+    );
+    if (!param) return '';
+    if (param.value_string !== null && param.value_string !== undefined) {
+      return param.value_string;
+    }
+    if (param.value_number !== null && param.value_number !== undefined) {
+      return String(param.value_number);
+    }
+    if (param.value_boolean !== null && param.value_boolean !== undefined) {
+      return String(param.value_boolean);
+    }
+    return '';
   };
 
   // Handle entity click
@@ -401,7 +459,7 @@ export function EntitySelectorModal({
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#333'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#222'}
                   >
-                    <div style={{ fontWeight: 'bold', marginBottom: '2px', color: '#fff', fontSize: '14px' }}>{entity.id}</div>
+                    <div style={{ fontWeight: 'bold', marginBottom: '2px', color: '#fff', fontSize: '14px' }}>{getDisplaySlotValue(entity, 0)}</div>
                     <div style={{ fontSize: '12px', color: '#ccc' }}>
                       {getDisplayParameterValue(entity)}
                     </div>
