@@ -981,7 +981,7 @@ class ProjectTemplateRepository:
         if not template:
             raise ValueError(f"Template {project_template_id} not found")
 
-        # Export entity types with their parameter definitions
+        # Export entity types with their parameter definitions and slot system
         entity_types = []
         for et in self.list_entity_types(project_template_id):
             param_defs = self.list_parameter_definitions_by_entity_type(et.id)
@@ -989,11 +989,68 @@ class ProjectTemplateRepository:
 
             slot_groups_data = []
             for sg in slot_groups:
+                # Export default slot with options and constraints
+                default_slot_data = None
+                default_slot = self.get_default_slot(sg.id)
+                if default_slot:
+                    options_data = []
+                    for option in default_slot.options:
+                        constraints_data = []
+                        for constraint in option.parameter_constraints:
+                            constraints_data.append({
+                                "domain": constraint.domain,
+                                "key": constraint.key,
+                                "operator": constraint.operator,
+                                "value_string": constraint.value_string,
+                                "value_number": constraint.value_number,
+                                "value_boolean": constraint.value_boolean,
+                                "is_wildcard": constraint.is_wildcard,
+                            })
+                        options_data.append({
+                            "quantity": option.quantity,
+                            "sort_order": option.sort_order,
+                            "parameter_constraints": constraints_data,
+                        })
+                    default_slot_data = {
+                        "kind": default_slot.kind,
+                        "sort_order": default_slot.sort_order,
+                        "options": options_data,
+                    }
+
+                # Export per slots with options and constraints
+                per_slots_data = []
+                for per_slot in self.list_per_slots(sg.id):
+                    options_data = []
+                    for option in per_slot.options:
+                        constraints_data = []
+                        for constraint in option.parameter_constraints:
+                            constraints_data.append({
+                                "domain": constraint.domain,
+                                "key": constraint.key,
+                                "operator": constraint.operator,
+                                "value_string": constraint.value_string,
+                                "value_number": constraint.value_number,
+                                "value_boolean": constraint.value_boolean,
+                                "is_wildcard": constraint.is_wildcard,
+                            })
+                        options_data.append({
+                            "quantity": option.quantity,
+                            "sort_order": option.sort_order,
+                            "parameter_constraints": constraints_data,
+                        })
+                    per_slots_data.append({
+                        "kind": per_slot.kind,
+                        "sort_order": per_slot.sort_order,
+                        "options": options_data,
+                    })
+
                 slot_groups_data.append({
                     "type": sg.type,
                     "min_slots": sg.min_slots,
                     "max_slots": sg.max_slots,
                     "sort_order": sg.sort_order,
+                    "default_slot": default_slot_data,
+                    "per_slots": per_slots_data,
                 })
 
             param_defs_data = [
@@ -1048,6 +1105,15 @@ class ProjectTemplateRepository:
                 "configs": configs_data,
             })
 
+        # Export plan output solver configuration
+        plan_output_solver_data = None
+        plan_output_solver = self.get_plan_output_solver_by_template(project_template_id)
+        if plan_output_solver:
+            plan_output_solver_data = {
+                "new_plan_defaults": plan_output_solver.new_plan_defaults,
+                "results_view_defaults": plan_output_solver.results_view_defaults,
+            }
+
         return {
             "template": {
                 "name": template.name,
@@ -1056,6 +1122,7 @@ class ProjectTemplateRepository:
             },
             "entity_types": entity_types,
             "views": views,
+            "plan_output_solver": plan_output_solver_data,
         }
 
     def _get_entity_type_name_by_id(self, entity_type_id: Optional[uuid.UUID]) -> Optional[str]:
@@ -1070,6 +1137,7 @@ class ProjectTemplateRepository:
         template_data = data["template"]
         entity_types_data = data["entity_types"]
         views_data = data["views"]
+        plan_output_solver_data = data.get("plan_output_solver")
 
         # Use provided name or fall back to the name in the JSON
         template_name = name if name and name.strip() else template_data["name"]
@@ -1084,7 +1152,7 @@ class ProjectTemplateRepository:
         # Track entity type name -> ID mapping for references
         entity_type_id_map: Dict[str, uuid.UUID] = {}
 
-        # Import entity types with their parameter definitions and slot groups
+        # Import entity types with their parameter definitions and slot system
         for et_data in entity_types_data:
             et = self.create_entity_type(
                 project_template_id=template.id,
@@ -1117,7 +1185,7 @@ class ProjectTemplateRepository:
                     validation_regex=pd_data.get("validation_regex"),
                 )
 
-            # Import slot groups
+            # Import slot groups with default slots and per slots
             for sg_data in et_data.get("slot_groups", []):
                 sg = self.create_slot_group(
                     entity_type_id=et.id,
@@ -1126,6 +1194,27 @@ class ProjectTemplateRepository:
                     max_slots=sg_data.get("max_slots"),
                     sort_order=sg_data["sort_order"],
                 )
+
+                # Import default slot with options and constraints
+                default_slot_data = sg_data.get("default_slot")
+                if default_slot_data:
+                    options_data = default_slot_data.get("options", [])
+                    self.create_default_slot(
+                        slot_group_id=sg.id,
+                        kind=default_slot_data["kind"],
+                        sort_order=default_slot_data["sort_order"],
+                        options_data=options_data,
+                    )
+
+                # Import per slots with options and constraints
+                for per_slot_data in sg_data.get("per_slots", []):
+                    options_data = per_slot_data.get("options", [])
+                    per_slot = self.create_per_slot(
+                        slot_group_id=sg.id,
+                        kind=per_slot_data["kind"],
+                        sort_order=per_slot_data["sort_order"],
+                        options_data=options_data,
+                    )
 
         # Import views with their configs
         for view_data in views_data:
@@ -1150,6 +1239,14 @@ class ProjectTemplateRepository:
                     display_slots=config_data.get("display_slots"),
                     sort_order=config_data["sort_order"],
                 )
+
+        # Import plan output solver configuration
+        if plan_output_solver_data:
+            self.create_plan_output_solver(
+                project_template_id=template.id,
+                new_plan_defaults=plan_output_solver_data.get("new_plan_defaults"),
+                results_view_defaults=plan_output_solver_data.get("results_view_defaults"),
+            )
 
         return template
 
