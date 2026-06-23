@@ -20,9 +20,9 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [template, setTemplate] = useState<any>(null);
   
   // Graph selector state
-  const [recipeDomainKey, setRecipeDomainKey] = useState<string>('identity:name');
-  const [materialDomainKey, setMaterialDomainKey] = useState<string>('identity:name');
-  const [simplifyLevel, setSimplifyLevel] = useState<number>(0);
+  const [recipeDomainKey, setRecipeDomainKey] = useState<string>('');
+  const [materialDomainKey, setMaterialDomainKey] = useState<string>('');
+  const [simplifyLevel, setSimplifyLevel] = useState<number>(1);
   const [useImages, setUseImages] = useState<boolean>(false);
   
   // Subcard expansion state
@@ -44,6 +44,23 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
+  // Helper function to get domain:key options from template data
+  const getDomainKeyOptionsFromTemplate = (templateData: any, kind: 'recipe' | 'material') => {
+    if (!templateData?.entity_types) return [];
+    
+    const entityType = templateData.entity_types.find((et: any) => et.kind === kind);
+    if (!entityType?.parameter_definitions) return [];
+    
+    const domainKeySet = new Set<string>();
+    entityType.parameter_definitions.forEach((param: any) => {
+      if (param.domain && param.key) {
+        domainKeySet.add(`${param.domain}:${param.key}`);
+      }
+    });
+    
+    return Array.from(domainKeySet).sort();
+  };
+
   useEffect(() => {
     const loadRun = async () => {
       if (!runId) return;
@@ -57,6 +74,12 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
         // Load template to get domain:key options
         const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
+        
+        // Initialize domain keys to first option from template
+        const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
+        const materialOptions = getDomainKeyOptionsFromTemplate(templateData, 'material');
+        if (recipeOptions.length > 0) setRecipeDomainKey(recipeOptions[0]);
+        if (materialOptions.length > 0) setMaterialDomainKey(materialOptions[0]);
         
         // Initialize selected scores - first 4 checked by default
         if (runData.result?.plans && runData.result.plans.length > 0) {
@@ -189,19 +212,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
 
   // Helper to get domain:key options from template
   const getDomainKeyOptions = (kind: 'recipe' | 'material') => {
-    if (!template?.entity_types) return [];
-    
-    const entityType = template.entity_types.find((et: any) => et.kind === kind);
-    if (!entityType?.parameter_definitions) return [];
-    
-    const domainKeySet = new Set<string>();
-    entityType.parameter_definitions.forEach((param: any) => {
-      if (param.domain && param.key) {
-        domainKeySet.add(`${param.domain}:${param.key}`);
-      }
-    });
-    
-    return Array.from(domainKeySet).sort();
+    return getDomainKeyOptionsFromTemplate(template, kind);
   };
 
   if (loading) {
