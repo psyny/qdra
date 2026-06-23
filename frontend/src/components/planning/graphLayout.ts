@@ -46,7 +46,7 @@ export async function applyLayout(
       'elk.direction':                              ELK_DIRECTION[direction],
       'elk.layered.spacing.nodeNodeBetweenLayers':  '100',
       'elk.spacing.nodeNode':                       '60',
-      'elk.edgeRouting':                            'ORTHOGONAL',
+      'elk.edgeRouting':                            'SPLINES',
       'elk.layered.unnecessaryBendpoints':          'false',
     },
     children: nodes.map((n) => ({
