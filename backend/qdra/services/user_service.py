@@ -11,6 +11,15 @@ from schemas.user_schemas import UserCreate, UserUpdate, UserRead, UserAppPermis
 from models.user import User
 from models.user_app_permissions import UserAppPermissions
 from models.project_user_permissions import ProjectUserPermissions
+from infrastructure.cache.permission_cache import (
+    get_app_permissions,
+    set_app_permissions,
+    invalidate_app_permissions,
+    get_project_permissions,
+    set_project_permissions,
+    invalidate_project_permissions,
+    invalidate_all_user_permissions,
+)
 
 
 class UserService:
@@ -116,6 +125,10 @@ class UserService:
         )
         if not user:
             return None
+        
+        # Invalidate all permission caches for this user
+        invalidate_all_user_permissions(user_id)
+        
         return UserRead.model_validate(user)
 
     def deactivate_user(self, user_id: uuid.UUID) -> Optional[UserRead]:
@@ -123,6 +136,10 @@ class UserService:
         user = self.user_repo.deactivate(user_id)
         if not user:
             return None
+        
+        # Invalidate all permission caches for this user
+        invalidate_all_user_permissions(user_id)
+        
         return UserRead.model_validate(user)
 
     def set_last_login_at(self, user_id: uuid.UUID, timestamp: datetime) -> None:
@@ -131,11 +148,23 @@ class UserService:
 
     def get_app_permissions(self, user_id: uuid.UUID) -> UserAppPermissionsRead:
         """Get app-level permissions for a user."""
+        # Try cache first
+        cached = get_app_permissions(user_id)
+        if cached is not None:
+            return UserAppPermissionsRead(**cached)
+        
+        # Cache miss - fetch from database
         perms = self.app_perms_repo.get_by_user_id(user_id)
         if not perms:
             # Ensure permissions row exists
             perms = self.app_perms_repo.ensure_exists(user_id)
-        return UserAppPermissionsRead.model_validate(perms)
+        
+        result = UserAppPermissionsRead.model_validate(perms)
+        
+        # Cache the result
+        set_app_permissions(user_id, result.model_dump())
+        
+        return result
 
     def update_app_permissions(self, user_id: uuid.UUID, update_data: UserAppPermissionsUpdate) -> UserAppPermissionsRead:
         """Update app-level permissions for a user."""
@@ -152,19 +181,42 @@ class UserService:
         if not perms:
             # Create if doesn't exist
             perms = self.app_perms_repo.ensure_exists(user_id)
-        return UserAppPermissionsRead.model_validate(perms)
+        
+        result = UserAppPermissionsRead.model_validate(perms)
+        
+        # Invalidate cache for this user
+        invalidate_app_permissions(user_id)
+        
+        return result
 
     def ensure_app_permissions_row(self, user_id: uuid.UUID) -> UserAppPermissionsRead:
         """Ensure a user has an app permissions row."""
         perms = self.app_perms_repo.ensure_exists(user_id)
-        return UserAppPermissionsRead.model_validate(perms)
+        result = UserAppPermissionsRead.model_validate(perms)
+        
+        # Invalidate cache for this user since we may have created new permissions
+        invalidate_app_permissions(user_id)
+        
+        return result
 
     def get_project_permissions(self, user_id: uuid.UUID, project_id: uuid.UUID) -> Optional[ProjectUserPermissionsRead]:
         """Get project permissions for a user."""
+        # Try cache first
+        cached = get_project_permissions(user_id, project_id)
+        if cached is not None:
+            return ProjectUserPermissionsRead(**cached)
+        
+        # Cache miss - fetch from database
         perms = self.project_perms_repo.get_by_user_and_project(user_id, project_id)
         if not perms:
             return None
-        return ProjectUserPermissionsRead.model_validate(perms)
+        
+        result = ProjectUserPermissionsRead.model_validate(perms)
+        
+        # Cache the result
+        set_project_permissions(user_id, project_id, result.model_dump())
+        
+        return result
 
     def list_project_users(self, project_id: uuid.UUID) -> List[ProjectUserPermissionsRead]:
         """List all users with permissions for a project."""
@@ -196,8 +248,16 @@ class UserService:
             can_delete_recipe=update_data.can_delete_recipe,
             can_run_plan=update_data.can_run_plan,
         )
-        return ProjectUserPermissionsRead.model_validate(perms)
+        result = ProjectUserPermissionsRead.model_validate(perms)
+        
+        # Invalidate cache for this user/project
+        invalidate_project_permissions(user_id, project_id)
+        
+        return result
 
     def remove_user_from_project(self, user_id: uuid.UUID, project_id: uuid.UUID) -> None:
         """Remove a user from a project by deleting their permissions."""
         self.project_perms_repo.delete(user_id, project_id)
+        
+        # Invalidate cache for this user/project
+        invalidate_project_permissions(user_id, project_id)

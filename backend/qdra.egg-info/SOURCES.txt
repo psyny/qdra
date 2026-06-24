@@ -30,6 +30,8 @@ qdra/alembic/versions/20260622_add_timing_fields.py
 qdra/alembic/versions/20260622_drop_reasoning_jobs.py
 qdra/alembic/versions/20260623_add_project_templates_plans_output_solver.py
 qdra/alembic/versions/20260624_add_access_control_tables.py
+qdra/alembic/versions/20260624_add_can_access_to_project_user_permissions.py
+qdra/alembic/versions/20260624_add_project_id.py
 qdra/api/__init__.py
 qdra/api/auth.py
 qdra/api/entities.py
@@ -59,6 +61,7 @@ qdra/domain/planning/output_solver_domain.py
 qdra/domain/validation/__init__.py
 qdra/infrastructure/__init__.py
 qdra/infrastructure/cache/cache_service.py
+qdra/infrastructure/cache/permission_cache.py
 qdra/infrastructure/cache/relationship_cache.py
 qdra/infrastructure/config/__init__.py
 qdra/infrastructure/config/settings.py
