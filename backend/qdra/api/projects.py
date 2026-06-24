@@ -14,7 +14,7 @@ from repositories.entity_repository import EntityRepository
 from repositories.project_user_permissions_repository import ProjectUserPermissionsRepository
 from repositories.user_repository import UserRepository
 from api.project_templates import ProjectTemplateDetailResponse
-from infrastructure.security.permission_checker import get_current_user_id
+from infrastructure.security.permission_checker import get_current_user_id, require_can_create_projects, require_can_edit_projects, require_can_delete_projects
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
@@ -60,7 +60,11 @@ class ProjectResponse(BaseModel):
 
 
 @router.post("/projects", response_model=ProjectResponse, status_code=201)
-def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
+def create_project(
+    project_data: ProjectCreate,
+    user_id: uuid.UUID = Depends(require_can_create_projects),
+    db: Session = Depends(get_db)
+):
     # Validate that the template exists
     template_repo = ProjectTemplateRepository(db)
     template = template_repo.get_by_id(project_data.project_template_id)
@@ -158,6 +162,7 @@ class ProjectUpdate(BaseModel):
 def update_project_template(
     project_id: uuid.UUID,
     data: ProjectUpdateTemplate,
+    user_id: uuid.UUID = Depends(require_can_edit_projects),
     db: Session = Depends(get_db),
 ):
     """Update a project's template."""
@@ -177,6 +182,7 @@ def update_project_template(
 def update_project(
     project_id: uuid.UUID,
     data: ProjectUpdate,
+    user_id: uuid.UUID = Depends(require_can_edit_projects),
     db: Session = Depends(get_db),
 ):
     """Update a project's name or image_size_px."""
@@ -192,7 +198,11 @@ def update_project(
 
 
 @router.delete("/projects/{project_id}", status_code=204)
-def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_project(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(require_can_delete_projects),
+    db: Session = Depends(get_db)
+):
     """Delete a project and all its entities and images."""
     from qdra.infrastructure.cache.cache_service import CacheService
     entity_repo = EntityRepository(db, CacheService())

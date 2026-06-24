@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { BreadcrumbItem } from '../components/Breadcrumb';
 import { clearToken, getToken, getCurrentUser } from '../api/auth';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const { clearAppPermissions } = usePermissionContext();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
@@ -42,6 +44,7 @@ export function SettingsPage() {
 
   const handleLogout = () => {
     clearToken();
+    clearAppPermissions();
     navigate('/login');
   };
 

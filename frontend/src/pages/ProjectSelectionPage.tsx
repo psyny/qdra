@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getProjects, createProject, updateProject } from '../api/projects';
+import { getProjects, createProject, updateProject, deleteProject } from '../api/projects';
 import { getTemplates } from '../api/templates';
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
 import { ProjectTemplate } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { ProjectForm } from '../components/ProjectForm';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function ProjectSelectionPage() {
+  const { appPermissions } = usePermissionContext();
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,18 @@ export function ProjectSelectionPage() {
     }
   };
 
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) {
+      return;
+    }
+    try {
+      await deleteProject(projectId);
+      setProjects(projects.filter((p) => p.id !== projectId));
+    } catch (err) {
+      setError('Could not delete project');
+    }
+  };
+
   const editingProject = editingProjectId ? projects.find((p) => p.id === editingProjectId) : null;
 
   const filteredProjects = projects.filter((project) => {
@@ -114,7 +128,7 @@ export function ProjectSelectionPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
-          {!showCreateForm && !editingProjectId && (
+          {!showCreateForm && !editingProjectId && appPermissions?.can_create_projects && (
             <button
               onClick={() => setShowCreateForm(true)}
               className="button button--primary page-actions__create"
@@ -201,12 +215,22 @@ export function ProjectSelectionPage() {
                       )}
                     </div>
                     <div className="project-card__actions">
-                      <button
-                        onClick={() => setEditingProjectId(project.id)}
-                        className="button button--secondary"
-                      >
-                        Edit
-                      </button>
+                      {appPermissions?.can_edit_projects && (
+                        <button
+                          onClick={() => setEditingProjectId(project.id)}
+                          className="button button--secondary"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {appPermissions?.can_delete_projects && (
+                        <button
+                          onClick={() => handleDeleteProject(project.id)}
+                          className="button button--secondary"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

@@ -30,6 +30,7 @@ interface PermissionContextType {
   setCurrentUserId: (id: string) => void;
   setProjectPermissions: (permissions: ProjectPermissions) => void;
   clearProjectPermissions: () => void;
+  clearAppPermissions: () => void;
   hasAnyMaterialPermission: () => boolean;
   hasAnyRecipePermission: () => boolean;
 }
@@ -47,6 +48,11 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
 
   const clearProjectPermissions = () => {
     setProjectPermissionsState(null);
+  };
+
+  const clearAppPermissions = () => {
+    setAppPermissions(null);
+    setCurrentUserId(null);
   };
 
   const hasAnyMaterialPermission = () => {
@@ -73,6 +79,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
         setCurrentUserId,
         setProjectPermissions,
         clearProjectPermissions,
+        clearAppPermissions,
         hasAnyMaterialPermission,
         hasAnyRecipePermission,
       }}
