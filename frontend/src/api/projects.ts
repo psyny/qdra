@@ -44,6 +44,7 @@ export async function createProject(payload: CreateProjectRequest): Promise<Proj
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -58,6 +59,7 @@ export async function updateProject(projectId: string, payload: UpdateProjectReq
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });

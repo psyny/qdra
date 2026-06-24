@@ -7,11 +7,17 @@ import {
   EntityType,
   ParameterDefinition,
 } from '../types/template';
+import { getToken } from './auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 export async function getTemplates(): Promise<ProjectTemplate[]> {
-  const response = await fetch(`${API_URL}/api/project-templates`);
+  const response = await fetch(`${API_URL}/api/project-templates`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch templates');
   }
@@ -19,7 +25,7 @@ export async function getTemplates(): Promise<ProjectTemplate[]> {
 }
 
 export async function getTemplate(templateId: string): Promise<ProjectTemplateDetail> {
-  const response = await fetch(`${API_URL}/api/project-templates/${templateId}`);
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch template');
   }
@@ -31,6 +37,7 @@ export async function createTemplate(payload: CreateTemplateRequest): Promise<Pr
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -45,6 +52,7 @@ export async function updateTemplate(templateId: string, payload: UpdateTemplate
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -57,6 +65,7 @@ export async function updateTemplate(templateId: string, payload: UpdateTemplate
 export async function deleteTemplate(templateId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-templates/${templateId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) {
     if (response.status === 409) {
@@ -71,6 +80,7 @@ export async function cloneTemplate(templateId: string, payload: CloneTemplateRe
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(payload),
   });
@@ -81,7 +91,7 @@ export async function cloneTemplate(templateId: string, payload: CloneTemplateRe
 }
 
 export async function exportTemplate(templateId: string): Promise<any> {
-  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/export`);
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/export`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to export template');
   }
@@ -93,6 +103,7 @@ export async function importTemplate(data: any, name?: string): Promise<ProjectT
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ data, name }),
   });
@@ -103,7 +114,7 @@ export async function importTemplate(data: any, name?: string): Promise<ProjectT
 }
 
 export async function getEntityType(templateId: string, entityTypeId: string): Promise<EntityType> {
-  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}`);
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entity type');
   return response.json();
 }
@@ -112,7 +123,7 @@ export async function listEntityTypes(templateId: string, kind?: string): Promis
   const url = kind
     ? `${API_URL}/api/project-templates/${templateId}/entity-types?kind=${kind}`
     : `${API_URL}/api/project-templates/${templateId}/entity-types`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entity types');
   return response.json();
 }
@@ -123,7 +134,7 @@ export async function createEntityType(
 ): Promise<EntityType> {
   const response = await fetch(`${API_URL}/api/project-templates/${templateId}/entity-types`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create entity type');
@@ -139,7 +150,7 @@ export async function updateEntityType(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}`,
     {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(payload),
     },
   );
@@ -150,7 +161,7 @@ export async function updateEntityType(
 export async function deleteEntityType(templateId: string, entityTypeId: string): Promise<void> {
   const response = await fetch(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}`,
-    { method: 'DELETE' },
+    { method: 'DELETE', headers: getAuthHeaders() },
   );
   if (!response.ok) {
     if (response.status === 409) {
@@ -163,7 +174,7 @@ export async function deleteEntityType(templateId: string, entityTypeId: string)
 export async function cloneEntityType(templateId: string, entityTypeId: string): Promise<EntityType> {
   const response = await fetch(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}/clone`,
-    { method: 'POST' },
+    { method: 'POST', headers: getAuthHeaders() },
   );
   if (!response.ok) throw new Error('Failed to clone entity type');
   return response.json();
@@ -175,6 +186,7 @@ export async function listParameterDefinitions(
 ): Promise<ParameterDefinition[]> {
   const response = await fetch(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions`,
+    { headers: getAuthHeaders() },
   );
   if (!response.ok) throw new Error('Failed to fetch parameter definitions');
   return response.json();
@@ -205,7 +217,7 @@ export async function createParameterDefinition(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(payload),
     },
   );
@@ -239,7 +251,7 @@ export async function updateParameterDefinition(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions/${definitionId}`,
     {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(payload),
     },
   );
@@ -254,7 +266,7 @@ export async function deleteParameterDefinition(
 ): Promise<void> {
   const response = await fetch(
     `${API_URL}/api/project-templates/${templateId}/entity-types/${entityTypeId}/parameter-definitions/${definitionId}`,
-    { method: 'DELETE' },
+    { method: 'DELETE', headers: getAuthHeaders() },
   );
   if (!response.ok) throw new Error('Failed to delete parameter definition');
 }
@@ -262,7 +274,7 @@ export async function deleteParameterDefinition(
 // Slot Group operations
 
 export async function listSlotGroups(entityTypeId: string): Promise<any[]> {
-  const response = await fetch(`${API_URL}/api/project-template-entity-types/${entityTypeId}/slot-groups`);
+  const response = await fetch(`${API_URL}/api/project-template-entity-types/${entityTypeId}/slot-groups`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch slot groups');
   return response.json();
 }
@@ -279,7 +291,7 @@ export async function createSlotGroup(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-entity-types/${entityTypeId}/slot-groups`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -302,7 +314,7 @@ export async function updateSlotGroup(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update slot group');
@@ -312,6 +324,7 @@ export async function updateSlotGroup(
 export async function deleteSlotGroup(slotGroupId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to delete slot group');
 }
@@ -330,7 +343,7 @@ export async function createSlotDefinition(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/slot-definitions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create slot definition');
@@ -349,7 +362,7 @@ export async function updateSlotDefinition(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-definitions/${slotDefinitionId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update slot definition');
@@ -359,6 +372,7 @@ export async function updateSlotDefinition(
 export async function deleteSlotDefinition(slotDefinitionId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-slot-definitions/${slotDefinitionId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to delete slot definition');
 }
@@ -380,7 +394,7 @@ export async function createGroupConstraint(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/constraints`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create constraint');
@@ -402,7 +416,7 @@ export async function createDefinitionConstraint(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-definitions/${slotDefinitionId}/constraints`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create constraint');
@@ -424,7 +438,7 @@ export async function updateSlotConstraint(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-constraints/${constraintId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update constraint');
@@ -434,6 +448,7 @@ export async function updateSlotConstraint(
 export async function deleteSlotConstraint(constraintId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-slot-constraints/${constraintId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok) throw new Error('Failed to delete constraint');
 }
@@ -441,7 +456,7 @@ export async function deleteSlotConstraint(constraintId: string): Promise<void> 
 // Default Slot operations
 
 export async function getDefaultSlot(slotGroupId: string): Promise<any> {
-  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`);
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch default slot');
   return response.json();
 }
@@ -468,7 +483,7 @@ export async function createDefaultSlot(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create default slot');
@@ -497,7 +512,7 @@ export async function updateDefaultSlot(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update default slot');
@@ -507,6 +522,7 @@ export async function updateDefaultSlot(
 export async function deleteDefaultSlot(slotGroupId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/default-slot`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok && response.status !== 404) throw new Error('Failed to delete default slot');
 }
@@ -514,7 +530,7 @@ export async function deleteDefaultSlot(slotGroupId: string): Promise<void> {
 // Per Slot operations
 
 export async function listPerSlots(slotGroupId: string): Promise<any[]> {
-  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/per-slots`);
+  const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/per-slots`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch per slots');
   return response.json();
 }
@@ -541,7 +557,7 @@ export async function createPerSlot(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-slot-groups/${slotGroupId}/per-slots`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create per slot');
@@ -549,7 +565,7 @@ export async function createPerSlot(
 }
 
 export async function getPerSlot(perSlotId: string): Promise<any> {
-  const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`);
+  const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch per slot');
   return response.json();
 }
@@ -576,7 +592,7 @@ export async function updatePerSlot(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update per slot');
@@ -586,6 +602,7 @@ export async function updatePerSlot(
 export async function deletePerSlot(perSlotId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-template-per-slots/${perSlotId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok && response.status !== 404) throw new Error('Failed to delete per slot');
 }
@@ -593,7 +610,7 @@ export async function deletePerSlot(perSlotId: string): Promise<void> {
 // Plan Output Solver operations
 
 export async function getPlanOutputSolver(templateId: string): Promise<any> {
-  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`);
+  const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, { headers: getAuthHeaders() });
   if (!response.ok) {
     if (response.status === 404) {
       return null; // Not found is ok, means no config yet
@@ -612,7 +629,7 @@ export async function createPlanOutputSolver(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to create plan output solver configuration');
@@ -628,7 +645,7 @@ export async function updatePlanOutputSolver(
 ): Promise<any> {
   const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error('Failed to update plan output solver configuration');
@@ -638,6 +655,7 @@ export async function updatePlanOutputSolver(
 export async function deletePlanOutputSolver(templateId: string): Promise<void> {
   const response = await fetch(`${API_URL}/api/project-templates/${templateId}/plan-output-solver`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   if (!response.ok && response.status !== 404) throw new Error('Failed to delete plan output solver configuration');
 }
