@@ -81,6 +81,23 @@ def create_project(
         project_data.project_template_id,
         image_size_px=project_data.image_size_px
     )
+    
+    # Grant all permissions to the project creator
+    perm_repo = ProjectUserPermissionsRepository(db)
+    perm_repo.create(
+        user_id=user_id,
+        project_id=project.id,
+        can_access=True,
+        can_manage_project_users=True,
+        can_create_material=True,
+        can_edit_material=True,
+        can_delete_material=True,
+        can_create_recipe=True,
+        can_edit_recipe=True,
+        can_delete_recipe=True,
+        can_run_plan=True,
+    )
+    
     return project
 
 
