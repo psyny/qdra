@@ -3,15 +3,12 @@ FROM python:3.11-slim
 WORKDIR /app
 
 COPY pyproject.toml ./
+COPY qdra ./qdra
+COPY scripts ./scripts
+COPY docker ./docker
 RUN pip install --no-cache-dir -e .
 
-COPY qdra ./qdra
-
 ENV PYTHONPATH=/app/qdra
-ENV APP_ENV=development
-ENV DATABASE_URL=postgresql://qdra:qdra@postgres:5432/qdra
-ENV REDIS_URL=redis://redis:6379/0
-ENV GRAPH_JOB_QUEUE=graph_reasoning_jobs
-ENV WORKER_CONCURRENCY=1
+ENV PYTHONUNBUFFERED=1
 
 CMD ["python", "-m", "qdra.worker"]
