@@ -18,6 +18,7 @@ export function UserManagementPage() {
     login_name: '',
     password: '',
     display_name: '',
+    copy_permissions_from_user_id: undefined,
   });
 
   useEffect(() => {
@@ -41,7 +42,7 @@ export function UserManagementPage() {
     try {
       await createUser(createForm);
       setShowCreateModal(false);
-      setCreateForm({ login_name: '', password: '', display_name: '' });
+      setCreateForm({ login_name: '', password: '', display_name: '', copy_permissions_from_user_id: undefined });
       loadUsers();
     } catch (err) {
       setError('Failed to create user');
@@ -345,12 +346,44 @@ export function UserManagementPage() {
                   }}
                 />
               </div>
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  color: '#cfcfcf',
+                  marginBottom: '8px',
+                }}>
+                  Copy permissions from (optional)
+                </label>
+                <select
+                  value={createForm.copy_permissions_from_user_id || ''}
+                  onChange={(e) => setCreateForm({ ...createForm, copy_permissions_from_user_id: e.target.value || undefined })}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    padding: '12px',
+                    color: '#f5f5f5',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="">-- Select a user to copy permissions from --</option>
+                  {users.filter(u => u.is_active).map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.display_name} ({user.login_name})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreateModal(false);
-                    setCreateForm({ login_name: '', password: '', display_name: '' });
+                    setCreateForm({ login_name: '', password: '', display_name: '', copy_permissions_from_user_id: undefined });
                   }}
                   style={{
                     background: 'transparent',

@@ -15,6 +15,7 @@ export interface UserCreate {
   login_name: string;
   password: string;
   display_name: string;
+  copy_permissions_from_user_id?: string;
 }
 
 export interface UserUpdate {

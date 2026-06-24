@@ -21,6 +21,7 @@ class UserCreateRequest(BaseModel):
     login_name: str = Field(..., min_length=1)
     display_name: str = Field(..., min_length=1)
     password: str = Field(..., min_length=1)
+    copy_permissions_from_user_id: uuid.UUID = Field(None)
 
 
 class UserUpdateRequest(BaseModel):
@@ -62,7 +63,7 @@ def create_user(request: UserCreateRequest, db: Session = Depends(get_db)):
         password=request.password,
         display_name=request.display_name
     )
-    return user_service.create_user(user_data)
+    return user_service.create_user(user_data, copy_permissions_from_user_id=request.copy_permissions_from_user_id)
 
 
 @router.put("/{user_id}", response_model=UserRead)

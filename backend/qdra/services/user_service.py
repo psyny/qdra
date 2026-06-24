@@ -20,11 +20,11 @@ class UserService:
         self.app_perms_repo = UserAppPermissionsRepository(db)
         self.project_perms_repo = ProjectUserPermissionsRepository(db)
 
-    def create_user(self, user_data: UserCreate) -> UserRead:
+    def create_user(self, user_data: UserCreate, copy_permissions_from_user_id: Optional[uuid.UUID] = None) -> UserRead:
         """Create a new user with hashed password and app permissions.
         
         If this is the first user in the database, grant all app-level permissions.
-        Otherwise, grant no app-level permissions.
+        Otherwise, grant no app-level permissions unless copy_permissions_from_user_id is provided.
         """
         # Check if this is the first user
         is_first_user = self.user_repo.count_all() == 0
@@ -37,7 +37,23 @@ class UserService:
         )
         
         # Create app permissions
-        if is_first_user:
+        if copy_permissions_from_user_id:
+            # Copy permissions from source user
+            source_app_perms = self.app_perms_repo.get_by_user_id(copy_permissions_from_user_id)
+            if source_app_perms:
+                app_perms = self.app_perms_repo.create(
+                    user_id=user.id,
+                    can_manage_users=source_app_perms.can_manage_users,
+                    can_create_projects=source_app_perms.can_create_projects,
+                    can_edit_projects=source_app_perms.can_edit_projects,
+                    can_delete_projects=source_app_perms.can_delete_projects,
+                    can_create_templates=source_app_perms.can_create_templates,
+                    can_edit_templates=source_app_perms.can_edit_templates,
+                    can_delete_templates=source_app_perms.can_delete_templates,
+                )
+            else:
+                app_perms = self.app_perms_repo.create(user_id=user.id)
+        elif is_first_user:
             # First user gets all permissions
             app_perms = self.app_perms_repo.create(
                 user_id=user.id,
@@ -52,6 +68,23 @@ class UserService:
         else:
             # Subsequent users get no permissions
             app_perms = self.app_perms_repo.create(user_id=user.id)
+        
+        # Copy project permissions if copy_permissions_from_user_id is provided
+        if copy_permissions_from_user_id:
+            source_project_perms = self.project_perms_repo.list_by_user(copy_permissions_from_user_id)
+            for source_perm in source_project_perms:
+                self.project_perms_repo.upsert(
+                    user_id=user.id,
+                    project_id=source_perm.project_id,
+                    can_manage_project_users=source_perm.can_manage_project_users,
+                    can_create_material=source_perm.can_create_material,
+                    can_edit_material=source_perm.can_edit_material,
+                    can_delete_material=source_perm.can_delete_material,
+                    can_create_recipe=source_perm.can_create_recipe,
+                    can_edit_recipe=source_perm.can_edit_recipe,
+                    can_delete_recipe=source_perm.can_delete_recipe,
+                    can_run_plan=source_perm.can_run_plan,
+                )
         
         return UserRead.model_validate(user)
 
