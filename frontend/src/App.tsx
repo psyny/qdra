@@ -20,6 +20,7 @@ import { SlotDefinitionsPage } from './pages/SlotDefinitionsPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
 import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
 import { UserManagementPage } from './pages/UserManagementPage';
+import { UserEditPage } from './pages/UserEditPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
@@ -135,6 +136,7 @@ function App() {
         />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/settings/users" element={<UserManagementPage />} />
+        <Route path="/settings/users/:userId/edit" element={<UserEditPage />} />
       </Routes>
     </BrowserRouter>
   );

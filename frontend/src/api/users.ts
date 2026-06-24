@@ -47,6 +47,33 @@ export interface UserAppPermissionsUpdate {
   can_delete_templates?: boolean;
 }
 
+export interface ProjectUserPermissions {
+  id: string;
+  user_id: string;
+  project_id: string;
+  can_manage_project_users: boolean;
+  can_create_material: boolean;
+  can_edit_material: boolean;
+  can_delete_material: boolean;
+  can_create_recipe: boolean;
+  can_edit_recipe: boolean;
+  can_delete_recipe: boolean;
+  can_run_plan: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectUserPermissionsUpdate {
+  can_manage_project_users?: boolean;
+  can_create_material?: boolean;
+  can_edit_material?: boolean;
+  can_delete_material?: boolean;
+  can_create_recipe?: boolean;
+  can_edit_recipe?: boolean;
+  can_delete_recipe?: boolean;
+  can_run_plan?: boolean;
+}
+
 async function getHeaders() {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -141,6 +168,45 @@ export async function updateUserPermissions(
   });
   if (!response.ok) {
     throw new Error('Failed to update user permissions');
+  }
+  return response.json();
+}
+
+export async function listUserProjects(userId: string): Promise<ProjectUserPermissions[]> {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/users/${userId}/projects`, {
+    headers,
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch user projects');
+  }
+  return response.json();
+}
+
+export async function getUserProjectPermissions(userId: string, projectId: string): Promise<ProjectUserPermissions> {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/users/${userId}/projects/${projectId}/permissions`, {
+    headers,
+  });
+  if (!response.ok) {
+    throw new Error('Failed to fetch project permissions');
+  }
+  return response.json();
+}
+
+export async function updateUserProjectPermissions(
+  userId: string,
+  projectId: string,
+  permissions: ProjectUserPermissionsUpdate
+): Promise<ProjectUserPermissions> {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/users/${userId}/projects/${projectId}/permissions`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(permissions),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to update project permissions');
   }
   return response.json();
 }
