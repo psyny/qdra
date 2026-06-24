@@ -112,6 +112,9 @@ class PlanningRun(Base):
     __tablename__ = "planning_runs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(
+        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
     name = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -126,4 +129,5 @@ class PlanningRun(Base):
     __table_args__ = (
         Index("idx_planning_runs_status", "status"),
         Index("idx_planning_runs_type", "type"),
+        Index("idx_planning_runs_project_id", "project_id"),
     )

@@ -159,14 +159,17 @@ def create_planning_run(
 def list_planning_runs(
     type: Optional[str] = None,
     status: Optional[str] = None,
+    project_id: Optional[uuid.UUID] = None,
     db: Session = Depends(get_db),
 ):
-    """List all planning runs without results (to avoid traffic bloat). Can filter by type and status."""
+    """List all planning runs without results (to avoid traffic bloat). Can filter by type, status, and project_id."""
     query = db.query(PlanningRun)
     if type is not None:
         query = query.filter(PlanningRun.type == type)
     if status is not None:
         query = query.filter(PlanningRun.status == status)
+    if project_id is not None:
+        query = query.filter(PlanningRun.project_id == project_id)
     planning_runs = query.all()
     return planning_runs
 
@@ -461,6 +464,7 @@ def create_output_solver_run(
         }
 
     planning_run = PlanningRun(
+        project_id=request.project_id,
         name=request.name,
         type="output_solver",
         status="pending",

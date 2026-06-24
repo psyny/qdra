@@ -24,10 +24,11 @@ export interface PlanningRunWithResults extends PlanningRun {
   result: any;
 }
 
-export async function listPlanningRuns(type?: string, status?: string): Promise<PlanningRun[]> {
+export async function listPlanningRuns(type?: string, status?: string, projectId?: string): Promise<PlanningRun[]> {
   const params = new URLSearchParams();
   if (type) params.append('type', type);
   if (status) params.append('status', status);
+  if (projectId) params.append('project_id', projectId);
   
   const response = await fetch(`${API_URL}/api/planning-runs?${params.toString()}`, { headers: getAuthHeaders() });
   if (!response.ok) {

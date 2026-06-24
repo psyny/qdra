@@ -33,7 +33,7 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
           setViewLabel(outputSolverView.label);
         }
         
-        const runsData = await listPlanningRuns('output_solver');
+        const runsData = await listPlanningRuns('output_solver', undefined, projectId);
         setRuns(runsData);
       } catch (error) {
         setError('Failed to load planning runs');

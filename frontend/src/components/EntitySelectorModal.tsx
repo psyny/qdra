@@ -301,7 +301,6 @@ export function EntitySelectorModal({
         value_boolean: p.value_boolean,
       })),
     };
-    console.log('EntitySelectorModal - Selection result:', result);
     onSelection(result);
     setDetailModalOpen(false);
     setSelectedEntity(null);
@@ -325,7 +324,6 @@ export function EntitySelectorModal({
       })),
     };
     
-    console.log('EntitySelectorModal - Selection result:', result);
     onSelection(result);
     setDetailModalOpen(false);
     setSelectedEntity(null);
