@@ -30,8 +30,8 @@ class UserRepository:
         return self.db.query(User).filter(User.id == user_id).first()
 
     def get_by_login_name(self, login_name: str) -> Optional[User]:
-        """Get a user by login name."""
-        return self.db.query(User).filter(User.login_name == login_name).first()
+        """Get a user by login name (case-insensitive)."""
+        return self.db.query(User).filter(User.login_name.ilike(login_name)).first()
 
     def list_all(self, include_inactive: bool = False) -> List[User]:
         """List all users, optionally including inactive ones."""

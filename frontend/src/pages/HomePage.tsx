@@ -21,6 +21,11 @@ export function HomePage() {
             <h2 className="hub-card__title">Project Templates</h2>
             <p className="hub-card__description">Define schemas and display configurations</p>
           </Link>
+
+          <Link to="/settings/users" className="card hub-card">
+            <h2 className="hub-card__title">Users</h2>
+            <p className="hub-card__description">Manage users and permissions</p>
+          </Link>
         </div>
       </div>
     </div>

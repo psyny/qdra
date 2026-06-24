@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     s3_secret_access_key: str = ""
     s3_public_base_url: str = ""
     s3_force_path_style: bool = False
+    
+    # JWT configuration
+    jwt_secret_key: str = "change-this-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_hours: int = 24
 
 
 settings = Settings()

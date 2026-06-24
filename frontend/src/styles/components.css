@@ -411,18 +411,34 @@
 }
 
 .workspace-header {
-  padding: 24px 32px;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-main);
   margin-bottom: 24px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+}
+
+.settings-icon {
+  color: var(--text-secondary);
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: var(--radius-small);
+}
+
+.settings-icon:hover {
+  color: var(--text-primary);
+  background: var(--card-bg-hover);
 }
 
 .workspace-header__breadcrumb {
   font-size: 14px;
   color: var(--text-secondary);
+  margin: 0;
 }
 
 .workspace-header__breadcrumb span {

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
 import { ProjectSelectionPage } from './pages/ProjectSelectionPage';
 import { ProjectHomePage } from './pages/ProjectHomePage';
 import { ProjectWorkspaceWrapper } from './components/ProjectWorkspaceWrapper';
@@ -18,12 +19,15 @@ import { ViewEditorPage } from './pages/ViewEditorPage';
 import { SlotDefinitionsPage } from './pages/SlotDefinitionsPage';
 import { TemplatesPlaceholderPage } from './pages/TemplatesPlaceholderPage';
 import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
+import { UserManagementPage } from './pages/UserManagementPage';
+import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/home" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/projects" element={<ProjectSelectionPage />} />
         <Route path="/templates" element={<TemplateListPage />} />
@@ -129,6 +133,8 @@ function App() {
             </ProjectWorkspaceWrapper>
           }
         />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/users" element={<UserManagementPage />} />
       </Routes>
     </BrowserRouter>
   );
