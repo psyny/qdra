@@ -1,5 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 import { getToken } from './auth';
+import { apiUrl } from './config';
 
 export interface User {
   id: string;
@@ -90,7 +90,7 @@ async function getHeaders() {
 
 export async function getUsers(includeInactive: boolean = false): Promise<User[]> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users?include_inactive=${includeInactive}`, {
+  const response = await fetch(apiUrl(`/api/users?include_inactive=${includeInactive}`), {
     headers,
   });
   if (!response.ok) {
@@ -101,7 +101,7 @@ export async function getUsers(includeInactive: boolean = false): Promise<User[]
 
 export async function getUser(userId: string): Promise<User> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}`), {
     headers,
   });
   if (!response.ok) {
@@ -112,7 +112,7 @@ export async function getUser(userId: string): Promise<User> {
 
 export async function createUser(userData: UserCreate): Promise<User> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users`, {
+  const response = await fetch(apiUrl('/api/users'), {
     method: 'POST',
     headers,
     body: JSON.stringify(userData),
@@ -125,7 +125,7 @@ export async function createUser(userData: UserCreate): Promise<User> {
 
 export async function updateUser(userId: string, userData: UserUpdate): Promise<User> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}`), {
     method: 'PUT',
     headers,
     body: JSON.stringify(userData),
@@ -138,7 +138,7 @@ export async function updateUser(userId: string, userData: UserUpdate): Promise<
 
 export async function resetPassword(userId: string, newPassword: string): Promise<void> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/reset-password`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/reset-password`), {
     method: 'POST',
     headers,
     body: JSON.stringify({ new_password: newPassword }),
@@ -150,7 +150,7 @@ export async function resetPassword(userId: string, newPassword: string): Promis
 
 export async function getUserPermissions(userId: string): Promise<UserAppPermissions> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/permissions`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/permissions`), {
     headers,
   });
   if (!response.ok) {
@@ -164,7 +164,7 @@ export async function updateUserPermissions(
   permissions: UserAppPermissionsUpdate
 ): Promise<UserAppPermissions> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/permissions`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/permissions`), {
     method: 'PUT',
     headers,
     body: JSON.stringify(permissions),
@@ -177,7 +177,7 @@ export async function updateUserPermissions(
 
 export async function listUserProjects(userId: string): Promise<ProjectUserPermissions[]> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/projects`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/projects`), {
     headers,
   });
   if (!response.ok) {
@@ -188,7 +188,7 @@ export async function listUserProjects(userId: string): Promise<ProjectUserPermi
 
 export async function getUserProjectPermissions(userId: string, projectId: string): Promise<ProjectUserPermissions> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/projects/${projectId}/permissions`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/projects/${projectId}/permissions`), {
     headers,
   });
   if (!response.ok) {
@@ -203,7 +203,7 @@ export async function updateUserProjectPermissions(
   permissions: ProjectUserPermissionsUpdate
 ): Promise<ProjectUserPermissions> {
   const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/users/${userId}/projects/${projectId}/permissions`, {
+  const response = await fetch(apiUrl(`/api/users/${userId}/projects/${projectId}/permissions`), {
     method: 'PUT',
     headers,
     body: JSON.stringify(permissions),

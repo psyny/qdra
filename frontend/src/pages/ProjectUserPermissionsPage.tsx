@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { usePermissionContext } from '../contexts/PermissionContext';
 import { useMessageContext } from '../contexts/MessageContext';
+import { apiUrl } from '../api/config';
 
 interface ProjectUser {
   user_id: string;
@@ -43,7 +44,7 @@ export function ProjectUserPermissionsPage() {
   const loadProjectUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/projects/${projectId}/permissions`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/permissions`), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -62,7 +63,7 @@ export function ProjectUserPermissionsPage() {
   const loadAllUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/users', {
+      const response = await fetch(apiUrl('/api/users'), {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -81,7 +82,7 @@ export function ProjectUserPermissionsPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/projects/${projectId}/permissions/${selectedUserToAdd}`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/permissions/${selectedUserToAdd}`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -114,7 +115,7 @@ export function ProjectUserPermissionsPage() {
   const removeUserFromProject = async (userId: string) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/projects/${projectId}/permissions/${userId}`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/permissions/${userId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -135,7 +136,7 @@ export function ProjectUserPermissionsPage() {
   const updatePermissions = async (userId: string, permissions: any) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/projects/${projectId}/permissions/${userId}`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/permissions/${userId}`), {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

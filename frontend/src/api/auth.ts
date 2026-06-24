@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from './config';
 
 export interface LoginRequest {
   login: string;
@@ -30,7 +30,7 @@ export interface CurrentUser {
 }
 
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+  const response = await fetch(apiUrl('/api/auth/login'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function getCurrentUser(token: string): Promise<CurrentUser> {
-  const response = await fetch(`${API_URL}/api/auth/me`, {
+  const response = await fetch(apiUrl('/api/auth/me'), {
     headers: {
       'Authorization': `Bearer ${token}`,
     },

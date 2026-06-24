@@ -1,7 +1,6 @@
 import { Entity, EntityParameter, CreateEntityRequest, AddParameterRequest } from '../types/entity';
 import { getToken } from './auth';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from './config';
 
 function getAuthHeaders(): Record<string, string> {
   const token = getToken();
@@ -10,27 +9,27 @@ function getAuthHeaders(): Record<string, string> {
 
 export async function getEntities(projectId: string, kind?: string): Promise<Entity[]> {
   const url = kind
-    ? `${API_URL}/api/projects/${projectId}/entities?kind=${kind}`
-    : `${API_URL}/api/projects/${projectId}/entities`;
+    ? apiUrl(`/api/projects/${projectId}/entities?kind=${kind}`)
+    : apiUrl(`/api/projects/${projectId}/entities`);
   const response = await fetch(url, { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entities');
   return response.json();
 }
 
 export async function getEntitiesByViewConfig(projectId: string, configId: string): Promise<Entity[]> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/view-configs/${configId}/entities`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/view-configs/${configId}/entities`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entities by view config');
   return response.json();
 }
 
 export async function getEntity(projectId: string, entityId: string): Promise<Entity> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/entities/${entityId}`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/entities/${entityId}`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entity');
   return response.json();
 }
 
 export async function createEntity(projectId: string, payload: CreateEntityRequest): Promise<Entity> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/entities`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/entities`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
@@ -40,7 +39,7 @@ export async function createEntity(projectId: string, payload: CreateEntityReque
 }
 
 export async function updateEntity(projectId: string, entityId: string, payload: { parameters?: any[] }): Promise<Entity> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/entities/${entityId}`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/entities/${entityId}`), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
@@ -50,7 +49,7 @@ export async function updateEntity(projectId: string, entityId: string, payload:
 }
 
 export async function deleteEntity(projectId: string, entityId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/entities/${entityId}`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/entities/${entityId}`), {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -58,7 +57,7 @@ export async function deleteEntity(projectId: string, entityId: string): Promise
 }
 
 export async function getEntityParameters(projectId: string, entityId: string): Promise<EntityParameter[]> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/entities/${entityId}/parameters`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/entities/${entityId}/parameters`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch entity parameters');
   return response.json();
 }
@@ -69,7 +68,7 @@ export async function addEntityParameter(
   param: AddParameterRequest,
 ): Promise<EntityParameter> {
   const response = await fetch(
-    `${API_URL}/api/projects/${projectId}/entities/${entityId}/parameters`,
+    apiUrl(`/api/projects/${projectId}/entities/${entityId}/parameters`),
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -86,7 +85,7 @@ export async function deleteEntityParameter(
   parameterId: string,
 ): Promise<void> {
   const response = await fetch(
-    `${API_URL}/api/projects/${projectId}/entities/${entityId}/parameters/${parameterId}`,
+    apiUrl(`/api/projects/${projectId}/entities/${entityId}/parameters/${parameterId}`),
     { method: 'DELETE', headers: getAuthHeaders() },
   );
   if (!response.ok) throw new Error('Failed to delete entity parameter');
@@ -98,7 +97,7 @@ export async function getDistinctParameterValues(
   key: string,
   groups: string[] = [],
 ): Promise<string[]> {
-  const url = `${API_URL}/api/projects/${projectId}/parameter-values`;
+  const url = apiUrl(`/api/projects/${projectId}/parameter-values`);
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
@@ -116,7 +115,7 @@ export async function createRecipeSlot(
   kind: string,
   sortOrder: number = 0,
 ): Promise<any> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ kind, sort_order: sortOrder }),
@@ -132,7 +131,7 @@ export async function createRecipeOption(
   quantity: number,
   sortOrder: number = 0,
 ): Promise<any> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ quantity, sort_order: sortOrder }),
@@ -156,7 +155,7 @@ export async function createRecipeConstraint(
     is_wildcard?: boolean;
   },
 ): Promise<any> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(constraint),
@@ -166,25 +165,25 @@ export async function createRecipeConstraint(
 }
 
 export async function getRecipeSlots(projectId: string, recipeId: string): Promise<any[]> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch recipe slots');
   return response.json();
 }
 
 export async function getRecipeOptions(projectId: string, recipeId: string, slotId: string): Promise<any[]> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch recipe options');
   return response.json();
 }
 
 export async function getRecipeConstraints(projectId: string, recipeId: string, slotId: string, optionId: string): Promise<any[]> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints`), { headers: getAuthHeaders() });
   if (!response.ok) throw new Error('Failed to fetch recipe constraints');
   return response.json();
 }
 
 export async function deleteRecipeSlot(projectId: string, recipeId: string, slotId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}`), {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -192,7 +191,7 @@ export async function deleteRecipeSlot(projectId: string, recipeId: string, slot
 }
 
 export async function deleteRecipeOption(projectId: string, recipeId: string, slotId: string, optionId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}`), {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -200,7 +199,7 @@ export async function deleteRecipeOption(projectId: string, recipeId: string, sl
 }
 
 export async function deleteRecipeConstraint(projectId: string, recipeId: string, slotId: string, optionId: string, constraintId: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints/${constraintId}`, {
+  const response = await fetch(apiUrl(`/api/projects/${projectId}/recipes/${recipeId}/slots/${slotId}/options/${optionId}/constraints/${constraintId}`), {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });

@@ -1,6 +1,5 @@
 import { getToken } from './auth';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { apiUrl } from './config';
 
 function getAuthHeaders(): Record<string, string> {
   const token = getToken();
@@ -30,7 +29,7 @@ export async function listPlanningRuns(type?: string, status?: string, projectId
   if (status) params.append('status', status);
   if (projectId) params.append('project_id', projectId);
   
-  const response = await fetch(`${API_URL}/api/planning-runs?${params.toString()}`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/planning-runs?${params.toString()}`), { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning runs');
   }
@@ -38,7 +37,7 @@ export async function listPlanningRuns(type?: string, status?: string, projectId
 }
 
 export async function getPlanningRun(runId: string): Promise<PlanningRun> {
-  const response = await fetch(`${API_URL}/api/planning-runs/${runId}`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/planning-runs/${runId}`), { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning run');
   }
@@ -46,7 +45,7 @@ export async function getPlanningRun(runId: string): Promise<PlanningRun> {
 }
 
 export async function getPlanningRunWithResults(runId: string): Promise<PlanningRunWithResults> {
-  const response = await fetch(`${API_URL}/api/planning-runs/${runId}/with-results`, { headers: getAuthHeaders() });
+  const response = await fetch(apiUrl(`/api/planning-runs/${runId}/with-results`), { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning run with results');
   }
@@ -59,7 +58,7 @@ export async function createPlanningRun(data: {
   status?: string;
   input?: any;
 }): Promise<PlanningRunWithResults> {
-  const response = await fetch(`${API_URL}/api/planning-runs`, {
+  const response = await fetch(apiUrl('/api/planning-runs'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
@@ -133,7 +132,7 @@ export async function createOutputSolverRun(data: {
   score_rules?: ScoreRules;
   name?: string;
 }): Promise<PlanningRunWithResults> {
-  const response = await fetch(`${API_URL}/api/planning-runs/output-solver/runs`, {
+  const response = await fetch(apiUrl('/api/planning-runs/output-solver/runs'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),

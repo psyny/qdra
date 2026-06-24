@@ -7,12 +7,6 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 3000,
     strictPort: true,
-    proxy: {
-      "/api": {
-        target: "http://backend-api:8000",
-        changeOrigin: true,
-      },
-    },
   },
   test: {
     globals: true,
