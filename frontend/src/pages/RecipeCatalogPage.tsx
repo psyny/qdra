@@ -4,7 +4,6 @@ import { getProjectTemplate } from '../api/projects';
 import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
-import { EntitySelectorModal, EntitySelectorResult } from '../components/EntitySelectorModal';
 
 type RecipeCatalogPageProps = {
   projectId: string;
@@ -23,7 +22,6 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmEntity, setDeleteConfirmEntity] = useState<Entity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [selectorModalOpen, setSelectorModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -218,9 +216,6 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
     setDeleteConfirmEntity(null);
   };
 
-  const handleSelectorSelection = (result: EntitySelectorResult) => {
-    console.log('RecipeCatalogPage - Entity selector result:', result);
-  };
 
   if (loading && !recipeCatalogView) {
     return (
@@ -296,15 +291,6 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
           <p className="card-description">Create and manage entities.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {selectedConfig && (
-            <button
-              onClick={() => setSelectorModalOpen(true)}
-              className="button button--secondary"
-              style={{ fontSize: '12px' }}
-            >
-              Test Entity Selector
-            </button>
-          )}
           {selectedConfig && (
             <Link
               to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
@@ -424,14 +410,6 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
         </div>
       )}
 
-      {/* Entity Selector Modal */}
-      <EntitySelectorModal
-        projectId={projectId}
-        isOpen={selectorModalOpen}
-        onClose={() => setSelectorModalOpen(false)}
-        onSelection={handleSelectorSelection}
-        initialType="recipe"
-      />
     </div>
   );
 }

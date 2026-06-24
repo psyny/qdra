@@ -8,8 +8,59 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from services.entity_service import EntityService
+from infrastructure.security.permission_checker import (
+    require_can_create_material,
+    require_can_edit_material,
+    require_can_delete_material,
+    get_current_user_id,
+)
+from repositories.project_template_repository import ProjectTemplateRepository
+from repositories.project_repository import ProjectRepository
 
 router = APIRouter(prefix="/api")
+
+
+def _is_material_entity_type(project_id: uuid.UUID, entity_type_id: uuid.UUID, db: Session) -> bool:
+    """Check if an entity type is a material kind."""
+    project = ProjectRepository(db).get_by_id(project_id)
+    if not project:
+        return False
+    entity_types = ProjectTemplateRepository(db).list_entity_types(
+        project.project_template_id, kind="material"
+    )
+    return any(et.id == entity_type_id for et in entity_types)
+
+
+def _is_material_entity(entity_id: uuid.UUID, db: Session) -> bool:
+    """Check if an existing entity is a material kind."""
+    from repositories.entity_repository import EntityRepository
+    entity_repo = EntityRepository(db)
+    entity = entity_repo.get_by_id(entity_id)
+    if not entity:
+        return False
+    return _is_material_entity_type(entity.project_id, entity.entity_type_id, db)
+
+
+def _check_material_permission(
+    project_id: uuid.UUID,
+    permission_name: str,
+    db: Session,
+    user_id: uuid.UUID
+) -> None:
+    """Check if user has a specific material permission for the project."""
+    from services.user_service import UserService
+
+    user_service = UserService(db)
+    permissions = user_service.get_project_permissions(user_id, project_id)
+
+    if not permissions:
+        raise HTTPException(status_code=403, detail="You do not have access to this project")
+
+    if not getattr(permissions, permission_name, False):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission '{permission_name}' is required"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +131,17 @@ async def create_entity(
     project_id: uuid.UUID,
     request: CreateEntityRequest,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
+    # Check if this is a material entity type
+    is_material = _is_material_entity_type(project_id, request.entity_type_id, db)
+
+    # If it's a material, check create permission
+    if is_material:
+        _check_material_permission(project_id, "can_create_material", db, user_id)
 
     service = EntityService(db)
     try:
@@ -116,6 +175,7 @@ async def bulk_create_entities(
     project_id: uuid.UUID,
     request: BulkCreateEntityRequest,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
@@ -124,6 +184,13 @@ async def bulk_create_entities(
     results = []
     try:
         for item in request.entities:
+            # Check if this is a material entity type
+            is_material = _is_material_entity_type(project_id, item.entity_type_id, db)
+
+            # If it's a material, check create permission
+            if is_material:
+                _check_material_permission(project_id, "can_create_material", db, user_id)
+
             entity = service.create_entity(
                 project_id=project_id,
                 entity_type_id=item.entity_type_id,
@@ -186,27 +253,35 @@ async def update_entity(
     entity_id: uuid.UUID,
     request: UpdateEntityRequest,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Update an entity's parameters."""
     from repositories.entity_repository import EntityRepository
     from qdra.infrastructure.cache.cache_service import CacheService
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
+    # Check if this is a material entity
+    is_material = _is_material_entity(entity_id, db)
+
+    # If it's a material, check edit permission
+    if is_material:
+        _check_material_permission(project_id, "can_edit_material", db, user_id)
+
     service = EntityService(db)
     entity_repo = EntityRepository(db, CacheService())
-    
+
     try:
         # Verify entity exists
         await service.get_entity(entity_id)
-        
+
         # Update parameters if provided
         if request.parameters:
             # First, delete existing parameters for this entity
             existing_params = service.get_entity_parameters(entity_id)
             for param in existing_params:
                 service.delete_parameter(param.id)
-            
+
             # Add new parameters
             for param in request.parameters:
                 service.add_parameter(
@@ -217,16 +292,16 @@ async def update_entity(
                     value_number=param.value_number,
                     value_boolean=param.value_boolean,
                 )
-            
+
             # Invalidate entity cache
             entity_repo.invalidate_entity(entity_id)
-            
+
             # Invalidate all relationship caches for this project
             if settings.l1_caching:
                 clear_all_caches()
             if settings.l2_caching:
                 clear_pattern(str(project_id))
-        
+
         return await service.get_entity(entity_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -237,10 +312,18 @@ def delete_entity(
     project_id: uuid.UUID,
     entity_id: uuid.UUID,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
+    # Check if this is a material entity
+    is_material = _is_material_entity(entity_id, db)
+
+    # If it's a material, check delete permission
+    if is_material:
+        _check_material_permission(project_id, "can_delete_material", db, user_id)
+
     service = EntityService(db)
     try:
         service.delete_entity(entity_id)
@@ -262,9 +345,17 @@ def add_entity_parameter(
     entity_id: uuid.UUID,
     request: ParameterValueModel,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
+    # Check if this is a material entity
+    is_material = _is_material_entity(entity_id, db)
+
+    # If it's a material, check edit permission
+    if is_material:
+        _check_material_permission(project_id, "can_edit_material", db, user_id)
 
     service = EntityService(db)
     try:
@@ -328,9 +419,17 @@ def delete_entity_parameter(
     entity_id: uuid.UUID,
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+
+    # Check if this is a material entity
+    is_material = _is_material_entity(entity_id, db)
+
+    # If it's a material, check edit permission
+    if is_material:
+        _check_material_permission(project_id, "can_edit_material", db, user_id)
 
     service = EntityService(db)
     deleted = service.delete_parameter(parameter_id)
