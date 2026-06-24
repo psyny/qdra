@@ -33,6 +33,7 @@ class ProjectUserPermissionsRepository:
         self,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
+        can_access: bool = False,
         can_manage_project_users: bool = False,
         can_create_material: bool = False,
         can_edit_material: bool = False,
@@ -46,6 +47,7 @@ class ProjectUserPermissionsRepository:
         permissions = ProjectUserPermissions(
             user_id=user_id,
             project_id=project_id,
+            can_access=can_access,
             can_manage_project_users=can_manage_project_users,
             can_create_material=can_create_material,
             can_edit_material=can_edit_material,
@@ -64,6 +66,7 @@ class ProjectUserPermissionsRepository:
         self,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
+        can_access: Optional[bool] = None,
         can_manage_project_users: Optional[bool] = None,
         can_create_material: Optional[bool] = None,
         can_edit_material: Optional[bool] = None,
@@ -78,6 +81,8 @@ class ProjectUserPermissionsRepository:
         if not permissions:
             return None
 
+        if can_access is not None:
+            permissions.can_access = can_access
         if can_manage_project_users is not None:
             permissions.can_manage_project_users = can_manage_project_users
         if can_create_material is not None:
@@ -103,6 +108,7 @@ class ProjectUserPermissionsRepository:
         self,
         user_id: uuid.UUID,
         project_id: uuid.UUID,
+        can_access: Optional[bool] = None,
         can_manage_project_users: Optional[bool] = None,
         can_create_material: Optional[bool] = None,
         can_edit_material: Optional[bool] = None,
@@ -117,6 +123,8 @@ class ProjectUserPermissionsRepository:
         
         if permissions:
             # Update existing
+            if can_access is not None:
+                permissions.can_access = can_access
             if can_manage_project_users is not None:
                 permissions.can_manage_project_users = can_manage_project_users
             if can_create_material is not None:
@@ -141,6 +149,7 @@ class ProjectUserPermissionsRepository:
             return self.create(
                 user_id=user_id,
                 project_id=project_id,
+                can_access=can_access or False,
                 can_manage_project_users=can_manage_project_users or False,
                 can_create_material=can_create_material or False,
                 can_edit_material=can_edit_material or False,

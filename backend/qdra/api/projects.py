@@ -271,6 +271,7 @@ def update_project_user_permissions(
     permissions = perm_repo.upsert(
         user_id=user_id,
         project_id=project_id,
+        can_access=request.can_access,
         can_manage_project_users=request.can_manage_project_users,
         can_create_material=request.can_create_material,
         can_edit_material=request.can_edit_material,

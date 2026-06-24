@@ -24,6 +24,7 @@ class ProjectUserPermissions(Base):
         ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
     )
+    can_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     can_manage_project_users: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     can_create_material: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     can_edit_material: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

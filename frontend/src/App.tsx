@@ -26,6 +26,8 @@ import { ProjectUserPermissionsPage } from './pages/ProjectUserPermissionsPage';
 import { MessageProvider } from './contexts/MessageContext';
 import { PermissionProvider } from './contexts/PermissionContext';
 import { PermissionRouteGuard } from './components/PermissionRouteGuard';
+import { RequireAuth } from './components/RequireAuth';
+import { RequireManageUsers } from './components/RequireManageUsers';
 
 function App() {
   return (
@@ -35,6 +37,7 @@ function App() {
           <Routes>
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route element={<RequireAuth />}>
           <Route path="/home" element={<HomePage />} />
           <Route path="/projects" element={<ProjectSelectionPage />} />
           <Route path="/templates" element={<TemplateListPage />} />
@@ -177,8 +180,11 @@ function App() {
             }
           />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/settings/users" element={<UserManagementPage />} />
-          <Route path="/settings/users/:userId/edit" element={<UserEditPage />} />
+          <Route element={<RequireManageUsers />}>
+            <Route path="/settings/users" element={<UserManagementPage />} />
+            <Route path="/settings/users/:userId/edit" element={<UserEditPage />} />
+          </Route>
+          </Route>
         </Routes>
         </BrowserRouter>
       </MessageProvider>

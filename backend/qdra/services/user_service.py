@@ -76,6 +76,7 @@ class UserService:
                 self.project_perms_repo.upsert(
                     user_id=user.id,
                     project_id=source_perm.project_id,
+                    can_access=source_perm.can_access,
                     can_manage_project_users=source_perm.can_manage_project_users,
                     can_create_material=source_perm.can_create_material,
                     can_edit_material=source_perm.can_edit_material,

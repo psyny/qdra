@@ -116,6 +116,7 @@ export function UserEditPage() {
         id: '',
         user_id: userId,
         project_id: project.id,
+        can_access: false,
         can_manage_project_users: false,
         can_create_material: false,
         can_edit_material: false,
@@ -155,6 +156,7 @@ export function UserEditPage() {
         userId,
         selectedProject.id,
         {
+          can_access: projectPermissions.can_access,
           can_manage_project_users: projectPermissions.can_manage_project_users,
           can_create_material: projectPermissions.can_create_material,
           can_edit_material: projectPermissions.can_edit_material,
@@ -215,6 +217,7 @@ export function UserEditPage() {
           try {
             const perms = await getUserProjectPermissions(userToCopy.id, project.id);
             await updateUserProjectPermissions(userId, project.id, {
+              can_access: perms.can_access,
               can_manage_project_users: perms.can_manage_project_users,
               can_create_material: perms.can_create_material,
               can_edit_material: perms.can_edit_material,
@@ -240,6 +243,7 @@ export function UserEditPage() {
         if (!selectedProject) return;
         const perms = await getUserProjectPermissions(userToCopy.id, selectedProject.id);
         await updateUserProjectPermissions(userId, selectedProject.id, {
+          can_access: perms.can_access,
           can_manage_project_users: perms.can_manage_project_users,
           can_create_material: perms.can_create_material,
           can_edit_material: perms.can_edit_material,
@@ -710,6 +714,22 @@ export function UserEditPage() {
               }}>
                 {selectedProject.name}
               </h4>
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '14px',
+                color: '#cfcfcf',
+                marginBottom: '8px',
+                cursor: 'pointer',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={projectPermissions.can_access}
+                  onChange={(e) => setProjectPermissions({ ...projectPermissions, can_access: e.target.checked })}
+                  style={{ marginRight: '8px' }}
+                />
+                Can access
+              </label>
               <label style={{
                 display: 'flex',
                 alignItems: 'center',

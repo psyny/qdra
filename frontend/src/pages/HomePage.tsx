@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function HomePage() {
+  const { appPermissions } = usePermissionContext();
+
   return (
     <div className="page">
       <WorkspaceHeader breadcrumbItems={[{ label: 'Home', to: '/home' }]} />
@@ -22,10 +25,12 @@ export function HomePage() {
             <p className="hub-card__description">Define schemas and display configurations</p>
           </Link>
 
-          <Link to="/settings/users" className="card hub-card">
-            <h2 className="hub-card__title">Users</h2>
-            <p className="hub-card__description">Manage users and permissions</p>
-          </Link>
+          {appPermissions?.can_manage_users && (
+            <Link to="/settings/users" className="card hub-card">
+              <h2 className="hub-card__title">Users</h2>
+              <p className="hub-card__description">Manage users and permissions</p>
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ interface AppPermissions {
 }
 
 interface ProjectPermissions {
+  can_access: boolean;
   can_manage_project_users: boolean;
   can_create_material: boolean;
   can_edit_material: boolean;

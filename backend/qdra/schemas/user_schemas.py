@@ -56,6 +56,7 @@ class UserAppPermissionsRead(BaseModel):
 
 
 class ProjectUserPermissionsUpdate(BaseModel):
+    can_access: Optional[bool] = None
     can_manage_project_users: Optional[bool] = None
     can_create_material: Optional[bool] = None
     can_edit_material: Optional[bool] = None
@@ -72,6 +73,7 @@ class ProjectUserPermissionsRead(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
     project_id: uuid.UUID
+    can_access: bool
     can_manage_project_users: bool
     can_create_material: bool
     can_edit_material: bool

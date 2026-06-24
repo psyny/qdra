@@ -52,6 +52,7 @@ export interface ProjectUserPermissions {
   id: string;
   user_id: string;
   project_id: string;
+  can_access: boolean;
   can_manage_project_users: boolean;
   can_create_material: boolean;
   can_edit_material: boolean;
@@ -65,6 +66,7 @@ export interface ProjectUserPermissions {
 }
 
 export interface ProjectUserPermissionsUpdate {
+  can_access?: boolean;
   can_manage_project_users?: boolean;
   can_create_material?: boolean;
   can_edit_material?: boolean;
