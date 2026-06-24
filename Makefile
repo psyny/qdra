@@ -1,5 +1,6 @@
 .PHONY: up down build logs restart clean help
 .PHONY: be-venv be-install be-qdra-tests-unit be-qdra-tests-integration be-qdra-tests-all
+.PHONY: prod-local-up prod-local-down prod-local-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -83,6 +84,22 @@ db-reset-all: ## Drop and recreate both main and test databases
 db-check-structure: ## Check current database structure via API
 	@echo "Fetching database structure..."
 	@curl -s http://localhost:8000/api/schema | $(BE_PYTHON) -m json.tool
+
+# ============================================================================
+# Production-Local Test Commands
+# ============================================================================
+
+prod-local-up: ## Start production-like local test environment
+	docker compose -f docker-compose.prod-local.yml up --build
+	@echo ""
+	@echo "Production-like services started. Click here to access the frontend: http://localhost:8080"
+	@echo ""
+
+prod-local-down: ## Stop production-like local test environment
+	docker compose -f docker-compose.prod-local.yml down
+
+prod-local-clean: ## Stop and remove all containers, volumes, and networks for production-like test
+	docker compose -f docker-compose.prod-local.yml down -v
 
 # ============================================================================
 # Backend (Qdra) Commands
