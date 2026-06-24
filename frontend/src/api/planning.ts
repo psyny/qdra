@@ -1,4 +1,11 @@
+import { getToken } from './auth';
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
 
 export interface PlanningRun {
   id: string;
@@ -22,7 +29,7 @@ export async function listPlanningRuns(type?: string, status?: string): Promise<
   if (type) params.append('type', type);
   if (status) params.append('status', status);
   
-  const response = await fetch(`${API_URL}/api/planning-runs?${params.toString()}`);
+  const response = await fetch(`${API_URL}/api/planning-runs?${params.toString()}`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning runs');
   }
@@ -30,7 +37,7 @@ export async function listPlanningRuns(type?: string, status?: string): Promise<
 }
 
 export async function getPlanningRun(runId: string): Promise<PlanningRun> {
-  const response = await fetch(`${API_URL}/api/planning-runs/${runId}`);
+  const response = await fetch(`${API_URL}/api/planning-runs/${runId}`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning run');
   }
@@ -38,7 +45,7 @@ export async function getPlanningRun(runId: string): Promise<PlanningRun> {
 }
 
 export async function getPlanningRunWithResults(runId: string): Promise<PlanningRunWithResults> {
-  const response = await fetch(`${API_URL}/api/planning-runs/${runId}/with-results`);
+  const response = await fetch(`${API_URL}/api/planning-runs/${runId}/with-results`, { headers: getAuthHeaders() });
   if (!response.ok) {
     throw new Error('Failed to fetch planning run with results');
   }
@@ -53,7 +60,7 @@ export async function createPlanningRun(data: {
 }): Promise<PlanningRunWithResults> {
   const response = await fetch(`${API_URL}/api/planning-runs`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
@@ -127,7 +134,7 @@ export async function createOutputSolverRun(data: {
 }): Promise<PlanningRunWithResults> {
   const response = await fetch(`${API_URL}/api/planning-runs/output-solver/runs`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(data),
   });
   if (!response.ok) {

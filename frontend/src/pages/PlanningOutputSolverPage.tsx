@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProjectTemplate } from '../api/projects';
 import { listPlanningRuns, PlanningRun } from '../api/planning';
+import { PermissionAction } from '../components/PermissionAction';
 
 type PlanningOutputSolverPageProps = {
   projectId: string;
@@ -131,13 +132,15 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
           <h2 className="card-title">{viewLabel}</h2>
           <p className="card-description">View and manage planning runs.</p>
         </div>
-        <Link 
-          to={`/projects/${projectId}/planning/planning_output_solver/new`}
-          className="button button--primary"
-          style={{ textDecoration: 'none' }}
-        >
-          + New Run
-        </Link>
+        <PermissionAction requireRunPlan>
+          <Link 
+            to={`/projects/${projectId}/planning/planning_output_solver/new`}
+            className="button button--primary"
+            style={{ textDecoration: 'none' }}
+          >
+            + New Run
+          </Link>
+        </PermissionAction>
       </div>
       <hr style={{ margin: '16px 0', border: 'none', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }} />
 

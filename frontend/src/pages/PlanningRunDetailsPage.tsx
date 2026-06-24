@@ -5,6 +5,7 @@ import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planni
 import { PlanningGraph } from '../components/planning/PlanningGraph';
 import { getProjectTemplate } from '../api/projects';
 import { getEntity } from '../api/entities';
+import { PermissionAction } from '../components/PermissionAction';
 
 type PlanningRunDetailsPageProps = {
   projectId: string;
@@ -435,13 +436,15 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
           >
             ← Back to Runs
           </Link>
-          <button
-            onClick={handleClone}
-            className="button button--primary"
-            style={{ height: '35px' }}
-          >
-            Clone Run
-          </button>
+          <PermissionAction requireRunPlan>
+            <button
+              onClick={handleClone}
+              className="button button--primary"
+              style={{ height: '35px' }}
+            >
+              Clone Run
+            </button>
+          </PermissionAction>
         </div>
       </div>
 

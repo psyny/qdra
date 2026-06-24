@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from infrastructure.db.models import PlanningRun
+from infrastructure.security.permission_checker import get_current_user_id
+from services.user_service import UserService
 from domain.constraints import ConstraintSpec, ConstraintRule
 from domain.planning.output_solver_domain import (
     TargetSpec,
@@ -231,8 +233,19 @@ def update_planning_run(
 def create_output_solver_run(
     request: OutputSolverRunRequest,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Create an output solver planning run (async execution)."""
+    
+    # Check can_run_plan permission
+    user_service = UserService(db)
+    permissions = user_service.get_project_permissions(user_id, request.project_id)
+    
+    if not permissions:
+        raise HTTPException(status_code=403, detail="You do not have access to this project")
+    
+    if not permissions.can_run_plan:
+        raise HTTPException(status_code=403, detail="Permission 'can_run_plan' is required")
     
     def to_spec(m: ConstraintSpecModel) -> ConstraintSpec:
         # Handle missing operator field with default
