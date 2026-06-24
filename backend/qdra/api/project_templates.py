@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from repositories.project_template_repository import ProjectTemplateRepository
+from infrastructure.security.permission_checker import require_can_create_templates, require_can_edit_templates, require_can_delete_templates
 
 router = APIRouter(prefix="/api")
 
@@ -318,7 +319,11 @@ class TemplateExportResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.post("/project-templates", response_model=ProjectTemplateResponse, status_code=201)
-def create_project_template(data: ProjectTemplateCreate, db: Session = Depends(get_db)):
+def create_project_template(
+    data: ProjectTemplateCreate,
+    user_id: uuid.UUID = Depends(require_can_create_templates),
+    db: Session = Depends(get_db)
+):
     repo = ProjectTemplateRepository(db)
     return repo.create(name=data.name, description=data.description, is_builtin=False)
 
@@ -368,6 +373,7 @@ def get_project_template_detail(
 def update_project_template(
     project_template_id: uuid.UUID,
     data: ProjectTemplateUpdate,
+    user_id: uuid.UUID = Depends(require_can_edit_templates),
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
@@ -380,6 +386,7 @@ def update_project_template(
 @router.delete("/project-templates/{project_template_id}", status_code=204)
 def delete_project_template(
     project_template_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(require_can_delete_templates),
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
@@ -395,6 +402,7 @@ def delete_project_template(
 def clone_project_template(
     project_template_id: uuid.UUID,
     data: ProjectTemplateCloneRequest,
+    user_id: uuid.UUID = Depends(require_can_create_templates),
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
@@ -410,6 +418,7 @@ def clone_project_template(
 )
 def export_template(
     project_template_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(require_can_create_templates),
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)
@@ -426,6 +435,7 @@ def export_template(
 )
 def import_template(
     request: TemplateImportRequest,
+    user_id: uuid.UUID = Depends(require_can_create_templates),
     db: Session = Depends(get_db),
 ):
     repo = ProjectTemplateRepository(db)

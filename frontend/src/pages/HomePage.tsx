@@ -20,10 +20,12 @@ export function HomePage() {
             <p className="hub-card__description">Manage your planning workspaces</p>
           </Link>
 
-          <Link to="/templates" className="card hub-card">
-            <h2 className="hub-card__title">Project Templates</h2>
-            <p className="hub-card__description">Define schemas and display configurations</p>
-          </Link>
+          {(appPermissions?.can_create_templates || appPermissions?.can_edit_templates || appPermissions?.can_delete_templates) && (
+            <Link to="/templates" className="card hub-card">
+              <h2 className="hub-card__title">Project Templates</h2>
+              <p className="hub-card__description">Define schemas and display configurations</p>
+            </Link>
+          )}
 
           {appPermissions?.can_manage_users && (
             <Link to="/settings/users" className="card hub-card">

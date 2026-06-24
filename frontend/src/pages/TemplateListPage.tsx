@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getTemplates, deleteTemplate, cloneTemplate, exportTemplate, importTemplate } from '../api/templates';
 import { ProjectTemplate, CloneTemplateRequest } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function TemplateListPage() {
   const navigate = useNavigate();
+  const { appPermissions } = usePermissionContext();
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,12 +154,16 @@ export function TemplateListPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
           />
-          <button onClick={() => setShowImportDialog(true)} className="button button--secondary">
-            Import Template
-          </button>
-          <button onClick={handleCreateTemplate} className="button button--primary page-actions__create">
-            Create Template
-          </button>
+          {appPermissions?.can_create_templates && (
+            <button onClick={() => setShowImportDialog(true)} className="button button--secondary">
+              Import Template
+            </button>
+          )}
+          {appPermissions?.can_create_templates && (
+            <button onClick={handleCreateTemplate} className="button button--primary page-actions__create">
+              Create Template
+            </button>
+          )}
         </div>
       </div>
 
@@ -212,46 +218,54 @@ export function TemplateListPage() {
                   </p>
                 </div>
                 <div className="template-card__actions">
-                  <Link to={`/templates/${template.id}/edit`} className="button button--secondary">
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleCloneTemplate(template.id)}
-                    disabled={isCloning === template.id}
-                    className="button button--secondary"
-                  >
-                    {isCloning === template.id ? 'Cloning...' : 'Clone'}
-                  </button>
-                  <button
-                    onClick={() => handleExportTemplate(template.id)}
-                    disabled={isExporting === template.id}
-                    className="button button--secondary"
-                  >
-                    {isExporting === template.id ? 'Exporting...' : 'Export'}
-                  </button>
-                  {deleteConfirm === template.id ? (
-                    <>
+                  {appPermissions?.can_edit_templates && (
+                    <Link to={`/templates/${template.id}/edit`} className="button button--secondary">
+                      Edit
+                    </Link>
+                  )}
+                  {appPermissions?.can_create_templates && (
+                    <button
+                      onClick={() => handleCloneTemplate(template.id)}
+                      disabled={isCloning === template.id}
+                      className="button button--secondary"
+                    >
+                      {isCloning === template.id ? 'Cloning...' : 'Clone'}
+                    </button>
+                  )}
+                  {appPermissions?.can_create_templates && (
+                    <button
+                      onClick={() => handleExportTemplate(template.id)}
+                      disabled={isExporting === template.id}
+                      className="button button--secondary"
+                    >
+                      {isExporting === template.id ? 'Exporting...' : 'Export'}
+                    </button>
+                  )}
+                  {appPermissions?.can_delete_templates && (
+                    deleteConfirm === template.id ? (
+                      <>
+                        <button
+                          onClick={() => handleDeleteTemplate(template.id)}
+                          disabled={isDeleting === template.id}
+                          className="button button--danger"
+                        >
+                          {isDeleting === template.id ? 'Deleting...' : 'Confirm'}
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm(null)}
+                          className="button button--secondary"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
                       <button
-                        onClick={() => handleDeleteTemplate(template.id)}
-                        disabled={isDeleting === template.id}
+                        onClick={() => setDeleteConfirm(template.id)}
                         className="button button--danger"
                       >
-                        {isDeleting === template.id ? 'Deleting...' : 'Confirm'}
+                        Delete
                       </button>
-                      <button
-                        onClick={() => setDeleteConfirm(null)}
-                        className="button button--secondary"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => setDeleteConfirm(template.id)}
-                      className="button button--danger"
-                    >
-                      Delete
-                    </button>
+                    )
                   )}
                 </div>
               </div>
