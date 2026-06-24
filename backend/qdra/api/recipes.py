@@ -16,6 +16,11 @@ from repositories.option_repository import OptionRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.project_repository import ProjectRepository
+from infrastructure.security.permission_checker import (
+    require_can_create_recipe,
+    require_can_edit_recipe,
+    require_can_delete_recipe,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -200,6 +205,7 @@ async def create_recipe(
     project_id: uuid.UUID,
     data: RecipeCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_create_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
@@ -223,6 +229,7 @@ async def create_recipe_bulk(
     project_id: uuid.UUID,
     recipe_data: RecipeBulkCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_create_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
@@ -289,11 +296,14 @@ async def get_recipe(
 
 @router.delete("/projects/{project_id}/recipes/{recipe_id}", status_code=204)
 def delete_recipe(
-    project_id: uuid.UUID, recipe_id: uuid.UUID, db: Session = Depends(get_db)
+    project_id: uuid.UUID,
+    recipe_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_delete_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     try:
         service.delete_entity(recipe_id)
@@ -312,10 +322,11 @@ def create_slot(
     recipe_id: uuid.UUID,
     slot_data: SlotCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     slot_repo = SlotRepository(db)
     slot = slot_repo.create(
         recipe_entity_id=recipe_id,
@@ -337,10 +348,11 @@ def create_option(
     slot_id: uuid.UUID,
     option_data: OptionCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     option_repo = OptionRepository(db)
     option = option_repo.create(
         slot_id=slot_id,
@@ -367,10 +379,11 @@ def create_constraint(
     option_id: uuid.UUID,
     constraint_data: ConstraintCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     constraint_repo = ParameterConstraintRepository(db)
     constraint = constraint_repo.create(
         option_id=option_id,
@@ -488,10 +501,11 @@ def delete_recipe_slot(
     recipe_id: uuid.UUID,
     slot_id: uuid.UUID,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     slot_repo = SlotRepository(db)
     if not slot_repo.delete(slot_id):
         raise HTTPException(status_code=404, detail="Slot not found")
@@ -509,10 +523,11 @@ def delete_recipe_option(
     slot_id: uuid.UUID,
     option_id: uuid.UUID,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     option_repo = OptionRepository(db)
     option = option_repo.get_by_id(option_id)
     if not option:
@@ -534,10 +549,11 @@ def delete_recipe_constraint(
     option_id: uuid.UUID,
     constraint_id: uuid.UUID,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     constraint_repo = ParameterConstraintRepository(db)
     constraint = constraint_repo.get_by_id(constraint_id)
     if not constraint:
@@ -557,10 +573,11 @@ def add_recipe_parameter(
     recipe_id: uuid.UUID,
     param_data: RecipeParameterCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     try:
         result = service.add_parameter(
@@ -595,10 +612,11 @@ def delete_recipe_parameter(
     recipe_id: uuid.UUID,
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")

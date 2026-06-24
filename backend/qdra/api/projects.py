@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -11,11 +11,14 @@ from repositories.project_repository import ProjectRepository
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.image_asset_repository import ImageAssetRepository
 from repositories.entity_repository import EntityRepository
+from repositories.project_user_permissions_repository import ProjectUserPermissionsRepository
+from repositories.user_repository import UserRepository
 from api.project_templates import ProjectTemplateDetailResponse
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.config.settings import settings
+from schemas.user_schemas import ProjectUserPermissionsUpdate, ProjectUserPermissionsRead
 
 router = APIRouter(prefix="/api")
 
@@ -181,10 +184,10 @@ def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
     entity_repo = EntityRepository(db, CacheService())
     image_repo = ImageAssetRepository(db)
     storage_provider = _get_storage_provider()
-    
+
     # Get all entities in the project
     entities = entity_repo.list_by_project(project_id)
-    
+
     # Delete images from storage for all entities
     for entity in entities:
         images = image_repo.get_by_entity_id(entity.id)
@@ -193,8 +196,114 @@ def delete_project(project_id: uuid.UUID, db: Session = Depends(get_db)):
                 storage_provider.delete(image.storage_key)
             except Exception:
                 pass  # Ignore storage deletion errors
-    
+
     # Delete the project (repository handles entity cascade)
     repo = ProjectRepository(db)
     if not repo.delete(project_id):
         raise HTTPException(status_code=404, detail="Project not found")
+
+
+class ProjectUserWithPermissions(BaseModel):
+    user_id: uuid.UUID
+    login_name: str
+    display_name: str
+    permissions: ProjectUserPermissionsRead
+
+
+@router.get("/projects/{project_id}/permissions", response_model=List[ProjectUserWithPermissions])
+def list_project_permissions(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List all users and their permissions for a project."""
+    # Verify project exists
+    project_repo = ProjectRepository(db)
+    project = project_repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+
+    perm_repo = ProjectUserPermissionsRepository(db)
+    user_repo = UserRepository(db)
+
+    permissions_list = perm_repo.list_by_project(project_id)
+    result = []
+
+    for perm in permissions_list:
+        user = user_repo.get_by_id(perm.user_id)
+        if user:
+            result.append(ProjectUserWithPermissions(
+                user_id=user.id,
+                login_name=user.login_name,
+                display_name=user.display_name,
+                permissions=ProjectUserPermissionsRead.model_validate(perm)
+            ))
+
+    return result
+
+
+@router.put("/projects/{project_id}/permissions/{user_id}", response_model=ProjectUserPermissionsRead)
+def update_project_user_permissions(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    request: ProjectUserPermissionsUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update a user's permissions for a specific project."""
+    # Verify project exists
+    project_repo = ProjectRepository(db)
+    project = project_repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+
+    # Verify user exists
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    perm_repo = ProjectUserPermissionsRepository(db)
+    permissions = perm_repo.upsert(
+        user_id=user_id,
+        project_id=project_id,
+        can_manage_project_users=request.can_manage_project_users,
+        can_create_material=request.can_create_material,
+        can_edit_material=request.can_edit_material,
+        can_delete_material=request.can_delete_material,
+        can_create_recipe=request.can_create_recipe,
+        can_edit_recipe=request.can_edit_recipe,
+        can_delete_recipe=request.can_delete_recipe,
+        can_run_plan=request.can_run_plan,
+    )
+
+    return ProjectUserPermissionsRead.model_validate(permissions)
+
+
+@router.delete("/projects/{project_id}/permissions/{user_id}", status_code=204)
+def remove_user_from_project(
+    project_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db)
+):
+    """Remove a user from a project by deleting their permissions."""
+    # Verify project exists
+    project_repo = ProjectRepository(db)
+    project = project_repo.get_by_id(project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+
+    perm_repo = ProjectUserPermissionsRepository(db)
+    success = perm_repo.delete(user_id, project_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User permissions not found for this project"
+        )

@@ -12,6 +12,11 @@ from services.entity_service import EntityService
 from services.recipe_evaluation_service import RecipeEvaluationService
 from repositories.project_template_repository import ProjectTemplateRepository
 from repositories.project_repository import ProjectRepository
+from infrastructure.security.permission_checker import (
+    require_can_create_material,
+    require_can_edit_material,
+    require_can_delete_material,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -98,6 +103,7 @@ async def create_material(
     project_id: uuid.UUID,
     data: MaterialCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_create_material),
 ):
     service = EntityService(db)
     try:
@@ -120,6 +126,7 @@ async def create_material_bulk(
     project_id: uuid.UUID,
     material_data: MaterialBulkCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_create_material),
 ):
     service = EntityService(db)
     try:
@@ -158,10 +165,15 @@ async def get_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Sessio
 
 
 @router.delete("/projects/{project_id}/materials/{material_id}", status_code=204)
-def delete_material(project_id: uuid.UUID, material_id: uuid.UUID, db: Session = Depends(get_db)):
+def delete_material(
+    project_id: uuid.UUID,
+    material_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_delete_material),
+):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     try:
         service.delete_entity(material_id)
@@ -195,10 +207,11 @@ def add_parameter(
     material_id: uuid.UUID,
     param_data: ParameterCreate,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_material),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     try:
         result = service.add_parameter(
@@ -233,10 +246,11 @@ def delete_parameter(
     material_id: uuid.UUID,
     parameter_id: uuid.UUID,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_edit_material),
 ):
     from qdra.infrastructure.config.settings import settings
     from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
-    
+
     service = EntityService(db)
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")

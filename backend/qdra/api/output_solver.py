@@ -16,6 +16,7 @@ from domain.planning.output_solver_domain import (
     MaterialNodeType, RecipeEdgeType,
     Entities, EntityData,
 )
+from infrastructure.security.permission_checker import require_can_run_plan
 
 router = APIRouter(prefix="/api")
 
@@ -172,6 +173,7 @@ def solve_output(
     project_id: uuid.UUID,
     request_data: SolverRequestModel,
     db: Session = Depends(get_db),
+    _: uuid.UUID = Depends(require_can_run_plan),
 ):
     """Run the output solver algorithm to produce plan graphs."""
 

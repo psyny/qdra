@@ -31,6 +31,7 @@ qdra/alembic/versions/20260622_drop_reasoning_jobs.py
 qdra/alembic/versions/20260623_add_project_templates_plans_output_solver.py
 qdra/alembic/versions/20260624_add_access_control_tables.py
 qdra/api/__init__.py
+qdra/api/auth.py
 qdra/api/entities.py
 qdra/api/health.py
 qdra/api/images.py
@@ -41,6 +42,7 @@ qdra/api/project_templates.py
 qdra/api/projects.py
 qdra/api/recipes.py
 qdra/api/schema.py
+qdra/api/users.py
 qdra/db/__init__.py
 qdra/db/base.py
 qdra/db/session.py
@@ -66,7 +68,9 @@ qdra/infrastructure/db/models.py
 qdra/infrastructure/db/session.py
 qdra/infrastructure/queue/__init__.py
 qdra/infrastructure/security/__init__.py
+qdra/infrastructure/security/jwt_handler.py
 qdra/infrastructure/security/password_hasher.py
+qdra/infrastructure/security/permission_checker.py
 qdra/infrastructure/storage/__init__.py
 qdra/infrastructure/storage/image_storage_provider.py
 qdra/infrastructure/storage/local_image_storage_provider.py
@@ -95,8 +99,10 @@ qdra/repositories/project_user_permissions_repository.py
 qdra/repositories/slot_repository.py
 qdra/repositories/user_app_permissions_repository.py
 qdra/repositories/user_repository.py
+qdra/schemas/auth_schemas.py
 qdra/schemas/user_schemas.py
 qdra/services/__init__.py
+qdra/services/auth_service.py
 qdra/services/constraint_matcher.py
 qdra/services/constraint_resolution_service.py
 qdra/services/entity_service.py

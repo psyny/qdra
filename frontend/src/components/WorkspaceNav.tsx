@@ -1,6 +1,7 @@
 import { useLocation, Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { getProjectTemplate } from '../api/projects';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 type WorkspaceNavProps = {
   projectId: string;
@@ -17,16 +18,17 @@ export function WorkspaceNav({ projectId }: WorkspaceNavProps) {
   const location = useLocation();
   const currentPath = location.pathname.split('/').pop() || '';
   const [navItems, setNavItems] = useState(baseNavItems);
+  const { projectPermissions } = usePermissionContext();
 
   useEffect(() => {
     async function fetchViewLabels() {
       try {
         const template = await getProjectTemplate(projectId);
         const views = template.views;
-        
+
         const materialCatalogView = views.find(v => v.view_key === 'material_catalog');
         const recipeCatalogView = views.find(v => v.view_key === 'recipe_catalog');
-        
+
         setNavItems(baseNavItems.map(item => {
           if (item.path === 'materials' && materialCatalogView) {
             return { ...item, label: materialCatalogView.label };
@@ -44,9 +46,31 @@ export function WorkspaceNav({ projectId }: WorkspaceNavProps) {
     fetchViewLabels();
   }, [projectId]);
 
+  const filteredNavItems = navItems.filter(item => {
+    if (item.path === '') return true; // Project home always visible
+    if (item.path === 'materials') {
+      return projectPermissions && (
+        projectPermissions.can_create_material ||
+        projectPermissions.can_edit_material ||
+        projectPermissions.can_delete_material
+      );
+    }
+    if (item.path === 'recipes') {
+      return projectPermissions && (
+        projectPermissions.can_create_recipe ||
+        projectPermissions.can_edit_recipe ||
+        projectPermissions.can_delete_recipe
+      );
+    }
+    if (item.path === 'planning') {
+      return projectPermissions && projectPermissions.can_run_plan;
+    }
+    return true;
+  });
+
   return (
     <nav className="workspace-nav">
-      {navItems.map((item) => {
+      {filteredNavItems.map((item) => {
         const isActive = currentPath === item.path;
         const to = item.path ? `/projects/${projectId}/${item.path}` : `/projects/${projectId}`;
         return (
