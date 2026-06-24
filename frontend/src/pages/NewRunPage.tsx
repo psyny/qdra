@@ -29,12 +29,26 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<any>(null);
+  const [materialViewLabel, setMaterialViewLabel] = useState<string>('Material');
+  const [recipeViewLabel, setRecipeViewLabel] = useState<string>('Recipe');
 
   useEffect(() => {
     const loadTemplate = async () => {
       try {
         const templateData = await getProjectTemplate(projectId);
         setTemplate(templateData);
+        
+        // Load view labels
+        const views = templateData.views;
+        const materialCatalogView = views.find((v: any) => v.view_key === 'material_catalog');
+        const recipeCatalogView = views.find((v: any) => v.view_key === 'recipe_catalog');
+        
+        if (materialCatalogView) {
+          setMaterialViewLabel(materialCatalogView.label);
+        }
+        if (recipeCatalogView) {
+          setRecipeViewLabel(recipeCatalogView.label);
+        }
       } catch (err) {
         console.error('Failed to load template:', err);
       }
@@ -456,8 +470,8 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
                   onChange={(e) => setTarget({ ...target, target_type: e.target.value, constraints: [] })}
                   className="form-input"
                 >
-                  <option value="material">Material</option>
-                  <option value="recipe">Recipe</option>
+                  <option value="material">{materialViewLabel} Entity</option>
+                  <option value="recipe">{recipeViewLabel} Entity</option>
                 </select>
               </div>
               <div className="form-field">
@@ -478,7 +492,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
         {/* Subcard 2: Plan Options (Domain Constraints) */}
         <div className="card mb-4" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <h3 className="card-title" style={{ fontSize: '18px' }}>Plan Options</h3>
+            <h3 className="card-title" style={{ fontSize: '18px' }}>Advanced Plan Options</h3>
             <button
               type="button"
               onClick={() => toggleCard('planOptions')}
@@ -515,7 +529,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
               {/* Do Not Expand Materials Matching */}
               <div>
-                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Do Not Expand Materials Matching</h4>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Do Not Expand {materialViewLabel} Entities Matching</h4>
                 {domainConstraints.do_not_expand_materials_matching.map((rule: ConstraintRule, index: number) => (
                   <ConstraintRuleCard
                     key={index}
@@ -543,7 +557,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
               {/* Forbidden Materials Matching */}
               <div>
-                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden Materials Matching</h4>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden {materialViewLabel} Entities Matching</h4>
                 {domainConstraints.forbidden_materials_matching.map((rule: ConstraintRule, index: number) => (
                   <ConstraintRuleCard
                     key={index}
@@ -571,7 +585,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
               {/* Forbidden Recipe Matching */}
               <div>
-                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden Recipe Matching</h4>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Forbidden {recipeViewLabel} Entities Matching</h4>
                 {domainConstraints.forbidden_recipe_matching.map((rule: ConstraintRule, index: number) => (
                   <ConstraintRuleCard
                     key={index}
@@ -599,7 +613,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
               {/* Required Materials Matching */}
               <div>
-                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required Materials Matching</h4>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required {materialViewLabel} Entities Matching</h4>
                 {domainConstraints.required_materials_matching.map((rule: ConstraintRule, index: number) => (
                   <ConstraintRuleCard
                     key={index}
@@ -627,7 +641,7 @@ export function NewRunPage({ projectId }: NewRunPageProps) {
 
               {/* Required Recipe Matching */}
               <div>
-                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required Recipe Matching</h4>
+                <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Required {recipeViewLabel} Entities Matching</h4>
                 {domainConstraints.required_recipe_matching.map((rule: ConstraintRule, index: number) => (
                   <ConstraintRuleCard
                     key={index}

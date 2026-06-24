@@ -21,6 +21,8 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<any>(null);
   const [imagesMap, setImagesMap] = useState<Record<string, string>>({});
+  const [materialViewLabel, setMaterialViewLabel] = useState<string>('Material');
+  const [recipeViewLabel, setRecipeViewLabel] = useState<string>('Recipe');
   
   // Graph selector state
   const [recipeDomainKey, setRecipeDomainKey] = useState<string>('');
@@ -79,6 +81,18 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
       // Load template to get domain:key options
       const templateData = await getProjectTemplate(projectId);
       setTemplate(templateData);
+      
+      // Load view labels
+      const views = templateData.views;
+      const materialCatalogView = views.find((v: any) => v.view_key === 'material_catalog');
+      const recipeCatalogView = views.find((v: any) => v.view_key === 'recipe_catalog');
+      
+      if (materialCatalogView) {
+        setMaterialViewLabel(materialCatalogView.label);
+      }
+      if (recipeCatalogView) {
+        setRecipeViewLabel(recipeCatalogView.label);
+      }
 
       // Initialize domain keys from template defaults
       const recipeOptions = getDomainKeyOptionsFromTemplate(templateData, 'recipe');
@@ -655,7 +669,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                 {/* Graph selectors */}
                 <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Recipe Display Parameter</label>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>{recipeViewLabel} Display Parameter</label>
                     <select
                       value={recipeDomainKey}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRecipeDomainKey(e.target.value)}
@@ -668,7 +682,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
                     </select>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Material Display Parameter</label>
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>{materialViewLabel} Display Parameter</label>
                     <select
                       value={materialDomainKey}
                       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setMaterialDomainKey(e.target.value)}
