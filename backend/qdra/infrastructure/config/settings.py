@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +39,18 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-this-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
+
+    # Deployment configuration
+    cors_origins: str = "http://localhost:3000"
+    run_migrations_on_startup: bool = False
+    log_level: str = "info"
+
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.app_env == "production":
+            if not self.jwt_secret_key or self.jwt_secret_key == "change-this-in-production":
+                raise ValueError("JWT_SECRET_KEY must be set to a secure value in production")
+        return self
 
 
 settings = Settings()

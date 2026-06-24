@@ -1,10 +1,9 @@
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://qdra:qdra@localhost:5432/qdra"
-)
+from qdra.infrastructure.config.settings import settings
+
+DATABASE_URL = settings.database_url
 
 engine = create_engine(DATABASE_URL.replace("+asyncpg", ""), pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
