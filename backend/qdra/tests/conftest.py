@@ -21,8 +21,15 @@ from infrastructure.security.permission_checker import (
     require_can_delete_recipe,
     require_can_run_plan,
     require_can_manage_project_users,
+    require_can_create_projects,
+    require_can_edit_projects,
+    require_can_delete_projects,
+    require_can_create_templates,
+    require_can_edit_templates,
+    require_can_delete_templates,
 )
 from repositories.project_user_permissions_repository import ProjectUserPermissionsRepository
+from repositories.user_app_permissions_repository import UserAppPermissionsRepository
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -57,6 +64,22 @@ def setup_test_user():
                 {"id": str(TEST_USER_ID)}
             )
             session.commit()
+        
+        # Ensure app-level permissions exist for test user
+        app_perms_repo = UserAppPermissionsRepository(session)
+        app_perms_repo.ensure_exists(TEST_USER_ID)
+        # Grant all app-level permissions to test user
+        app_perms_repo.update(
+            user_id=TEST_USER_ID,
+            can_manage_users=True,
+            can_create_projects=True,
+            can_edit_projects=True,
+            can_delete_projects=True,
+            can_create_templates=True,
+            can_edit_templates=True,
+            can_delete_templates=True,
+        )
+        session.commit()
     finally:
         session.close()
     yield
@@ -96,6 +119,12 @@ def client(db: Session) -> Generator[TestClient, None, None]:
     app.dependency_overrides[require_can_delete_recipe] = override_require_permission
     app.dependency_overrides[require_can_run_plan] = override_require_permission
     app.dependency_overrides[require_can_manage_project_users] = override_require_permission
+    app.dependency_overrides[require_can_create_projects] = override_require_permission
+    app.dependency_overrides[require_can_edit_projects] = override_require_permission
+    app.dependency_overrides[require_can_delete_projects] = override_require_permission
+    app.dependency_overrides[require_can_create_templates] = override_require_permission
+    app.dependency_overrides[require_can_edit_templates] = override_require_permission
+    app.dependency_overrides[require_can_delete_templates] = override_require_permission
 
     with TestClient(app) as test_client:
         yield test_client
@@ -128,6 +157,7 @@ def project_ctx(client: TestClient) -> Dict[str, Any]:
         perm_repo.upsert(
             user_id=TEST_USER_ID,
             project_id=project_id,
+            can_access=True,
             can_manage_project_users=True,
             can_create_material=True,
             can_edit_material=True,
