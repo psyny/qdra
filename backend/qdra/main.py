@@ -15,12 +15,20 @@ from qdra.api.entities import router as entities_router
 from qdra.api.planning_runs import router as planning_runs_router
 from qdra.api.auth import router as auth_router
 from qdra.api.users import router as users_router
+from qdra.infrastructure.config.settings import settings
+
+
+def parse_cors_origins(raw: str) -> list[str]:
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 app = FastAPI(title="Qdra")
 
+cors_origins = parse_cors_origins(settings.cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,6 +50,8 @@ app.include_router(users_router)
 
 @app.on_event("startup")
 async def startup_event():
+    print(f"Configured CORS origins: {cors_origins}")
+    
     db = next(get_db())
     try:
         user_count = db.query(User).count()
