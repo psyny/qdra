@@ -26,75 +26,20 @@ export function PermissionRouteGuard({
       return;
     }
 
-    let hasAccess = true;
-
-    if (requireAnyMaterialPermission) {
-      hasAccess = hasAccess && (
-        projectPermissions.can_create_material ||
-        projectPermissions.can_edit_material ||
-        projectPermissions.can_delete_material
-      );
-    }
-
-    if (requireAnyRecipePermission) {
-      hasAccess = hasAccess && (
-        projectPermissions.can_create_recipe ||
-        projectPermissions.can_edit_recipe ||
-        projectPermissions.can_delete_recipe
-      );
-    }
-
-    if (requireRunPlan) {
-      hasAccess = hasAccess && projectPermissions.can_run_plan;
-    }
-
-    if (requireManageProjectUsers) {
-      hasAccess = hasAccess && projectPermissions.can_manage_project_users;
-    }
-
-    if (!hasAccess) {
+    // If user can access the project, they can view all pages
+    // Specific permissions only control what actions they can perform
+    if (!projectPermissions.can_access) {
       navigate('/projects');
     }
-  }, [
-    projectPermissions,
-    navigate,
-    requireAnyMaterialPermission,
-    requireAnyRecipePermission,
-    requireRunPlan,
-    requireManageProjectUsers,
-  ]);
+  }, [projectPermissions, navigate]);
 
   if (!projectPermissions) {
     return null;
   }
 
-  let hasAccess = true;
-
-  if (requireAnyMaterialPermission) {
-    hasAccess = hasAccess && (
-      projectPermissions.can_create_material ||
-      projectPermissions.can_edit_material ||
-      projectPermissions.can_delete_material
-    );
-  }
-
-  if (requireAnyRecipePermission) {
-    hasAccess = hasAccess && (
-      projectPermissions.can_create_recipe ||
-      projectPermissions.can_edit_recipe ||
-      projectPermissions.can_delete_recipe
-    );
-  }
-
-  if (requireRunPlan) {
-    hasAccess = hasAccess && projectPermissions.can_run_plan;
-  }
-
-  if (requireManageProjectUsers) {
-    hasAccess = hasAccess && projectPermissions.can_manage_project_users;
-  }
-
-  if (!hasAccess) {
+  // If user can access the project, they can view all pages
+  // Specific permissions only control what actions they can perform
+  if (!projectPermissions.can_access) {
     return null;
   }
 

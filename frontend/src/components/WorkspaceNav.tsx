@@ -49,21 +49,13 @@ export function WorkspaceNav({ projectId }: WorkspaceNavProps) {
   const filteredNavItems = navItems.filter(item => {
     if (item.path === '') return true; // Project home always visible
     if (item.path === 'materials') {
-      return projectPermissions && (
-        projectPermissions.can_create_material ||
-        projectPermissions.can_edit_material ||
-        projectPermissions.can_delete_material
-      );
+      return projectPermissions && projectPermissions.can_access;
     }
     if (item.path === 'recipes') {
-      return projectPermissions && (
-        projectPermissions.can_create_recipe ||
-        projectPermissions.can_edit_recipe ||
-        projectPermissions.can_delete_recipe
-      );
+      return projectPermissions && projectPermissions.can_access;
     }
     if (item.path === 'planning') {
-      return projectPermissions && projectPermissions.can_run_plan;
+      return projectPermissions && projectPermissions.can_access;
     }
     return true;
   });
