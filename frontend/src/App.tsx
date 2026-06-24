@@ -22,11 +22,13 @@ import { SettingsPlaceholderPage } from './pages/SettingsPlaceholderPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { UserEditPage } from './pages/UserEditPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { MessageProvider } from './contexts/MessageContext';
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <MessageProvider>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/home" element={<HomePage />} />
@@ -138,7 +140,8 @@ function App() {
         <Route path="/settings/users" element={<UserManagementPage />} />
         <Route path="/settings/users/:userId/edit" element={<UserEditPage />} />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </MessageProvider>
   );
 }
 

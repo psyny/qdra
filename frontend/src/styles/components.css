@@ -416,8 +416,13 @@
   background: var(--bg-main);
   margin-bottom: 24px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .settings-icon {
@@ -481,6 +486,7 @@
 
 .workspace-content {
   padding: 32px;
+  padding-top: 80px;
 }
 
 .workspace-content__card {
