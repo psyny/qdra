@@ -13,6 +13,9 @@ from models.project_template import (
     ProjectTemplateViewConfig,
 )
 from models.slot import Slot
+from models.user import User
+from models.user_app_permissions import UserAppPermissions
+from models.project_user_permissions import ProjectUserPermissions
 
 __all__ = [
     "Entity",
@@ -27,4 +30,7 @@ __all__ = [
     "ProjectTemplateView",
     "ProjectTemplateViewConfig",
     "Slot",
+    "User",
+    "UserAppPermissions",
+    "ProjectUserPermissions",
 ]

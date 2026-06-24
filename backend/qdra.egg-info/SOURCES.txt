@@ -29,6 +29,7 @@ qdra/alembic/versions/20260622_add_error_field.py
 qdra/alembic/versions/20260622_add_timing_fields.py
 qdra/alembic/versions/20260622_drop_reasoning_jobs.py
 qdra/alembic/versions/20260623_add_project_templates_plans_output_solver.py
+qdra/alembic/versions/20260624_add_access_control_tables.py
 qdra/api/__init__.py
 qdra/api/entities.py
 qdra/api/health.py
@@ -64,6 +65,8 @@ qdra/infrastructure/db/init_db.py
 qdra/infrastructure/db/models.py
 qdra/infrastructure/db/session.py
 qdra/infrastructure/queue/__init__.py
+qdra/infrastructure/security/__init__.py
+qdra/infrastructure/security/password_hasher.py
 qdra/infrastructure/storage/__init__.py
 qdra/infrastructure/storage/image_storage_provider.py
 qdra/infrastructure/storage/local_image_storage_provider.py
@@ -76,7 +79,10 @@ qdra/models/option.py
 qdra/models/parameter_constraint.py
 qdra/models/project.py
 qdra/models/project_template.py
+qdra/models/project_user_permissions.py
 qdra/models/slot.py
+qdra/models/user.py
+qdra/models/user_app_permissions.py
 qdra/repositories/__init__.py
 qdra/repositories/entity_parameter_repository.py
 qdra/repositories/entity_repository.py
@@ -85,7 +91,11 @@ qdra/repositories/option_repository.py
 qdra/repositories/parameter_constraint_repository.py
 qdra/repositories/project_repository.py
 qdra/repositories/project_template_repository.py
+qdra/repositories/project_user_permissions_repository.py
 qdra/repositories/slot_repository.py
+qdra/repositories/user_app_permissions_repository.py
+qdra/repositories/user_repository.py
+qdra/schemas/user_schemas.py
 qdra/services/__init__.py
 qdra/services/constraint_matcher.py
 qdra/services/constraint_resolution_service.py
@@ -93,6 +103,7 @@ qdra/services/entity_service.py
 qdra/services/image_service.py
 qdra/services/recipe_evaluation_service.py
 qdra/services/recipe_execution_service.py
+qdra/services/user_service.py
 qdra/services/planning/__init__.py
 qdra/services/planning/output_solver_service.py
 qdra/tests/__init__.py
@@ -103,6 +114,7 @@ qdra/tests/test_field_definitions.py
 qdra/tests/test_health.py
 qdra/tests/test_object_types.py
 qdra/tests/test_projects.py
+qdra/tests/test_user_service.py
 qdra/tests/e2e/__init__.py
 qdra/tests/integration/__init__.py
 qdra/tests/integration/conftest.py
