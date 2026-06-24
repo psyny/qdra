@@ -14,11 +14,13 @@ from repositories.entity_repository import EntityRepository
 from repositories.project_user_permissions_repository import ProjectUserPermissionsRepository
 from repositories.user_repository import UserRepository
 from api.project_templates import ProjectTemplateDetailResponse
+from infrastructure.security.permission_checker import get_current_user_id
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
 from infrastructure.config.settings import settings
 from schemas.user_schemas import ProjectUserPermissionsUpdate, ProjectUserPermissionsRead
+from services.user_service import UserService
 
 router = APIRouter(prefix="/api")
 
@@ -79,9 +81,21 @@ def create_project(project_data: ProjectCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/projects", response_model=list[ProjectResponse])
-def list_projects(db: Session = Depends(get_db)):
+def list_projects(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
     repo = ProjectRepository(db)
-    return repo.list_all()
+    user_service = UserService(db)
+
+    app_perms = user_service.get_app_permissions(user_id)
+    if app_perms and app_perms.can_manage_users:
+        return repo.list_all()
+
+    perm_repo = ProjectUserPermissionsRepository(db)
+    accessible_perms = perm_repo.list_by_user(user_id)
+    accessible_ids = {p.project_id for p in accessible_perms if p.can_access}
+    return [p for p in repo.list_all() if p.id in accessible_ids]
 
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
