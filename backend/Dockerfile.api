@@ -6,6 +6,8 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e .
 
 COPY qdra ./qdra
+COPY scripts ./scripts
+COPY docker ./docker
 
 ENV PYTHONPATH=/app/qdra
 ENV APP_ENV=development
@@ -15,4 +17,5 @@ ENV GRAPH_JOB_QUEUE=graph_reasoning_jobs
 
 EXPOSE 8000
 
+ENTRYPOINT ["/app/docker/api-entrypoint.sh"]
 CMD ["uvicorn", "qdra.main:app", "--host", "0.0.0.0", "--port", "8000"]
