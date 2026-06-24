@@ -27,6 +27,7 @@ services:
     environment:
       PYTHONUNBUFFERED: 1
       APP_ENV: development
+      QDRA_SERVICE_ROLE: api
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       REDIS_URL: redis://redis:6379/0
       GRAPH_JOB_QUEUE: graph_reasoning_jobs
@@ -53,6 +54,7 @@ services:
     environment:
       PYTHONUNBUFFERED: 1
       APP_ENV: development
+      QDRA_SERVICE_ROLE: worker
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       WORKER_CONCURRENCY: 1
     depends_on:
@@ -67,6 +69,7 @@ services:
     environment:
       PYTHONUNBUFFERED: 1
       APP_ENV: test
+      QDRA_SERVICE_ROLE: worker
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra_test
       WORKER_CONCURRENCY: 1
     depends_on:

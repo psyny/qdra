@@ -21,6 +21,7 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       APP_ENV: production
+      QDRA_SERVICE_ROLE: api
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       REDIS_URL: redis://redis:6379/0
       CORS_ORIGINS: http://localhost:8080
@@ -46,9 +47,9 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       APP_ENV: production
+      QDRA_SERVICE_ROLE: worker
       DATABASE_URL: postgresql://qdra:qdra@postgres:5432/qdra
       WORKER_CONCURRENCY: "1"
-      JWT_SECRET_KEY: local-production-test-secret-change-me
     depends_on:
       - postgres
 

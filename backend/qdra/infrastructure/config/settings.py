@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
     
     app_env: str = "development"
+    qdra_service_role: str = "api"
     database_url: str
     redis_url: str = "redis://localhost:6379/0"
     graph_job_queue: str = "graph_reasoning_jobs"
@@ -47,9 +48,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self):
+        # Validate service role
+        allowed_roles = {"api", "worker", "migration"}
+        if self.qdra_service_role not in allowed_roles:
+            raise ValueError(
+                f"QDRA_SERVICE_ROLE must be one of {allowed_roles}, got '{self.qdra_service_role}'"
+            )
+        
+        # Validate production settings based on service role
         if self.app_env == "production":
-            if not self.jwt_secret_key or self.jwt_secret_key == "change-this-in-production":
-                raise ValueError("JWT_SECRET_KEY must be set to a secure value in production")
+            if self.qdra_service_role == "api":
+                if not self.jwt_secret_key or self.jwt_secret_key == "change-this-in-production":
+                    raise ValueError("JWT_SECRET_KEY must be set to a secure value in production for API service")
+            # worker and migration roles do not require JWT_SECRET_KEY
         return self
 
 

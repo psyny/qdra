@@ -89,6 +89,9 @@ db-check-structure: ## Check current database structure via API
 # Production-Local Test Commands
 # ============================================================================
 
+# after up check:
+# GET http://localhost:8000/health
+# http://localhost:8080
 prod-local-up: ## Start production-like local test environment
 	docker compose -f docker-compose.prod-local.yml up --build
 	@echo ""
