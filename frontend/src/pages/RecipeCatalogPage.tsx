@@ -4,6 +4,7 @@ import { getProjectTemplate } from '../api/projects';
 import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
+import { PermissionAction } from '../components/PermissionAction';
 
 type RecipeCatalogPageProps = {
   projectId: string;
@@ -291,14 +292,16 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
           <p className="card-description">Create and manage entities.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          {selectedConfig && (
-            <Link
-              to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
-              className="button button--primary"
-            >
-              + New {recipeCatalogView.label} Entity
-            </Link>
-          )}
+          <PermissionAction requireCreateRecipe>
+            {selectedConfig && (
+              <Link
+                to={`/projects/${projectId}/recipes/new?configId=${selectedConfig.id}`}
+                className="button button--primary"
+              >
+                + New {recipeCatalogView.label} Entity
+              </Link>
+            )}
+          </PermissionAction>
         </div>
       </div>
 
@@ -351,20 +354,24 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
                   })}
                 </div>
                 <div className="material-catalog-card__actions">
-                  <Link
-                    to={`/projects/${projectId}/recipes/${entity.id}/edit?configId=${selectedConfig?.id}`}
-                    className="button button--secondary"
-                    style={{ padding: '1px 4px', fontSize: '10px' }}
-                  >
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDeleteClick(entity)}
-                    className="button button--danger"
-                    style={{ padding: '1px 4px', fontSize: '10px' }}
-                  >
-                    Delete
-                  </button>
+                  <PermissionAction requireEditRecipe>
+                    <Link
+                      to={`/projects/${projectId}/recipes/${entity.id}/edit?configId=${selectedConfig?.id}`}
+                      className="button button--secondary"
+                      style={{ padding: '1px 4px', fontSize: '10px' }}
+                    >
+                      Edit
+                    </Link>
+                  </PermissionAction>
+                  <PermissionAction requireDeleteRecipe>
+                    <button
+                      onClick={() => handleDeleteClick(entity)}
+                      className="button button--danger"
+                      style={{ padding: '1px 4px', fontSize: '10px' }}
+                    >
+                      Delete
+                    </button>
+                  </PermissionAction>
                 </div>
               </div>
               <div className="material-catalog-card__image-region">
