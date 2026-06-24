@@ -220,6 +220,18 @@ export function UserManagementPage() {
                 {user.is_active ? 'Active' : 'Inactive'}
               </div>
             </div>
+            <div style={{
+              textAlign: 'right',
+              fontSize: '13px',
+              color: '#8c8c8c',
+            }}>
+              <div style={{ marginBottom: '4px' }}>
+                <span style={{ color: '#6b7280' }}>Created:</span> {new Date(user.created_at).toLocaleDateString()}
+              </div>
+              <div>
+                <span style={{ color: '#6b7280' }}>Last login:</span> {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : 'Never'}
+              </div>
+            </div>
           </div>
         ))}
       </div>

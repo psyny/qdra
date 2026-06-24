@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getUserPermissions, updateUserPermissions, UserAppPermissions, ProjectUserPermissions, getUserProjectPermissions, updateUserProjectPermissions, getUser, updateUser, resetPassword, User, UserUpdate } from '../api/users';
+import { getUserPermissions, updateUserPermissions, UserAppPermissions, ProjectUserPermissions, getUserProjectPermissions, updateUserProjectPermissions, getUser, updateUser, resetPassword, User, UserUpdate, getUsers } from '../api/users';
 import { getProjects } from '../api/projects';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { BreadcrumbItem } from '../components/Breadcrumb';
+import { Combobox } from '../components/Combobox';
 
 export function UserEditPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -15,7 +16,12 @@ export function UserEditPage() {
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<any | null>(null);
   const [projectPermissions, setProjectPermissions] = useState<ProjectUserPermissions | null>(null);
-  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [selectedProjectName, setSelectedProjectName] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
+  const [showAppCopyModal, setShowAppCopyModal] = useState(false);
+  const [showProjectCopyModal, setShowProjectCopyModal] = useState(false);
+  const [selectedCopyUser, setSelectedCopyUser] = useState('');
+  const [copyAllProjects, setCopyAllProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -24,6 +30,7 @@ export function UserEditPage() {
       loadUser();
       loadAppPermissions();
       loadProjects();
+      loadUsers();
     }
   }, [userId]);
 
@@ -87,9 +94,19 @@ export function UserEditPage() {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const data = await getUsers(true);
+      setUsers(data);
+    } catch (err) {
+      console.error('Failed to load users', err);
+    }
+  };
+
   const handleProjectSelect = async (project: any) => {
     if (!userId) return;
     setSelectedProject(project);
+    setSelectedProjectName(project.name);
     try {
       const perms = await getUserProjectPermissions(userId, project.id);
       setProjectPermissions(perms);
@@ -152,6 +169,94 @@ export function UserEditPage() {
       alert('Project permissions updated successfully');
     } catch (err) {
       setError('Failed to update project permissions');
+    }
+  };
+
+  const handleCopyAppPermissions = async (userName: string) => {
+    // Parse the login_name from the format "Display Name (login_name)"
+    const match = userName.match(/\(([^)]+)\)$/);
+    const loginName = match ? match[1] : userName;
+    
+    const userToCopy = users.find((u: User) => u.login_name === loginName);
+    if (!userToCopy || userToCopy.id === userId) return;
+
+    try {
+      const perms = await getUserPermissions(userToCopy.id);
+      await updateUserPermissions(userId, {
+        can_manage_users: perms.can_manage_users,
+        can_create_projects: perms.can_create_projects,
+        can_edit_projects: perms.can_edit_projects,
+        can_delete_projects: perms.can_delete_projects,
+        can_create_templates: perms.can_create_templates,
+        can_edit_templates: perms.can_edit_templates,
+        can_delete_templates: perms.can_delete_templates,
+      });
+      setAppPermissions(perms);
+      setShowAppCopyModal(false);
+      setSelectedCopyUser('');
+      alert('App permissions copied and saved successfully');
+    } catch (err) {
+      setError('Failed to copy and save app permissions');
+    }
+  };
+
+  const handleCopyProjectPermissions = async (userName: string) => {
+    // Parse the login_name from the format "Display Name (login_name)"
+    const match = userName.match(/\(([^)]+)\)$/);
+    const loginName = match ? match[1] : userName;
+    
+    const userToCopy = users.find((u: User) => u.login_name === loginName);
+    if (!userToCopy || userToCopy.id === userId) return;
+
+    try {
+      if (copyAllProjects) {
+        // Copy permissions for all projects
+        for (const project of projects) {
+          try {
+            const perms = await getUserProjectPermissions(userToCopy.id, project.id);
+            await updateUserProjectPermissions(userId, project.id, {
+              can_manage_project_users: perms.can_manage_project_users,
+              can_create_material: perms.can_create_material,
+              can_edit_material: perms.can_edit_material,
+              can_delete_material: perms.can_delete_material,
+              can_create_recipe: perms.can_create_recipe,
+              can_edit_recipe: perms.can_edit_recipe,
+              can_delete_recipe: perms.can_delete_recipe,
+              can_run_plan: perms.can_run_plan,
+            });
+          } catch (err) {
+            // Skip projects where the source user doesn't have permissions
+            console.warn(`No permissions found for project ${project.name}`);
+          }
+        }
+        // Refresh current project permissions if one is selected
+        if (selectedProject) {
+          const perms = await getUserProjectPermissions(userToCopy.id, selectedProject.id);
+          setProjectPermissions(perms);
+        }
+        alert('Permissions copied and saved for all projects');
+      } else {
+        // Copy only for the selected project
+        if (!selectedProject) return;
+        const perms = await getUserProjectPermissions(userToCopy.id, selectedProject.id);
+        await updateUserProjectPermissions(userId, selectedProject.id, {
+          can_manage_project_users: perms.can_manage_project_users,
+          can_create_material: perms.can_create_material,
+          can_edit_material: perms.can_edit_material,
+          can_delete_material: perms.can_delete_material,
+          can_create_recipe: perms.can_create_recipe,
+          can_edit_recipe: perms.can_edit_recipe,
+          can_delete_recipe: perms.can_delete_recipe,
+          can_run_plan: perms.can_run_plan,
+        });
+        setProjectPermissions(perms);
+        alert('Project permissions copied and saved successfully');
+      }
+      setShowProjectCopyModal(false);
+      setSelectedCopyUser('');
+      setCopyAllProjects(false);
+    } catch (err) {
+      setError('Failed to copy and save project permissions');
     }
   };
 
@@ -511,21 +616,37 @@ export function UserEditPage() {
                   Can delete templates
                 </label>
               </div>
-              <button
-                onClick={handleUpdateAppPermissions}
-                style={{
-                  background: '#60A5FA',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '12px 24px',
-                  color: '#f5f5f5',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Save App Permissions
-              </button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={handleUpdateAppPermissions}
+                  style={{
+                    background: '#60A5FA',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#f5f5f5',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save App Permissions
+                </button>
+                <button
+                  onClick={() => setShowAppCopyModal(true)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#cfcfcf',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Copy Permissions From
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -553,11 +674,16 @@ export function UserEditPage() {
             Manage project-specific permissions for this user
           </p>
           
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={projectSearchQuery}
-            onChange={(e) => setProjectSearchQuery(e.target.value)}
+          <Combobox
+            value={selectedProjectName}
+            onChange={(value) => {
+              const project = projects.find((p: any) => p.name === value);
+              if (project) {
+                handleProjectSelect(project);
+              }
+            }}
+            options={projects.map((p: any) => p.name)}
+            placeholder="Select a project..."
             style={{
               width: '100%',
               background: 'rgba(0, 0, 0, 0.5)',
@@ -570,42 +696,6 @@ export function UserEditPage() {
               boxSizing: 'border-box',
             }}
           />
-          <div style={{
-            maxHeight: '150px',
-            overflowY: 'auto',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
-            marginBottom: '12px',
-          }}>
-            {projects
-              .filter(p => p.name.toLowerCase().includes(projectSearchQuery.toLowerCase()))
-              .map(project => (
-                <div
-                  key={project.id}
-                  onClick={() => handleProjectSelect(project)}
-                  style={{
-                    padding: '10px 12px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                    background: selectedProject?.id === project.id ? 'rgba(96, 165, 250, 0.2)' : 'transparent',
-                    color: '#cfcfcf',
-                    fontSize: '14px',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (selectedProject?.id !== project.id) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (selectedProject?.id !== project.id) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
-                  }}
-                >
-                  {project.name}
-                </div>
-              ))}
-          </div>
           {selectedProject && projectPermissions && (
             <div style={{
               background: 'rgba(0, 0, 0, 0.3)',
@@ -748,25 +838,250 @@ export function UserEditPage() {
                 />
                 Can run plan
               </label>
-              <button
-                onClick={handleUpdateProjectPermissions}
-                style={{
-                  background: '#60A5FA',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '10px 20px',
-                  color: '#f5f5f5',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  marginTop: '12px',
-                }}
-              >
-                Save Project Permissions
-              </button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
+                <button
+                  onClick={handleUpdateProjectPermissions}
+                  style={{
+                    background: '#60A5FA',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '10px 20px',
+                    color: '#f5f5f5',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Project Permissions
+                </button>
+                <button
+                  onClick={() => setShowProjectCopyModal(true)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: '12px',
+                    padding: '10px 20px',
+                    color: '#cfcfcf',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Copy Permissions From
+                </button>
+              </div>
             </div>
           )}
         </div>
+
+        {/* App Permissions Copy Modal */}
+        {showAppCopyModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}>
+            <div style={{
+              background: 'rgba(30, 30, 30, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '18px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+            }}>
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#f5f5f5',
+                marginBottom: '8px',
+              }}>
+                Copy App Permissions From
+              </h3>
+              <p style={{
+                fontSize: '14px',
+                color: '#8c8c8c',
+                marginBottom: '24px',
+              }}>
+                Select a user to copy their app permissions from
+              </p>
+              <Combobox
+                value={selectedCopyUser}
+                onChange={(value) => setSelectedCopyUser(value)}
+                options={users
+                  .filter((u: User) => u.id !== userId)
+                  .map((u: User) => `${u.display_name} (${u.login_name})`)}
+                placeholder="Search users..."
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  color: '#f5f5f5',
+                  fontSize: '14px',
+                  marginBottom: '24px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowAppCopyModal(false);
+                    setSelectedCopyUser('');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#cfcfcf',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    flex: 1,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleCopyAppPermissions(selectedCopyUser)}
+                  disabled={!selectedCopyUser}
+                  style={{
+                    background: selectedCopyUser ? '#60A5FA' : 'rgba(96, 165, 250, 0.3)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#f5f5f5',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: selectedCopyUser ? 'pointer' : 'not-allowed',
+                    flex: 1,
+                  }}
+                >
+                  Copy and Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Project Permissions Copy Modal */}
+        {showProjectCopyModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}>
+            <div style={{
+              background: 'rgba(30, 30, 30, 0.95)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '18px',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '90%',
+            }}>
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#f5f5f5',
+                marginBottom: '8px',
+              }}>
+                Copy Project Permissions From
+              </h3>
+              <p style={{
+                fontSize: '14px',
+                color: '#8c8c8c',
+                marginBottom: '24px',
+              }}>
+                Select a user to copy their {selectedProject?.name} project permissions from
+              </p>
+              <Combobox
+                value={selectedCopyUser}
+                onChange={(value) => setSelectedCopyUser(value)}
+                options={users
+                  .filter((u: User) => u.id !== userId)
+                  .map((u: User) => `${u.display_name} (${u.login_name})`)}
+                placeholder="Search users..."
+                style={{
+                  width: '100%',
+                  background: 'rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  color: '#f5f5f5',
+                  fontSize: '14px',
+                  marginBottom: '16px',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <label style={{
+                display: 'flex',
+                alignItems: 'center',
+                fontSize: '14px',
+                color: '#cfcfcf',
+                marginBottom: '24px',
+                cursor: 'pointer',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={copyAllProjects}
+                  onChange={(e) => setCopyAllProjects(e.target.checked)}
+                  style={{ marginRight: '8px' }}
+                />
+                Copy for all projects
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowProjectCopyModal(false);
+                    setSelectedCopyUser('');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#cfcfcf',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    flex: 1,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleCopyProjectPermissions(selectedCopyUser)}
+                  disabled={!selectedCopyUser}
+                  style={{
+                    background: selectedCopyUser ? '#60A5FA' : 'rgba(96, 165, 250, 0.3)',
+                    border: 'none',
+                    borderRadius: '12px',
+                    padding: '12px 24px',
+                    color: '#f5f5f5',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: selectedCopyUser ? 'pointer' : 'not-allowed',
+                    flex: 1,
+                  }}
+                >
+                  Copy and Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
