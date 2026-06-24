@@ -1,10 +1,18 @@
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
 import { ProjectTemplateDetail } from '../types/template';
+import { getToken } from './auth';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
 export async function getProjects(): Promise<Project[]> {
-  const response = await fetch(`${API_URL}/api/projects`);
+  const response = await fetch(`${API_URL}/api/projects`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch projects');
   }
@@ -12,7 +20,9 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getProject(projectId: string): Promise<Project> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch project');
   }
@@ -20,7 +30,9 @@ export async function getProject(projectId: string): Promise<Project> {
 }
 
 export async function getProjectTemplate(projectId: string): Promise<ProjectTemplateDetail> {
-  const response = await fetch(`${API_URL}/api/projects/${projectId}/template`);
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/template`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch project template');
   }

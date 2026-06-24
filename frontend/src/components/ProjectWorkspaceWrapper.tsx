@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getProject } from '../api/projects';
+import { getUserProjectPermissions } from '../api/users';
 import { Project } from '../types/project';
 import { WorkspaceLayout } from './WorkspaceLayout';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 type ProjectWorkspaceWrapperProps = {
   children: (project: Project) => React.ReactNode;
@@ -10,19 +12,31 @@ type ProjectWorkspaceWrapperProps = {
 
 export function ProjectWorkspaceWrapper({ children }: ProjectWorkspaceWrapperProps) {
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { currentUserId, setProjectPermissions, clearProjectPermissions } = usePermissionContext();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !currentUserId) return;
 
-    const loadProject = async () => {
+    const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await getProject(projectId);
-        setProject(data);
+        const [projectData, permissions] = await Promise.all([
+          getProject(projectId),
+          getUserProjectPermissions(currentUserId, projectId),
+        ]);
+        setProject(projectData);
+        
+        if (!permissions.can_access) {
+          setError('You do not have access to this project');
+          return;
+        }
+        
+        setProjectPermissions(permissions);
       } catch (err) {
         setError('Project not found');
       } finally {
@@ -30,8 +44,18 @@ export function ProjectWorkspaceWrapper({ children }: ProjectWorkspaceWrapperPro
       }
     };
 
-    loadProject();
-  }, [projectId]);
+    loadData();
+
+    return () => {
+      clearProjectPermissions();
+    };
+  }, [projectId, currentUserId]);
+
+  useEffect(() => {
+    if (error === 'You do not have access to this project') {
+      navigate('/projects');
+    }
+  }, [error, navigate]);
 
   if (loading) {
     return (

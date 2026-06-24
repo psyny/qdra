@@ -25,7 +25,9 @@ interface ProjectPermissions {
 interface PermissionContextType {
   appPermissions: AppPermissions | null;
   projectPermissions: ProjectPermissions | null;
+  currentUserId: string | null;
   setAppPermissions: (permissions: AppPermissions) => void;
+  setCurrentUserId: (id: string) => void;
   setProjectPermissions: (permissions: ProjectPermissions) => void;
   clearProjectPermissions: () => void;
   hasAnyMaterialPermission: () => boolean;
@@ -37,6 +39,7 @@ const PermissionContext = createContext<PermissionContextType | undefined>(undef
 export function PermissionProvider({ children }: { children: ReactNode }) {
   const [appPermissions, setAppPermissions] = useState<AppPermissions | null>(null);
   const [projectPermissions, setProjectPermissionsState] = useState<ProjectPermissions | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const setProjectPermissions = (permissions: ProjectPermissions) => {
     setProjectPermissionsState(permissions);
@@ -65,7 +68,9 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
       value={{
         appPermissions,
         projectPermissions,
+        currentUserId,
         setAppPermissions,
+        setCurrentUserId,
         setProjectPermissions,
         clearProjectPermissions,
         hasAnyMaterialPermission,
