@@ -26,6 +26,7 @@ export type Entity = {
   created_at: string;
   updated_at: string;
   image?: EntityImage | null;
+  parameters?: EntityParameter[];
 };
 
 export type CreateEntityRequest = {

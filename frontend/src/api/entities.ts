@@ -28,6 +28,16 @@ export async function getEntity(projectId: string, entityId: string): Promise<En
   return response.json();
 }
 
+export async function getEntitiesResolved(entityIds: string[]): Promise<Entity[]> {
+  const response = await fetch(apiUrl('/api/entities/resolved'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({ entity_ids: entityIds }),
+  });
+  if (!response.ok) throw new Error('Failed to fetch resolved entities');
+  return response.json();
+}
+
 export async function createEntity(projectId: string, payload: CreateEntityRequest): Promise<Entity> {
   const response = await fetch(apiUrl(`/api/projects/${projectId}/entities`), {
     method: 'POST',
