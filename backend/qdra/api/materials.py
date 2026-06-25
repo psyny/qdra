@@ -171,17 +171,13 @@ def delete_material(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_delete_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_edited
 
     service = EntityService(db)
     try:
         service.delete_entity(material_id)
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_edited([material_id], project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -209,8 +205,7 @@ def add_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entity_parameters_added
 
     service = EntityService(db)
     try:
@@ -220,10 +215,7 @@ def add_parameter(
             value_boolean=param_data.value_boolean,
         )
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entity_parameters_added(material_id, project_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -248,14 +240,10 @@ def delete_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entity_parameters_deleted
 
     service = EntityService(db)
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entity_parameters_deleted(material_id, project_id)

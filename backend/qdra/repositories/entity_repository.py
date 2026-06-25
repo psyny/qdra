@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
-from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data, invalidate_entity
+from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data
 from infrastructure.config.settings import settings
 
 
@@ -90,6 +90,7 @@ class EntityRepository:
     
     def invalidate_entity(self, entity_id: uuid.UUID) -> None:
         """Invalidate entity from cache."""
+        from qdra.infrastructure.cache.invalidation_controller import invalidate_entity
         invalidate_entity(entity_id)
 
     def list_by_project(

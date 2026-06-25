@@ -6,7 +6,6 @@ from sqlalchemy import and_, or_, exists
 from infrastructure.cache.constraint_cache import (
     get_constraint_resolution,
     set_constraint_resolution,
-    invalidate_constraint_resolution,
 )
 
 from models.entity import Entity
@@ -360,4 +359,5 @@ class ConstraintResolutionService:
 
     def clear_pattern(self, project_id: uuid.UUID):
         """Clear all caches matching the project pattern."""
-        invalidate_constraint_resolution(project_id)
+        from qdra.infrastructure.cache.invalidation_controller import constraint_resolution_changed
+        constraint_resolution_changed(project_id)
