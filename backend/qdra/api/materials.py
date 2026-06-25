@@ -105,6 +105,8 @@ async def create_material(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_material),
 ):
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
+
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
@@ -116,6 +118,8 @@ async def create_material(
                     value_string=p.value_string, value_number=p.value_number,
                     value_boolean=p.value_boolean,
                 )
+        # Invalidate all relationship caches so the solver sees the new material
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -128,6 +132,8 @@ async def create_material_bulk(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_material),
 ):
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
+
     service = EntityService(db)
     try:
         mat = MaterialCreate(parameters=material_data.parameters)
@@ -141,6 +147,8 @@ async def create_material_bulk(
                 value_string=p.value_string, value_number=p.value_number,
                 value_boolean=p.value_boolean,
             )
+        # Invalidate all relationship caches so the solver sees the new material
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
