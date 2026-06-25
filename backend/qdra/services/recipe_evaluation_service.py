@@ -48,7 +48,7 @@ class RecipeEvaluationService:
 
         Returns a RecipeMatchResult with success status and allocations.
         """
-        recipe = self.entity_repo.get_by_id(recipe_id)
+        recipe = self.entity_service.get_basic_entity(recipe_id)
         if not recipe:
             return RecipeMatchResult(
                 success=False,
@@ -61,7 +61,7 @@ class RecipeEvaluationService:
         materials = []
         material_params_map = {}
         for material_id in material_ids:
-            material = self.entity_repo.get_by_id(material_id)
+            material = self.entity_service.get_basic_entity(material_id)
             if material:
                 materials.append(material)
                 material_params_map[material_id] = (
@@ -220,7 +220,7 @@ class RecipeEvaluationService:
                 return cached
         
         # Compute result
-        recipe = self.entity_repo.get_by_id(recipe_id)
+        recipe = self.entity_service.get_basic_entity(recipe_id)
         if not recipe:
             return {"consumes": [], "produces": [], "requires": []}
 
@@ -311,7 +311,7 @@ class RecipeEvaluationService:
         
         # Compute result
         # Load material and its parameters once
-        material = self.entity_repo.get_by_id(material_id)
+        material = self.entity_service.get_basic_entity(material_id)
         if not material:
             return {"consumes": [], "produces": [], "requires": []}
         

@@ -18,6 +18,7 @@ from repositories.project_template_repository import ProjectTemplateRepository
 from infrastructure.cache.cache_service import CacheService
 
 from services.recipe_evaluation_service import RecipeEvaluationService
+from services.entity_service import EntityService
 
 from domain.evaluation import RecipeExecutionResult, Allocation
 
@@ -33,6 +34,7 @@ class RecipeExecutionService:
         self.project_repo = ProjectRepository(db)
         self.template_repo = ProjectTemplateRepository(db)
         self.evaluation_service = RecipeEvaluationService(db)
+        self.entity_service = EntityService(db)
 
     def execute_recipe(
         self, recipe_id: uuid.UUID, material_ids: List[uuid.UUID]
@@ -61,7 +63,7 @@ class RecipeExecutionService:
             )
         
         # Load recipe structure
-        recipe = self.entity_repo.get_by_id(recipe_id)
+        recipe = self.entity_service.get_basic_entity(recipe_id)
         if not recipe:
             return RecipeExecutionResult(
                 success=False,

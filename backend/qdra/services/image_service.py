@@ -14,6 +14,7 @@ from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvi
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.config.settings import settings
 from infrastructure.cache.cache_service import CacheService
+from services.entity_service import EntityService
 
 
 class ImageService:
@@ -22,6 +23,7 @@ class ImageService:
         self.image_asset_repo = ImageAssetRepository(db)
         self.entity_repo = EntityRepository(db)
         self.project_repo = ProjectRepository(db)
+        self.entity_service = EntityService(db)
         self.storage_provider = self._get_storage_provider()
     
     def _get_storage_provider(self) -> ImageStorageProvider:
@@ -88,7 +90,7 @@ class ImageService:
         alt_text: Optional[str] = None,
     ):
         """Upload an image for an entity."""
-        entity = self.entity_repo.get_by_id(entity_id)
+        entity = self.entity_service.get_basic_entity(entity_id)
         if not entity or entity.project_id != project_id:
             raise ValueError("Entity not found")
 
@@ -140,7 +142,7 @@ class ImageService:
         self.image_asset_repo.delete(image_asset_id)
         
         # Invalidate entity cache since image was deleted
-        entity = self.entity_repo.get_by_id(entity_id)
+        entity = self.entity_service.get_basic_entity(entity_id)
         if entity:
             entities_changed([entity_id], entity.project_id)
     
@@ -163,7 +165,7 @@ class ImageService:
         alt_text: Optional[str] = None,
     ):
         """Create a presigned upload URL for an image."""
-        entity = self.entity_repo.get_by_id(entity_id)
+        entity = self.entity_service.get_basic_entity(entity_id)
         if not entity:
             raise ValueError("Entity not found")
         
@@ -253,7 +255,7 @@ class ImageService:
         image_asset = self.image_asset_repo.update_status(image_asset_id, 'ready')
         
         # Invalidate entity cache since image status changed
-        entity = self.entity_repo.get_by_id(image_asset.entity_id)
+        entity = self.entity_service.get_basic_entity(image_asset.entity_id)
         if entity:
             entities_changed([image_asset.entity_id], entity.project_id)
         

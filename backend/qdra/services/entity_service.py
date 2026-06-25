@@ -247,6 +247,24 @@ class EntityService:
     def delete_parameter(self, parameter_id: uuid.UUID) -> bool:
         return self.entity_parameter_repository.delete(parameter_id)
 
+    def get_basic_entity(self, entity_id: uuid.UUID) -> Optional[Entity]:
+        """Get the basic Entity object with caching. Returns None if not found."""
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            # Reconstruct Entity from cached data
+            return Entity(
+                id=uuid.UUID(cached["id"]),
+                project_id=uuid.UUID(cached["project_id"]),
+                entity_type_id=uuid.UUID(cached["entity_type_id"]),
+                group=cached["group"],
+                created_at=cached["created_at"],
+                updated_at=cached["updated_at"],
+            )
+        
+        # Cache miss: query from DB
+        return self.entity_repository.get_by_id(entity_id)
+
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
         # Use cached parameters if available
         cached = get_entity_with_data(entity_id)
