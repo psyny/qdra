@@ -310,13 +310,24 @@ export function SlotDefinitionsPage() {
         }
       }
 
-      const newConstraint: ConstraintSpec = {
+      // If no parameters available, default to system constraint instead of parameter constraint
+      const newConstraint: ConstraintSpec = firstDomain && firstKey ? {
         origin: 'parameter',
         entity_type_id: firstEntityTypeId,
         domain: firstDomain,
         key: firstKey,
         operator: '=',
         value_string: null,
+        value_number: undefined,
+        value_boolean: undefined,
+      } : {
+        origin: 'system',
+        system_key: 'group',
+        entity_type_id: null,
+        domain: null,
+        key: null,
+        operator: '=',
+        value_string: entityTypes[0]?.name || null,
         value_number: undefined,
         value_boolean: undefined,
       };
@@ -388,16 +399,18 @@ export function SlotDefinitionsPage() {
             is_wildcard: false,
           };
         } else if (constraint.origin === 'parameter') {
-          // Parameter constraint
-          return {
-            domain: constraint.domain,
-            key: constraint.key,
-            operator: constraint.operator,
-            value_string: constraint.value_string,
-            value_number: constraint.value_number,
-            value_boolean: constraint.value_boolean,
-            is_wildcard: false,
-          };
+          // Parameter constraint - only include if domain and key are not null
+          if (constraint.domain && constraint.key) {
+            return {
+              domain: constraint.domain,
+              key: constraint.key,
+              operator: constraint.operator,
+              value_string: constraint.value_string,
+              value_number: constraint.value_number,
+              value_boolean: constraint.value_boolean,
+              is_wildcard: false,
+            };
+          }
         }
         return null;
       }).filter(c => c !== null),
@@ -430,15 +443,18 @@ export function SlotDefinitionsPage() {
               is_wildcard: false,
             };
           } else if (constraint.origin === 'parameter') {
-            return {
-              domain: constraint.domain,
-              key: constraint.key,
-              operator: constraint.operator,
-              value_string: constraint.value_string,
-              value_number: constraint.value_number,
-              value_boolean: constraint.value_boolean,
-              is_wildcard: false,
-            };
+            // Parameter constraint - only include if domain and key are not null
+            if (constraint.domain && constraint.key) {
+              return {
+                domain: constraint.domain,
+                key: constraint.key,
+                operator: constraint.operator,
+                value_string: constraint.value_string,
+                value_number: constraint.value_number,
+                value_boolean: constraint.value_boolean,
+                is_wildcard: false,
+              };
+            }
           }
           return null;
         }).filter(c => c !== null),
@@ -658,13 +674,24 @@ export function SlotDefinitionsPage() {
         }
       }
 
-      const newConstraint: ConstraintSpec = {
+      // If no parameters available, default to system constraint instead of parameter constraint
+      const newConstraint: ConstraintSpec = firstDomain && firstKey ? {
         origin: 'parameter',
         entity_type_id: firstEntityTypeId,
         domain: firstDomain,
         key: firstKey,
         operator: '=',
         value_string: null,
+        value_number: undefined,
+        value_boolean: undefined,
+      } : {
+        origin: 'system',
+        system_key: 'group',
+        entity_type_id: null,
+        domain: null,
+        key: null,
+        operator: '=',
+        value_string: entityTypes[0]?.name || null,
         value_number: undefined,
         value_boolean: undefined,
       };
@@ -906,12 +933,32 @@ export function SlotDefinitionsPage() {
                               onChange={(e) => {
                                 const newOrigin = e.target.value as 'system' | 'parameter';
                                 updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'origin', newOrigin);
+                                // Reset value fields when type changes
+                                updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', null);
+                                updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                 if (newOrigin === 'system') {
                                   updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'entity_type_id', null);
                                   updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', null);
                                   updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', null);
                                 } else {
                                   updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'system_key', null);
+                                  // Initialize domain/key to first available parameter
+                                  let firstDomain = null;
+                                  let firstKey = null;
+                                  for (const et of entityTypes) {
+                                    const params = getParametersForEntityType(et.id);
+                                    if (params.length > 0) {
+                                      firstDomain = params[0].domain;
+                                      firstKey = params[0].key;
+                                      updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'entity_type_id', et.id);
+                                      break;
+                                    }
+                                  }
+                                  if (firstDomain && firstKey) {
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', firstDomain);
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', firstKey);
+                                  }
                                 }
                               }}
                               className="form-input"
@@ -927,11 +974,19 @@ export function SlotDefinitionsPage() {
                               onChange={(e) => {
                                 if (constraint.origin === 'system') {
                                   updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'system_key', e.target.value);
+                                  // Reset value fields when system key changes
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', null);
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                  updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                 } else {
                                   const [domain, key] = e.target.value.split(':');
                                   if (domain && key) {
                                     updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', domain);
                                     updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', key);
+                                    // Reset value fields when parameter key changes
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', null);
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                    updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                   } else {
                                     updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'domain', null);
                                     updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'key', null);
@@ -1149,12 +1204,32 @@ export function SlotDefinitionsPage() {
                                     onChange={(e) => {
                                       const newOrigin = e.target.value as 'system' | 'parameter';
                                       updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'origin', newOrigin);
+                                      // Reset value fields when type changes
+                                      updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', null);
+                                      updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                      updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                       if (newOrigin === 'system') {
                                         updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'entity_type_id', null);
                                         updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', null);
                                         updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', null);
                                       } else {
                                         updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'system_key', null);
+                                        // Initialize domain/key to first available parameter
+                                        let firstDomain = null;
+                                        let firstKey = null;
+                                        for (const et of entityTypes) {
+                                          const params = getParametersForEntityType(et.id);
+                                          if (params.length > 0) {
+                                            firstDomain = params[0].domain;
+                                            firstKey = params[0].key;
+                                            updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'entity_type_id', et.id);
+                                            break;
+                                          }
+                                        }
+                                        if (firstDomain && firstKey) {
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', firstDomain);
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', firstKey);
+                                        }
                                       }
                                     }}
                                     className="form-input"
@@ -1170,11 +1245,19 @@ export function SlotDefinitionsPage() {
                                     onChange={(e) => {
                                       if (constraint.origin === 'system') {
                                         updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'system_key', e.target.value);
+                                        // Reset value fields when system key changes
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', null);
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                        updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                       } else {
                                         const [domain, key] = e.target.value.split(':');
                                         if (domain && key) {
                                           updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', domain);
                                           updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', key);
+                                          // Reset value fields when parameter key changes
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', null);
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_number', undefined);
+                                          updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_boolean', undefined);
                                         } else {
                                           updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'domain', null);
                                           updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'key', null);
