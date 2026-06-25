@@ -303,7 +303,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         />
       </div>
 
-      {filteredEntities.length === 0 && !entitiesLoading ? (
+      {filteredEntities.length === 0 && !loading && !entitiesLoading ? (
         <div className="card state-message">
           <p className="state-message__text">
             {entities.length === 0 ? 'No materials found.' : 'No materials match your search.'}
