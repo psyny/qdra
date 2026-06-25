@@ -88,11 +88,6 @@ class EntityRepository:
         except Exception:
             return None
     
-    def invalidate_entity(self, entity_id: uuid.UUID) -> None:
-        """Invalidate entity from cache."""
-        from qdra.infrastructure.cache.invalidation_controller import invalidate_entity
-        invalidate_entity(entity_id)
-
     def list_by_project(
         self, project_id: uuid.UUID, kind: Optional[str] = None
     ) -> List[Entity]:
@@ -123,7 +118,6 @@ class EntityRepository:
         entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
         if not entity:
             return False
-        self.invalidate_entity(entity_id)
         self.db.delete(entity)
         self.db.commit()
         return True
