@@ -14,6 +14,10 @@ from qdra.infrastructure.cache.permission_cache import (
     invalidate_project_permissions,
     invalidate_all_user_permissions,
 )
+from qdra.infrastructure.cache.constraint_cache import (
+    clear_all_constraint_caches,
+    invalidate_constraint_resolution,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +50,7 @@ def entities_added_for_project(project_id: uuid.UUID) -> None:
     """
     if settings.l1_caching:
         clear_all_caches()
+        clear_all_constraint_caches()
     if settings.l2_caching:
         clear_pattern(str(project_id))
 
@@ -60,6 +65,7 @@ def entities_edited(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None:
     # Invalidate relationship and constraint caches
     if settings.l1_caching:
         clear_all_caches()
+        clear_all_constraint_caches()
     if settings.l2_caching:
         clear_pattern(str(project_id))
     
@@ -93,10 +99,11 @@ def recipe_slots_changed(recipe_id: uuid.UUID, project_id: uuid.UUID) -> None:
     
     This invalidates:
     - Material↔Recipe Relationship Caches (L1 + L2)
-    - Constraint Resolution Cache (L2)
+    - Constraint Resolution Cache (L1 + L2)
     """
     if settings.l1_caching:
         clear_all_caches()
+        clear_all_constraint_caches()
     if settings.l2_caching:
         clear_pattern(str(project_id))
 
