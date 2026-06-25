@@ -14,7 +14,7 @@ def get_entity_cache():
     """Get or create the entity L1 cache."""
     global _entity_cache
     if _entity_cache is None:
-        _entity_cache = TTLCache(maxsize=1000, ttl=settings.cache_entity_local_ttl)
+        _entity_cache = TTLCache(maxsize=settings.cache_entity_size, ttl=settings.cache_entity_ttl)
     return _entity_cache
 
 
@@ -73,17 +73,19 @@ def set_entity_with_data(entity_id: uuid.UUID, data: Dict[str, Any]) -> None:
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"entity:{key}"
-        cache_service.set(l2_key, data, settings.cache_entity_redis_ttl)
+        cache_service.set(l2_key, data, settings.cache_entity_ttl)
 
 
 def invalidate_entity(entity_id: uuid.UUID) -> None:
     """Invalidate entity with parameters and slots from both L1 and L2 caches."""
     key = str(entity_id)
     
-    # Clear from L1
+    # Clear from L1 (including prefixed keys)
     if settings.l1_caching:
         cache = get_entity_cache()
         cache.pop(key, None)
+        cache.pop(f"flat:{key}", None)
+        cache.pop(f"params:{key}", None)
     
     # Clear from L2
     if settings.l2_caching:

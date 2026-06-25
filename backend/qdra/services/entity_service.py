@@ -19,7 +19,7 @@ from repositories.parameter_constraint_repository import ParameterConstraintRepo
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
-from infrastructure.cache.entity_cache import set_entity_with_data, get_entity_with_data
+from infrastructure.cache.entity_cache import set_entity_with_data, get_entity_with_data, get_entity_cache, invalidate_entity
 from infrastructure.config.settings import settings
 from infrastructure.cache.cache_service import CacheService
 
@@ -84,10 +84,13 @@ class EntityService:
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         from datetime import datetime
         
-        # Try cache first
-        cached = get_entity_with_data(entity_id)
-        if cached:
-            return cached
+        # Use a separate cache key for the flat structure (service layer)
+        # to avoid conflict with repository's nested structure cache
+        cache = get_entity_cache()
+        flat_key = f"flat:{entity_id}"
+        cached_flat = cache.get(flat_key)
+        if cached_flat:
+            return cached_flat
         
         # Cache miss: resolve from DB
         entity = self.entity_repository.get_by_id(entity_id)
@@ -141,6 +144,8 @@ class EntityService:
                 "value_string": p.value_string,
                 "value_number": p.value_number,
                 "value_boolean": p.value_boolean,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
             }
             for p in parameters
         ]
@@ -157,8 +162,8 @@ class EntityService:
                 for slot in slots
             ]
 
-        # Cache the full resolved entity data
-        set_entity_with_data(entity_id, result)
+        # Cache the flat structure with separate key
+        cache[flat_key] = result
 
         return result
 
@@ -235,6 +240,13 @@ class EntityService:
         if values_provided != 1:
             raise ValueError("Exactly one value must be provided")
 
+        # Invalidate cache for this entity
+        cache = get_entity_cache()
+        entity_id_str = str(entity_id)
+        cache.pop(f"flat:{entity_id_str}", None)
+        cache.pop(f"params:{entity_id_str}", None)
+        invalidate_entity(entity_id)
+
         return self.entity_parameter_repository.create(
             entity_id=entity_id,
             domain=domain,
@@ -245,6 +257,16 @@ class EntityService:
         )
 
     def delete_parameter(self, parameter_id: uuid.UUID) -> bool:
+        # Get the parameter first to find the entity_id
+        param = self.entity_parameter_repository.get_by_id(parameter_id)
+        if param:
+            # Invalidate cache for this entity
+            cache = get_entity_cache()
+            entity_id_str = str(param.entity_id)
+            cache.pop(f"flat:{entity_id_str}", None)
+            cache.pop(f"params:{entity_id_str}", None)
+            invalidate_entity(param.entity_id)
+        
         return self.entity_parameter_repository.delete(parameter_id)
 
     def get_basic_entity(self, entity_id: uuid.UUID) -> Optional[Entity]:
@@ -266,9 +288,11 @@ class EntityService:
         return self.entity_repository.get_by_id(entity_id)
 
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
-        # Use cached parameters if available
-        cached = get_entity_with_data(entity_id)
-        if cached and cached.get("parameters"):
+        # Use a separate cache key for parameters to avoid conflicts
+        cache = get_entity_cache()
+        params_key = f"params:{entity_id}"
+        cached_params = cache.get(params_key)
+        if cached_params:
             return [
                 EntityParameter(
                     id=uuid.UUID(p["id"]),
@@ -278,12 +302,32 @@ class EntityService:
                     value_string=p["value_string"],
                     value_number=p["value_number"],
                     value_boolean=p["value_boolean"],
+                    created_at=p["created_at"],
+                    updated_at=p["updated_at"],
                 )
-                for p in cached["parameters"]
+                for p in cached_params
             ]
         
-        # Fallback to DB query
-        return self.entity_parameter_repository.list_by_entity(entity_id)
+        # Cache miss: query from DB
+        params = self.entity_parameter_repository.list_by_entity(entity_id)
+        
+        # Cache the parameters with datetime fields
+        cache[params_key] = [
+            {
+                "id": str(p.id),
+                "entity_id": str(p.entity_id),
+                "domain": p.domain,
+                "key": p.key,
+                "value_string": p.value_string,
+                "value_number": p.value_number,
+                "value_boolean": p.value_boolean,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+            }
+            for p in params
+        ]
+        
+        return params
 
     def get_distinct_parameter_values(
         self,

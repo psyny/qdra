@@ -15,7 +15,7 @@ def get_app_permissions_cache():
     """Get or create the app permissions L1 cache."""
     global _app_permissions_cache
     if _app_permissions_cache is None:
-        _app_permissions_cache = TTLCache(maxsize=1000, ttl=settings.cache_permission_ttl)
+        _app_permissions_cache = TTLCache(maxsize=settings.cache_permission_size, ttl=settings.cache_permission_ttl)
     return _app_permissions_cache
 
 
@@ -23,7 +23,7 @@ def get_project_permissions_cache():
     """Get or create the project permissions L1 cache."""
     global _project_permissions_cache
     if _project_permissions_cache is None:
-        _project_permissions_cache = TTLCache(maxsize=5000, ttl=settings.cache_permission_ttl)
+        _project_permissions_cache = TTLCache(maxsize=settings.cache_permission_project_size, ttl=settings.cache_permission_ttl)
     return _project_permissions_cache
 
 

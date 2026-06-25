@@ -12,6 +12,7 @@ type WorkspaceLayoutProps = {
 
 export function WorkspaceLayout({ projectId, projectName, children, additionalBreadcrumbs }: WorkspaceLayoutProps) {
   const breadcrumbItems: BreadcrumbItem[] = [
+    { label: 'Home', to: '/home' },
     { label: 'Projects', to: '/projects' },
     { label: projectName, to: `/projects/${projectId}` },
   ];

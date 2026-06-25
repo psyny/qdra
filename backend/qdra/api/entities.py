@@ -103,8 +103,8 @@ class EntityParameterResponse(BaseModel):
     value_string: Optional[str] = None
     value_number: Optional[float] = None
     value_boolean: Optional[bool] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

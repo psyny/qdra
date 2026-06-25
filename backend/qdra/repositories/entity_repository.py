@@ -112,6 +112,8 @@ class EntityRepository:
                 "value_string": p.value_string,
                 "value_number": p.value_number,
                 "value_boolean": p.value_boolean,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "updated_at": p.updated_at.isoformat() if p.updated_at else None,
             }
             for p in parameters
         ]

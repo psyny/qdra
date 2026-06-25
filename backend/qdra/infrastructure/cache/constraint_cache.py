@@ -14,7 +14,7 @@ def get_constraint_cache():
     """Get or create the constraint resolution L1 cache."""
     global _constraint_cache
     if _constraint_cache is None:
-        _constraint_cache = TTLCache(maxsize=1000, ttl=settings.cache_relationship_ttl)
+        _constraint_cache = TTLCache(maxsize=settings.cache_constraint_size, ttl=settings.cache_constraint_ttl)
     return _constraint_cache
 
 
@@ -70,7 +70,7 @@ def set_constraint_resolution(cache_key: str, entity_ids: List[uuid.UUID]) -> No
     if settings.l2_caching:
         cache_service = get_cache_service()
         serialized = [str(id) for id in entity_ids]
-        cache_service.set(cache_key, serialized, settings.cache_relationship_ttl)
+        cache_service.set(cache_key, serialized, settings.cache_constraint_ttl)
 
 
 def invalidate_constraint_resolution(project_id: uuid.UUID) -> None:

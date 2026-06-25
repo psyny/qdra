@@ -13,13 +13,17 @@ class Settings(BaseSettings):
     worker_concurrency: int = 1
     
     # Cache configuration
-    cache_entity_local_size: int = 1000
-    cache_entity_local_ttl: int = 300  # 5 minutes
-    cache_entity_redis_ttl: int = 3600  # 1 hour
-    cache_relationship_ttl: int = 600  # 10 minutes for material/recipe relationships
-    cache_permission_ttl: int = 1800  # 30 minutes for user permissions
     l1_caching: bool = True
     l2_caching: bool = True
+    cache_entity_ttl: int = 300  # 5 minutes
+    cache_entity_size: int = 1000
+    cache_relationship_ttl: int = 600  # 10 minutes for material/recipe relationships
+    cache_relationship_size: int = 1000
+    cache_constraint_ttl: int = 600  # 10 minutes for constraint resolution
+    cache_constraint_size: int = 1000
+    cache_permission_ttl: int = 1800  # 30 minutes for user permissions
+    cache_permission_size: int = 1000
+    cache_permission_project_size: int = 5000
     
     # Image storage configuration
     image_storage_backend: str = "local"

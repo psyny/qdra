@@ -19,6 +19,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [entitiesLoading, setEntitiesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmEntity, setDeleteConfirmEntity] = useState<Entity | null>(null);
@@ -64,7 +65,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     if (!selectedConfig) return;
 
     const loadEntities = async () => {
-      setLoading(true);
+      setEntitiesLoading(true);
       setError(null);
       try {
         // Get base entities (no resolved data)
@@ -78,7 +79,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
       } catch (err) {
         setError('Could not load entities');
       } finally {
-        setLoading(false);
+        setEntitiesLoading(false);
       }
     };
 
@@ -216,8 +217,8 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
   };
 
 
-  if (loading && !materialCatalogView) {
-    return <LoadingSpinner message="Loading material catalog..." />;
+  if (loading || entitiesLoading) {
+    return <LoadingSpinner message={loading ? "Loading material catalog..." : "Loading materials..."} />;
   }
 
   if (error) {
@@ -302,7 +303,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
         />
       </div>
 
-      {filteredEntities.length === 0 ? (
+      {filteredEntities.length === 0 && !entitiesLoading ? (
         <div className="card state-message">
           <p className="state-message__text">
             {entities.length === 0 ? 'No materials found.' : 'No materials match your search.'}
