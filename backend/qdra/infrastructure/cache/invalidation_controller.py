@@ -24,17 +24,6 @@ from qdra.infrastructure.cache.constraint_cache import (
 # Entity Events
 # ---------------------------------------------------------------------------
 
-def invalidate_entity(entity_id: uuid.UUID) -> None:
-    """Invalidate a specific entity from cache.
-    
-    This is a low-level function for direct entity invalidation.
-    For entity edits/deletes, prefer entities_changed() which also invalidates
-    relationship and constraint caches.
-    """
-    from qdra.infrastructure.cache.entity_cache import invalidate_entity as cache_invalidate_entity
-    cache_invalidate_entity(entity_id)
-
-
 def entities_added(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None:
     """Invalidate caches when entities are created (Case #1).
     
