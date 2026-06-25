@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
 from models.image_asset import ImageAsset
+from models.entity_parameter import EntityParameter
 from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data
 from infrastructure.config.settings import settings
 
@@ -64,12 +65,17 @@ class EntityRepository:
                 ImageAsset.status == 'ready'
             ).first()
             
-            # Cache the entity with entity_type and image
+            # Fetch parameters for caching
+            parameters = self.db.query(EntityParameter).filter(
+                EntityParameter.entity_id == entity_id
+            ).all()
+            
+            # Cache the entity with entity_type, image, and parameters
             data = {
                 "entity": self._serialize_entity(entity),
                 "entity_type": self._serialize_entity_type(entity_type) if entity_type else None,
                 "image": self._serialize_image(image) if image else None,
-                "parameters": [],
+                "parameters": self._serialize_parameters(parameters),
                 "slots": [],
             }
             set_entity_with_data(entity_id, data)
@@ -116,6 +122,21 @@ class EntityRepository:
             "height": image.height,
             "alt_text": image.alt_text,
         }
+    
+    def _serialize_parameters(self, parameters: List[EntityParameter]) -> List[dict]:
+        """Serialize parameters for cache storage."""
+        return [
+            {
+                "id": str(p.id),
+                "entity_id": str(p.entity_id),
+                "domain": p.domain,
+                "key": p.key,
+                "value_string": p.value_string,
+                "value_number": p.value_number,
+                "value_boolean": p.value_boolean,
+            }
+            for p in parameters
+        ]
     
     def _serialize_entity(self, entity: Entity) -> dict:
         """Serialize entity for Redis storage."""

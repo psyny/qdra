@@ -238,9 +238,27 @@ class EntityService:
         return self.entity_parameter_repository.delete(parameter_id)
 
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
-        entity = self.entity_repository.get_by_id(entity_id)
+        # Use cached parameters if available
+        entity, cached_data = self.entity_repository.get_entity_with_cached_data(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
+        
+        # If parameters are cached, deserialize and return them
+        if cached_data and cached_data.get("parameters"):
+            return [
+                EntityParameter(
+                    id=uuid.UUID(p["id"]),
+                    entity_id=uuid.UUID(p["entity_id"]),
+                    domain=p["domain"],
+                    key=p["key"],
+                    value_string=p["value_string"],
+                    value_number=p["value_number"],
+                    value_boolean=p["value_boolean"],
+                )
+                for p in cached_data["parameters"]
+            ]
+        
+        # Fallback to DB query
         return self.entity_parameter_repository.list_by_entity(entity_id)
 
     def get_distinct_parameter_values(
