@@ -26,24 +26,21 @@ def clear_all_entity_caches():
 
 def get_entity_with_data(entity_id: uuid.UUID) -> Optional[Dict[str, Any]]:
     """Get entity with parameters and slots from cache (L1 then L2)."""
-    if not settings.l1_caching:
-        return None
-    
-    # Try L1 cache
-    cache = get_entity_cache()
     key = str(entity_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
     
-    # Try L2 cache
+    # Try L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_entity_cache()
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    
+    # Try L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"entity:{key}"
         cached = cache_service.get(l2_key)
         if cached is not None:
-            # Populate L1 cache
-            cache[key] = cached
             return cached
     
     return None
@@ -51,16 +48,14 @@ def get_entity_with_data(entity_id: uuid.UUID) -> Optional[Dict[str, Any]]:
 
 def set_entity_with_data(entity_id: uuid.UUID, data: Dict[str, Any]) -> None:
     """Set entity with parameters and slots in cache (L1 and L2)."""
-    if not settings.l1_caching:
-        return
-    
     key = str(entity_id)
     
-    # Set L1 cache
-    cache = get_entity_cache()
-    cache[key] = data
+    # Set L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_entity_cache()
+        cache[key] = data
     
-    # Set L2 cache
+    # Set L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"entity:{key}"

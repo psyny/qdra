@@ -26,23 +26,19 @@ def clear_all_constraint_caches():
 
 def get_constraint_resolution(cache_key: str) -> List[uuid.UUID]:
     """Get constraint resolution result from cache (L1 then L2)."""
-    if not settings.l1_caching:
-        return None
+    # Try L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_constraint_cache()
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
     
-    # Try L1 cache
-    cache = get_constraint_cache()
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return cached
-    
-    # Try L2 cache
+    # Try L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         cached = cache_service.get(cache_key)
         if cached is not None:
-            # Populate L1 cache
             result = [uuid.UUID(id_str) for id_str in cached]
-            cache[cache_key] = result
             return result
     
     return None
@@ -50,14 +46,12 @@ def get_constraint_resolution(cache_key: str) -> List[uuid.UUID]:
 
 def set_constraint_resolution(cache_key: str, entity_ids: List[uuid.UUID]) -> None:
     """Set constraint resolution result in cache (L1 and L2)."""
-    if not settings.l1_caching:
-        return
+    # Set L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_constraint_cache()
+        cache[cache_key] = entity_ids
     
-    # Set L1 cache
-    cache = get_constraint_cache()
-    cache[cache_key] = entity_ids
-    
-    # Set L2 cache
+    # Set L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         serialized = [str(id) for id in entity_ids]

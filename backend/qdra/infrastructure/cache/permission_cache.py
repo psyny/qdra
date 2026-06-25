@@ -37,24 +37,21 @@ def clear_all_permission_caches():
 
 def get_app_permissions(user_id: uuid.UUID) -> Optional[dict]:
     """Get app permissions from cache (L1 then L2)."""
-    if not settings.l1_caching:
-        return None
-    
-    # Try L1 cache
-    cache = get_app_permissions_cache()
     key = str(user_id)
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
     
-    # Try L2 cache
+    # Try L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_app_permissions_cache()
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    
+    # Try L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"app_permissions:{key}"
         cached = cache_service.get(l2_key)
         if cached is not None:
-            # Populate L1 cache
-            cache[key] = cached
             return cached
     
     return None
@@ -62,16 +59,14 @@ def get_app_permissions(user_id: uuid.UUID) -> Optional[dict]:
 
 def set_app_permissions(user_id: uuid.UUID, permissions: dict) -> None:
     """Set app permissions in cache (L1 and L2)."""
-    if not settings.l1_caching:
-        return
-    
     key = str(user_id)
     
-    # Set L1 cache
-    cache = get_app_permissions_cache()
-    cache[key] = permissions
+    # Set L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_app_permissions_cache()
+        cache[key] = permissions
     
-    # Set L2 cache
+    # Set L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"app_permissions:{key}"
@@ -96,24 +91,21 @@ def invalidate_app_permissions(user_id: uuid.UUID) -> None:
 
 def get_project_permissions(user_id: uuid.UUID, project_id: uuid.UUID) -> Optional[dict]:
     """Get project permissions from cache (L1 then L2)."""
-    if not settings.l1_caching:
-        return None
-    
-    # Try L1 cache
-    cache = get_project_permissions_cache()
     key = f"{user_id}:{project_id}"
-    cached = cache.get(key)
-    if cached is not None:
-        return cached
     
-    # Try L2 cache
+    # Try L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_project_permissions_cache()
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    
+    # Try L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"project_permissions:{key}"
         cached = cache_service.get(l2_key)
         if cached is not None:
-            # Populate L1 cache
-            cache[key] = cached
             return cached
     
     return None
@@ -121,16 +113,14 @@ def get_project_permissions(user_id: uuid.UUID, project_id: uuid.UUID) -> Option
 
 def set_project_permissions(user_id: uuid.UUID, project_id: uuid.UUID, permissions: dict) -> None:
     """Set project permissions in cache (L1 and L2)."""
-    if not settings.l1_caching:
-        return
-    
     key = f"{user_id}:{project_id}"
     
-    # Set L1 cache
-    cache = get_project_permissions_cache()
-    cache[key] = permissions
+    # Set L1 cache if enabled
+    if settings.l1_caching:
+        cache = get_project_permissions_cache()
+        cache[key] = permissions
     
-    # Set L2 cache
+    # Set L2 cache if enabled
     if settings.l2_caching:
         cache_service = get_cache_service()
         l2_key = f"project_permissions:{key}"
