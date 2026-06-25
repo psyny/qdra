@@ -8,6 +8,7 @@ from typing import List
 
 from qdra.infrastructure.config.settings import settings
 from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+from qdra.infrastructure.cache.entity_cache import invalidate_entity
 from qdra.infrastructure.cache.permission_cache import (
     invalidate_app_permissions,
     invalidate_project_permissions,
@@ -63,15 +64,8 @@ def entities_edited(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None:
         clear_pattern(str(project_id))
     
     # Invalidate specific entity caches
-    from repositories.entity_repository import EntityRepository
-    from qdra.infrastructure.cache.cache_service import CacheService
-    from db.session import get_db
-    
-    # Note: This requires a DB session. In practice, the caller should
-    # handle entity-specific invalidation or we should refactor to pass
-    # the repository instance. For now, we'll skip this and let the
-    # caller handle entity cache invalidation directly.
-    # TODO: Update once 003_new_entity_service.md is implemented
+    for entity_id in entity_ids:
+        invalidate_entity(entity_id)
 
 
 # ---------------------------------------------------------------------------

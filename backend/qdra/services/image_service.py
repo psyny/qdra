@@ -20,7 +20,7 @@ class ImageService:
     def __init__(self, db: Session):
         self.db = db
         self.image_asset_repo = ImageAssetRepository(db)
-        self.entity_repo = EntityRepository(db, CacheService())
+        self.entity_repo = EntityRepository(db)
         self.project_repo = ProjectRepository(db)
         self.storage_provider = self._get_storage_provider()
     

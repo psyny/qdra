@@ -221,8 +221,7 @@ def delete_project(
     db: Session = Depends(get_db)
 ):
     """Delete a project and all its entities and images."""
-    from qdra.infrastructure.cache.cache_service import CacheService
-    entity_repo = EntityRepository(db, CacheService())
+    entity_repo = EntityRepository(db)
     image_repo = ImageAssetRepository(db)
     storage_provider = _get_storage_provider()
 

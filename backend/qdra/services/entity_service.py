@@ -25,7 +25,7 @@ from infrastructure.cache.cache_service import CacheService
 class EntityService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repository = EntityRepository(db, CacheService())
+        self.entity_repository = EntityRepository(db)
         self.entity_parameter_repository = EntityParameterRepository(db)
         self.project_repository = ProjectRepository(db)
         self.template_repository = ProjectTemplateRepository(db)

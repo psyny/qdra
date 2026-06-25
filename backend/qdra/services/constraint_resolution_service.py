@@ -21,7 +21,7 @@ from services.constraint_matcher import ConstraintMatcher
 class ConstraintResolutionService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db, CacheService())
+        self.entity_repo = EntityRepository(db)
         self.entity_param_repo = EntityParameterRepository(db)
         from qdra.infrastructure.config.settings import settings
         self.settings = settings

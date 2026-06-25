@@ -260,7 +260,7 @@ async def update_entity(
         _check_material_permission(project_id, "can_edit_material", db, user_id)
 
     service = EntityService(db)
-    entity_repo = EntityRepository(db, CacheService())
+    entity_repo = EntityRepository(db)
 
     try:
         # Verify entity exists

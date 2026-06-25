@@ -29,7 +29,7 @@ from domain.constraints import ConstraintSpec
 class RecipeEvaluationService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db, CacheService())
+        self.entity_repo = EntityRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)
