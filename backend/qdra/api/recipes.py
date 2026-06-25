@@ -103,6 +103,8 @@ class RecipeResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     image: Optional[Dict[str, Any]] = None
+    parameters: Optional[List[Dict[str, Any]]] = None
+    slots: Optional[List[Dict[str, Any]]] = None
 
 
 class OptionMaterialsResponse(BaseModel):
@@ -276,15 +278,18 @@ async def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
 
+class EntityIdsRequest(BaseModel):
+    entity_ids: List[uuid.UUID]
+
 @router.post("/recipes/resolved", response_model=List[RecipeResponse])
 async def get_recipes_resolved(
-    entity_ids: List[uuid.UUID],
+    request: EntityIdsRequest,
     db: Session = Depends(get_db),
 ):
     """Get resolved recipes by list of IDs (includes images, parameters, etc.)."""
     service = EntityService(db)
     try:
-        return await service.get_entities(entity_ids)
+        return await service.get_entities(request.entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

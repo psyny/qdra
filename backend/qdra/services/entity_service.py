@@ -19,6 +19,7 @@ from repositories.parameter_constraint_repository import ParameterConstraintRepo
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
+from infrastructure.cache.entity_cache import set_entity_with_data, get_entity_with_data
 from infrastructure.config.settings import settings
 from infrastructure.cache.cache_service import CacheService
 
@@ -83,33 +84,22 @@ class EntityService:
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         from datetime import datetime
         
-        # Get entity with cached data (entity_type, image)
-        entity, cached_data = self.entity_repository.get_entity_with_cached_data(entity_id)
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            return cached
+        
+        # Cache miss: resolve from DB
+        entity = self.entity_repository.get_by_id(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
 
-        # Use cached entity_type if available, otherwise fallback to DB
-        if cached_data and cached_data.get("entity_type"):
-            entity_type_data = cached_data["entity_type"]
-            kind = entity_type_data.get("kind", "unknown")
-        else:
-            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-            kind = entity_type.kind if entity_type else "unknown"
+        # Get entity_type
+        entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+        kind = entity_type.kind if entity_type else "unknown"
 
-        # Use cached image if available, otherwise fallback to DB
-        if cached_data and cached_data.get("image"):
-            image_data = cached_data["image"]
-            image = ImageAsset(
-                id=uuid.UUID(image_data["id"]),
-                storage_key=image_data["storage_key"],
-                mime_type=image_data["mime_type"],
-                width=image_data["width"],
-                height=image_data["height"],
-                alt_text=image_data["alt_text"],
-                status='ready',
-            )
-        else:
-            image = self.image_asset_repository.get_primary_image(entity.id)
+        # Get image
+        image = self.image_asset_repository.get_primary_image(entity.id)
 
         # Ensure updated_at is set (fallback for test environments)
         updated_at = entity.updated_at or entity.created_at or datetime.utcnow()
@@ -140,6 +130,36 @@ class EntityService:
                 "height": image.height,
             }
 
+        # Get parameters (uses cache)
+        parameters = self.get_entity_parameters(entity_id)
+        result["parameters"] = [
+            {
+                "id": str(p.id),
+                "entity_id": str(p.entity_id),
+                "domain": p.domain,
+                "key": p.key,
+                "value_string": p.value_string,
+                "value_number": p.value_number,
+                "value_boolean": p.value_boolean,
+            }
+            for p in parameters
+        ]
+
+        # Get slots for recipe entities
+        if kind == "recipe":
+            slots = self.slot_repository.list_by_recipe_entity(entity_id)
+            result["slots"] = [
+                {
+                    "id": str(slot.id),
+                    "kind": slot.kind,
+                    "sort_order": slot.sort_order,
+                }
+                for slot in slots
+            ]
+
+        # Cache the full resolved entity data
+        set_entity_with_data(entity_id, result)
+
         return result
 
     async def get_entities(self, entity_ids: List[uuid.UUID]) -> List[Dict[str, Any]]:
@@ -155,25 +175,27 @@ class EntityService:
         project_id: uuid.UUID,
         kind: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """List entities by project (base data only, no resolved data)."""
+        """List entities by project (base data only, no resolved data like images/parameters)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
 
         entities = self.entity_repository.list_by_project(project_id, kind=kind)
         
-        # Return base entity data only (no resolved data like images, parameters)
-        return [
-            {
+        # Return base entity data with kind (no resolved data like images, parameters)
+        result = []
+        for entity in entities:
+            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+            result.append({
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
                 "group": entity.group,
+                "kind": entity_type.kind if entity_type else "unknown",
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
-            }
-            for entity in entities
-        ]
+            })
+        return result
 
     def delete_entity(self, entity_id: uuid.UUID) -> bool:
         entity = self.entity_repository.get_by_id(entity_id)
@@ -227,12 +249,8 @@ class EntityService:
 
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
         # Use cached parameters if available
-        entity, cached_data = self.entity_repository.get_entity_with_cached_data(entity_id)
-        if not entity:
-            raise ValueError(f"Entity '{entity_id}' not found")
-        
-        # If parameters are cached, deserialize and return them
-        if cached_data and cached_data.get("parameters"):
+        cached = get_entity_with_data(entity_id)
+        if cached and cached.get("parameters"):
             return [
                 EntityParameter(
                     id=uuid.UUID(p["id"]),
@@ -243,7 +261,7 @@ class EntityService:
                     value_number=p["value_number"],
                     value_boolean=p["value_boolean"],
                 )
-                for p in cached_data["parameters"]
+                for p in cached["parameters"]
             ]
         
         # Fallback to DB query
@@ -271,7 +289,7 @@ class EntityService:
         project_id: uuid.UUID,
         view_config_id: uuid.UUID,
     ) -> List[Dict[str, Any]]:
-        """List entities filtered by a view config's entity_type_id (base data only, no resolved data)."""
+        """List entities filtered by a view config's entity_type_id (base data only, no resolved data like images/parameters)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
@@ -290,15 +308,17 @@ class EntityService:
         )
 
         # TODO: Apply filter_params from view_config if needed
-        # Return base entity data only (no resolved data like images, parameters)
-        return [
-            {
+        # Return base entity data with kind (no resolved data like images, parameters)
+        result = []
+        for entity in entities:
+            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+            result.append({
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
                 "group": entity.group,
+                "kind": entity_type.kind if entity_type else "unknown",
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
-            }
-            for entity in entities
-        ]
+            })
+        return result

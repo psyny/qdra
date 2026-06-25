@@ -82,28 +82,6 @@ class EntityRepository:
         
         return entity
     
-    def get_entity_with_cached_data(self, entity_id: uuid.UUID) -> tuple[Optional[Entity], Optional[dict]]:
-        """Get entity and its cached data (entity_type, image) together."""
-        from datetime import datetime
-        
-        # Try cache first
-        cached = get_entity_with_data(entity_id)
-        if cached:
-            entity_data = cached.get("entity")
-            if entity_data:
-                entity = self._deserialize_entity(entity_data)
-                if entity:
-                    return entity, cached
-        
-        # Query database and cache
-        entity = self.get_by_id(entity_id)
-        if entity:
-            cached = get_entity_with_data(entity_id)
-            return entity, cached
-        
-        return None, None
-    
-    
     def _serialize_entity_type(self, entity_type: ProjectTemplateEntityType) -> dict:
         """Serialize entity_type for cache storage."""
         return {

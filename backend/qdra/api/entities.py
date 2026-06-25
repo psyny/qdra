@@ -118,6 +118,8 @@ class EntityResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     image: Optional[Dict[str, Any]] = None
+    parameters: Optional[List[Dict[str, Any]]] = None
+    slots: Optional[List[Dict[str, Any]]] = None
 
     model_config = {"from_attributes": True}
 
@@ -223,15 +225,18 @@ async def list_entities(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+class EntityIdsRequest(BaseModel):
+    entity_ids: List[uuid.UUID]
+
 @router.post("/entities/resolved", response_model=List[EntityResponse])
 async def get_entities_resolved(
-    entity_ids: List[uuid.UUID],
+    request: EntityIdsRequest,
     db: Session = Depends(get_db),
 ):
     """Get resolved entities by list of IDs (includes images, parameters, etc.)."""
     service = EntityService(db)
     try:
-        return await service.get_entities(entity_ids)
+        return await service.get_entities(request.entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
