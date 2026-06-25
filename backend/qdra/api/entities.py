@@ -459,7 +459,7 @@ def get_values_for_parameter(
         # Get parameter values for the specified domain:key from these materials and recipes
         all_values = set()
         for material_id in material_ids:
-            params = service.entity_parameter_repository.list_by_entity(material_id)
+            params = service.get_entity_parameters(material_id)
             for param in params:
                 # Check if this parameter matches the domain:key
                 if param.domain == domain and param.key == key:
@@ -471,7 +471,7 @@ def get_values_for_parameter(
                         all_values.add(str(param.value_boolean))
 
         for recipe_id in recipe_ids:
-            params = service.entity_parameter_repository.list_by_entity(recipe_id)
+            params = service.get_entity_parameters(recipe_id)
             for param in params:
                 # Check if this parameter matches the domain:key
                 if param.domain == domain and param.key == key:

@@ -1003,8 +1003,8 @@ class OutputSolverService:
         for node in state.material_nodes.values():
             if node.type != MaterialNodeType.INPUT:
                 continue
-            # Load material parameters from DB to extract parameter value
-            material_params = self.entity_param_repo.list_by_entity(node.material_id)
+            # Load material parameters from cache to extract parameter value
+            material_params = self.entity_service.get_entity_parameters(node.material_id)
             if self._node_matches_var_constraints(material_params, var_def.constraints):
                 param_value = self._extract_param_value_from_params(
                     material_params, var_def.parameter_domain, var_def.parameter_key
@@ -1100,7 +1100,8 @@ class OutputSolverService:
             for mid in material_ids:
                 entity = self.entity_repo.get_by_id(mid)
                 if entity and entity.project_id == project_id:
-                    params = self.entity_param_repo.list_by_entity(mid)
+                    # Use cached parameters if available via entity_service
+                    params = self.entity_service.get_entity_parameters(mid)
                     materials[mid] = EntityData(
                         id=entity.id, project_id=entity.project_id,
                         created_at=entity.created_at,
@@ -1111,7 +1112,8 @@ class OutputSolverService:
             for rid in recipe_ids:
                 entity = self.entity_repo.get_by_id(rid)
                 if entity and entity.project_id == project_id:
-                    params = self.entity_param_repo.list_by_entity(rid)
+                    # Use cached parameters if available via entity_service
+                    params = self.entity_service.get_entity_parameters(rid)
                     recipes[rid] = EntityData(
                         id=entity.id, project_id=entity.project_id,
                         created_at=entity.created_at,
@@ -1126,7 +1128,8 @@ class OutputSolverService:
         """Load recipe entity parameters as ConstraintSpec lists, keyed by str(recipe_id)."""
         result: Dict[str, List[ConstraintSpec]] = {}
         for rid in recipe_ids:
-            params = self.entity_param_repo.list_by_entity(rid)
+            # Use cached parameters if available via entity_service
+            params = self.entity_service.get_entity_parameters(rid)
             result[str(rid)] = [
                 ConstraintSpec(
                     domain=p.domain, key=p.key, operator="=",

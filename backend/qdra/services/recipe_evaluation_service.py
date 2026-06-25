@@ -226,8 +226,9 @@ class RecipeEvaluationService:
         materials = self.entity_repo.list_by_project(project_id, kind="material")
         material_params_map = {}
         for material in materials:
+            # Use cached parameters if available via entity_service
             material_params_map[material.id] = (
-                self.entity_parameter_repo.list_by_entity(material.id)
+                self.entity_service.get_entity_parameters(material.id)
             )
 
         # Load recipe structure
@@ -312,7 +313,8 @@ class RecipeEvaluationService:
         if not material:
             return {"consumes": [], "produces": [], "requires": []}
         
-        material_params = self.entity_parameter_repo.list_by_entity(material_id)
+        # Use cached parameters if available via entity_service
+        material_params = self.entity_service.get_entity_parameters(material_id)
         
         # Load all recipes in the project
         recipes = self.entity_repo.list_by_project(project_id, kind="recipe")
