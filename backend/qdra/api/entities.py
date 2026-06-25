@@ -215,9 +215,23 @@ async def list_entities(
     kind: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    """List entities by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind=kind)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/entities/resolved", response_model=List[EntityResponse])
+async def get_entities_resolved(
+    entity_ids: List[uuid.UUID],
+    db: Session = Depends(get_db),
+):
+    """Get resolved entities by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -376,7 +390,7 @@ async def list_entities_by_view_config(
     config_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """List entities filtered by a view config's entity_type_id and filter_params."""
+    """List entities filtered by a view config's entity_type_id (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities_by_view_config(project_id, config_id)

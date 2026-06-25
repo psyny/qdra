@@ -156,9 +156,23 @@ async def create_material_bulk(
 
 @router.get("/projects/{project_id}/materials", response_model=List[MaterialResponse])
 async def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List materials by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind="material")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/materials/resolved", response_model=List[MaterialResponse])
+async def get_materials_resolved(
+    entity_ids: List[uuid.UUID],
+    db: Session = Depends(get_db),
+):
+    """Get resolved materials by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

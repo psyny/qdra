@@ -142,24 +142,38 @@ class EntityService:
 
         return result
 
+    async def get_entities(self, entity_ids: List[uuid.UUID]) -> List[Dict[str, Any]]:
+        """Get resolved entities by list of IDs (uses cache for resolved data)."""
+        result = []
+        for entity_id in entity_ids:
+            entity_data = await self.get_entity(entity_id)
+            result.append(entity_data)
+        return result
+
     async def list_entities(
         self,
         project_id: uuid.UUID,
         kind: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        """List entities by project (base data only, no resolved data)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
 
         entities = self.entity_repository.list_by_project(project_id, kind=kind)
-        result = []
-
-        for entity in entities:
-            # Use get_entity which uses cached data (entity_type, image, parameters)
-            entity_data = await self.get_entity(entity.id)
-            result.append(entity_data)
-
-        return result
+        
+        # Return base entity data only (no resolved data like images, parameters)
+        return [
+            {
+                "id": entity.id,
+                "project_id": entity.project_id,
+                "entity_type_id": entity.entity_type_id,
+                "group": entity.group,
+                "created_at": entity.created_at,
+                "updated_at": entity.updated_at,
+            }
+            for entity in entities
+        ]
 
     def delete_entity(self, entity_id: uuid.UUID) -> bool:
         entity = self.entity_repository.get_by_id(entity_id)
@@ -257,7 +271,7 @@ class EntityService:
         project_id: uuid.UUID,
         view_config_id: uuid.UUID,
     ) -> List[Dict[str, Any]]:
-        """List entities filtered by a view config's entity_type_id and filter_params."""
+        """List entities filtered by a view config's entity_type_id (base data only, no resolved data)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
@@ -276,12 +290,15 @@ class EntityService:
         )
 
         # TODO: Apply filter_params from view_config if needed
-        # For now, return all entities of the type
-        result = []
-
-        for entity in entities:
-            # Use get_entity which uses cached data (entity_type, image, parameters)
-            entity_data = await self.get_entity(entity.id)
-            result.append(entity_data)
-
-        return result
+        # Return base entity data only (no resolved data like images, parameters)
+        return [
+            {
+                "id": entity.id,
+                "project_id": entity.project_id,
+                "entity_type_id": entity.entity_type_id,
+                "group": entity.group,
+                "created_at": entity.created_at,
+                "updated_at": entity.updated_at,
+            }
+            for entity in entities
+        ]

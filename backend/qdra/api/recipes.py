@@ -268,9 +268,23 @@ async def create_recipe_bulk(
 
 @router.get("/projects/{project_id}/recipes", response_model=List[RecipeResponse])
 async def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List recipes by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind="recipe")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/recipes/resolved", response_model=List[RecipeResponse])
+async def get_recipes_resolved(
+    entity_ids: List[uuid.UUID],
+    db: Session = Depends(get_db),
+):
+    """Get resolved recipes by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
