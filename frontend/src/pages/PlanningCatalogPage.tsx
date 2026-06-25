@@ -51,6 +51,12 @@ export function PlanningCatalogPage({ projectId }: PlanningCatalogPageProps) {
     loadData();
   }, [projectId]);
 
+  useEffect(() => {
+    if (!loading) {
+      window.scrollTo(0, 0);
+    }
+  }, [loading]);
+
   const handleSelectPlanning = (option: PlanningOption) => {
     // Navigate to the planning configuration view
     // For now, we'll just navigate to a placeholder since the actual view isn't implemented yet

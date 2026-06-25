@@ -93,6 +93,12 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
     loadEntities();
   }, [projectId, selectedConfig]);
 
+  useEffect(() => {
+    if (!loading) {
+      window.scrollTo(0, 0);
+    }
+  }, [loading]);
+
   // Helper to resolve display slot value from entity parameters
   const getDisplaySlotValue = (entity: Entity, slotIndex: number): string => {
     const displaySlots = selectedConfig?.display_slots;

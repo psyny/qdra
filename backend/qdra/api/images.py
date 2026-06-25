@@ -7,8 +7,54 @@ from sqlalchemy.orm import Session
 
 from db.session import get_db
 from services.image_service import ImageService
+from infrastructure.security.permission_checker import get_current_user_id, require_can_edit_material, require_can_edit_recipe
+from repositories.project_template_repository import ProjectTemplateRepository
+from repositories.project_repository import ProjectRepository
+from repositories.entity_repository import EntityRepository
 
 router = APIRouter(prefix="/api")
+
+
+def _is_material_entity(entity_id: uuid.UUID, db: Session) -> bool:
+    """Check if an existing entity is a material kind."""
+    entity_repo = EntityRepository(db)
+    entity = entity_repo.get_by_id(entity_id)
+    if not entity:
+        return False
+    project = ProjectRepository(db).get_by_id(entity.project_id)
+    if not project:
+        return False
+    entity_types = ProjectTemplateRepository(db).list_entity_types(
+        project.project_template_id, kind="material"
+    )
+    return any(et.id == entity.entity_type_id for et in entity_types)
+
+
+def _check_entity_edit_permission(
+    entity_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: Session
+) -> None:
+    """Check if user has edit permission for the entity (material or recipe)."""
+    entity_repo = EntityRepository(db)
+    entity = entity_repo.get_by_id(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    
+    is_material = _is_material_entity(entity_id, db)
+    
+    if is_material:
+        # Check material edit permission
+        user_service = __import__('services.user_service', fromlist=['UserService']).UserService(db)
+        permissions = user_service.get_project_permissions(user_id, entity.project_id)
+        if not permissions or not permissions.can_edit_material:
+            raise HTTPException(status_code=403, detail="Permission 'can_edit_material' is required")
+    else:
+        # Check recipe edit permission
+        user_service = __import__('services.user_service', fromlist=['UserService']).UserService(db)
+        permissions = user_service.get_project_permissions(user_id, entity.project_id)
+        if not permissions or not permissions.can_edit_recipe:
+            raise HTTPException(status_code=403, detail="Permission 'can_edit_recipe' is required")
 
 
 class ImageResponse(BaseModel):
@@ -70,9 +116,13 @@ def _make_response(image_asset, project_id: uuid.UUID) -> ImageResponse:
 async def presign_upload(
     entity_id: uuid.UUID,
     request: PresignUploadRequest,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     """Create a presigned URL for uploading an image."""
+    # Check edit permission for the entity
+    _check_entity_edit_permission(entity_id, user_id, db)
+    
     service = ImageService(db)
     try:
         result = await service.presign_upload(
@@ -98,12 +148,15 @@ async def presign_upload(
 @router.post("/image-assets/{image_asset_id}/finalize", response_model=FinalizeResponse)
 async def finalize_upload(
     image_asset_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ):
     """Finalize an image upload after the file is uploaded to storage."""
     service = ImageService(db)
     try:
         result = await service.finalize_upload(image_asset_id)
+        # Check edit permission for the entity
+        _check_entity_edit_permission(result["entity_id"], user_id, db)
         return FinalizeResponse(
             id=result["id"],
             entity_id=result["entity_id"],

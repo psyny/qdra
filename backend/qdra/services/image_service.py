@@ -235,8 +235,13 @@ class ImageService:
         # Mark as ready
         image_asset = self.image_asset_repo.update_status(image_asset_id, 'ready')
         
-        # Generate public URL
+        # Generate public URL, fallback to presigned URL if not available
         public_url = await self.storage_provider.get_public_url(image_asset.storage_key)
+        if not public_url:
+            public_url = await self.storage_provider.create_presigned_download_url(
+                image_asset.storage_key,
+                expires_in_seconds=3600,
+            )
         
         return {
             "id": image_asset.id,

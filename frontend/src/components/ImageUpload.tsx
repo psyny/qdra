@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { validateImageFile } from '../utils/imageUtils';
+import { getToken } from '../api/auth';
 
 interface ImageUploadProps {
   entityId: string;
@@ -155,9 +156,14 @@ export function ImageUpload({
 
         // Request presigned upload URL
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const token = getToken();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
         const presignResponse = await fetch(`${API_URL}/api/entities/${entityId}/images/presign-upload`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             filename: 'image.png',
             mime_type: blob.type,
@@ -185,8 +191,13 @@ export function ImageUpload({
         }
 
         // Finalize upload
+        const finalizeHeaders: Record<string, string> = {};
+        if (token) {
+          finalizeHeaders['Authorization'] = `Bearer ${token}`;
+        }
         const finalizeResponse = await fetch(`${API_URL}/api/image-assets/${presignData.image_asset_id}/finalize`, {
           method: 'POST',
+          headers: finalizeHeaders,
         });
 
         if (!finalizeResponse.ok) {
