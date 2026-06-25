@@ -369,6 +369,15 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
                       Edit
                     </Link>
                   </PermissionAction>
+                  <PermissionAction requireCreateRecipe>
+                    <Link
+                      to={`/projects/${projectId}/recipes/new?configId=${selectedConfig?.id}&cloneFrom=${entity.id}`}
+                      className="button button--primary"
+                      style={{ padding: '1px 4px', fontSize: '10px' }}
+                    >
+                      Clone
+                    </Link>
+                  </PermissionAction>
                   <PermissionAction requireDeleteRecipe>
                     <button
                       onClick={() => handleDeleteClick(entity)}

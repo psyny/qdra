@@ -15,6 +15,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   const { materialId } = useParams<{ materialId: string }>();
   const [searchParams] = useSearchParams();
   const configId = searchParams.get('configId');
+  const cloneFrom = searchParams.get('cloneFrom');
   const navigate = useNavigate();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
@@ -64,6 +65,11 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
           setEntity(entityData);
           const params = await getEntityParameters(projectId, materialId);
           setEntityParameters(params);
+        } else if (cloneFrom) {
+          // Load source entity for cloning
+          const sourceEntityData = await getEntity(projectId, cloneFrom);
+          const sourceParams = await getEntityParameters(projectId, cloneFrom);
+          setEntityParameters(sourceParams);
         }
       } catch (err) {
         setError('Could not load data');
@@ -73,7 +79,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
     };
 
     loadData();
-  }, [projectId, materialId, configId]);
+  }, [projectId, materialId, configId, cloneFrom]);
 
   const draftToApiParam = (p: DraftParameter) => {
     if (p.value_type === 'string') return { domain: p.domain, key: p.key, value_string: String(p.value ?? '') };

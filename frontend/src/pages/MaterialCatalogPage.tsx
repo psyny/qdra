@@ -352,6 +352,15 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
                       Edit
                     </Link>
                   </PermissionAction>
+                  <PermissionAction requireCreateMaterial>
+                    <Link
+                      to={`/projects/${projectId}/materials/new?configId=${selectedConfig?.id}&cloneFrom=${entity.id}`}
+                      className="button button--primary"
+                      style={{ padding: '1px 4px', fontSize: '10px' }}
+                    >
+                      Clone
+                    </Link>
+                  </PermissionAction>
                   <PermissionAction requireDeleteMaterial>
                     <button
                       onClick={() => handleDeleteClick(entity)}

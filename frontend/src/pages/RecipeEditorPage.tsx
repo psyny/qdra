@@ -33,6 +33,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const { recipeId } = useParams<{ recipeId: string }>();
   const [searchParams] = useSearchParams();
   const configId = searchParams.get('configId');
+  const cloneFrom = searchParams.get('cloneFrom');
   const navigate = useNavigate();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
@@ -146,6 +147,40 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
             setInitialSlotCounts({ requires: 0, consumes: 0, produces: 0 });
             setInitialSlotConstraints({ requires: [], consumes: [], produces: [] });
           }
+        } else if (cloneFrom) {
+          // Load source entity for cloning
+          const sourceEntityData = await getEntity(projectId, cloneFrom);
+          const sourceParams = await getEntityParameters(projectId, cloneFrom);
+          setEntityParameters(sourceParams);
+
+          // Load slot definitions for cloning
+          try {
+            const slots = await getRecipeSlots(projectId, cloneFrom);
+            const slotCounts: Record<string, number> = { requires: 0, consumes: 0, produces: 0 };
+            const slotConstraints: any = { requires: [], consumes: [], produces: [] };
+
+            for (const slot of slots) {
+              slotCounts[slot.kind] = (slotCounts[slot.kind] || 0) + 1;
+              const options = await getRecipeOptions(projectId, cloneFrom, slot.id);
+              const slotIndex = slotCounts[slot.kind] - 1;
+              slotConstraints[slot.kind][slotIndex] = [];
+
+              for (const option of options) {
+                const constraints = await getRecipeConstraints(projectId, cloneFrom, slot.id, option.id);
+                slotConstraints[slot.kind][slotIndex].push({
+                  constraints,
+                  quantity: option.quantity || 1,
+                });
+              }
+            }
+
+            setInitialSlotCounts(slotCounts);
+            setInitialSlotConstraints(slotConstraints);
+          } catch (err) {
+            console.error('Failed to load slot definitions for cloning:', err);
+            setInitialSlotCounts({ requires: 0, consumes: 0, produces: 0 });
+            setInitialSlotConstraints({ requires: [], consumes: [], produces: [] });
+          }
         }
       } catch (err) {
         setError('Could not load data');
@@ -155,7 +190,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
     };
 
     loadData();
-  }, [projectId, recipeId, configId]);
+  }, [projectId, recipeId, configId, cloneFrom]);
 
   const draftToApiParam = (p: DraftParameter) => {
     if (p.value_type === 'string') return { domain: p.domain, key: p.key, value_string: String(p.value ?? '') };
