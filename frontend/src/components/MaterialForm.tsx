@@ -16,6 +16,7 @@ type MaterialFormProps = {
   currentImage?: string | null;
   projectId?: string;
   group?: string;
+  canEdit?: boolean;
 };
 
 export function MaterialForm({
@@ -30,6 +31,7 @@ export function MaterialForm({
   currentImage,
   projectId,
   group,
+  canEdit = true,
 }: MaterialFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -307,6 +309,7 @@ export function MaterialForm({
             onUploadComplete={setImageUrl}
             onUploadError={(error) => setValidationError(error)}
             onRemove={() => setImageUrl(null)}
+            canEdit={canEdit}
           />
         </div>
       )}
@@ -314,7 +317,7 @@ export function MaterialForm({
       <div className="form-actions">
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !canEdit}
           className="button button--primary"
         >
           {isSubmitting ? 'Saving...' : submitLabel}

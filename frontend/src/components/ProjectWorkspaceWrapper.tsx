@@ -5,12 +5,14 @@ import { getUserProjectPermissions } from '../api/users';
 import { Project } from '../types/project';
 import { WorkspaceLayout } from './WorkspaceLayout';
 import { usePermissionContext } from '../contexts/PermissionContext';
+import { BreadcrumbItem } from './Breadcrumb';
 
 type ProjectWorkspaceWrapperProps = {
   children: (project: Project) => React.ReactNode;
+  additionalBreadcrumbs?: BreadcrumbItem[] | ((project: Project) => BreadcrumbItem[]);
 };
 
-export function ProjectWorkspaceWrapper({ children }: ProjectWorkspaceWrapperProps) {
+export function ProjectWorkspaceWrapper({ children, additionalBreadcrumbs }: ProjectWorkspaceWrapperProps) {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { currentUserId, setProjectPermissions, clearProjectPermissions } = usePermissionContext();
@@ -86,8 +88,12 @@ export function ProjectWorkspaceWrapper({ children }: ProjectWorkspaceWrapperPro
     );
   }
 
+  const resolvedBreadcrumbs = typeof additionalBreadcrumbs === 'function' 
+    ? additionalBreadcrumbs(project) 
+    : additionalBreadcrumbs;
+
   return (
-    <WorkspaceLayout projectId={project.id} projectName={project.name}>
+    <WorkspaceLayout projectId={project.id} projectName={project.name} additionalBreadcrumbs={resolvedBreadcrumbs}>
       {children(project)}
     </WorkspaceLayout>
   );

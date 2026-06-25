@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getPlanningRunWithResults, PlanningRunWithResults } from '../api/planning';
+import { getPlanningRunWithResults, getPlanningRun, PlanningRunWithResults } from '../api/planning';
 import { PlanningGraph } from '../components/planning/PlanningGraph';
 import { getProjectTemplate } from '../api/projects';
 import { getEntity } from '../api/entities';
@@ -17,6 +17,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const [run, setRun] = useState<PlanningRunWithResults | null>(null);
+  const [runStatus, setRunStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [template, setTemplate] = useState<any>(null);
@@ -77,6 +78,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     try {
       const runData = await getPlanningRunWithResults(runId);
       setRun(runData);
+      setRunStatus(runData.status);
 
       // Load template to get domain:key options
       const templateData = await getProjectTemplate(projectId);
@@ -187,24 +189,35 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
     loadRun();
   }, [runId, projectId]);
 
-  // Poll for run completion every 2 seconds
+  // Poll for run completion every 2 seconds - lightweight status check only
   useEffect(() => {
-    if (!run || run.status === 'completed' || run.status === 'failed') {
+    if (!runStatus || runStatus === 'completed' || runStatus === 'failed') {
       return;
     }
 
-    const interval = setInterval(() => {
-      loadRun();
+    const interval = setInterval(async () => {
+      try {
+        const lightweightRun = await getPlanningRun(runId!);
+        if (lightweightRun.status !== runStatus) {
+          // Status changed, reload full data
+          loadRun();
+        }
+      } catch (error) {
+        // If plan was deleted (404), stop polling and show error
+        console.error('Error polling run status:', error);
+        setError('Planning run was deleted');
+        setRunStatus('deleted');
+      }
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [run]);
+  }, [runStatus, runId]);
 
   // Dynamically expand/collapse cards based on run status
   useEffect(() => {
-    if (!run) return;
+    if (!runStatus) return;
 
-    if (run.status === 'completed') {
+    if (runStatus === 'completed') {
       setExpandedCards({
         runningState: false,
         planTarget: false,
@@ -218,7 +231,7 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
       });
 
       // Auto-select first plan if available
-      if (run.result?.plans && run.result.plans.length > 0) {
+      if (run?.result?.plans && run.result.plans.length > 0) {
         setSelectedPlanId(0);
       }
     } else {
@@ -313,6 +326,21 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString();
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'failed':
+        return '#d52828'; // red
+      case 'completed':
+        return '#2e894f'; // green
+      case 'running':
+        return '#d4a720'; // yellow
+      case 'pending':
+        return '#3b62a1'; // blue
+      default:
+        return '#6b7280'; // gray
+    }
   };
 
   const formatDuration = (startDate: string | null, endDate: string | null) => {
@@ -482,7 +510,31 @@ export function PlanningRunDetailsPage({ projectId }: PlanningRunDetailsPageProp
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
                 <label className="form-label">Status</label>
-                <span>{run.status}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: getStatusColor(run.status),
+                      display: 'inline-block',
+                    }}
+                  />
+                  {run.status}
+                  {(run.status === 'pending' || run.status === 'running') && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderTop: '2px solid #ffffff',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                      }}
+                    />
+                  )}
+                </span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '12px', alignItems: 'center' }}>
                 <label className="form-label">Type</label>

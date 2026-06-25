@@ -5,6 +5,7 @@ import { getEntitiesByViewConfig, getEntitiesResolved, deleteEntity } from '../a
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { PermissionAction } from '../components/PermissionAction';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type MaterialCatalogPageProps = {
   projectId: string;
@@ -216,11 +217,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
 
 
   if (loading && !materialCatalogView) {
-    return (
-      <div className="card state-message">
-        <p className="state-message__text">Loading material catalog...</p>
-      </div>
-    );
+    return <LoadingSpinner message="Loading material catalog..." />;
   }
 
   if (error) {
@@ -314,7 +311,12 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
       ) : (
         <div className="project-grid">
           {filteredEntities.map((entity: Entity) => (
-            <div key={entity.id} className="card material-card">
+            <Link
+              key={entity.id}
+              to={`/projects/${projectId}/materials/${entity.id}/edit?configId=${selectedConfig?.id}`}
+              className="card material-card"
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
               <div className="material-catalog-card__info-region">
                 <div className="material-catalog-card__title-region">
                   <h3 className="material-catalog-card__title">{getDisplaySlotValue(entity, 0) || '<title>'}</h3>
@@ -334,27 +336,19 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
                   })}
                 </div>
                 <div className="material-catalog-card__actions">
-                  <PermissionAction requireEditMaterial>
-                    <Link
-                      to={`/projects/${projectId}/materials/${entity.id}/edit?configId=${selectedConfig?.id}`}
-                      className="button button--secondary"
-                      style={{ padding: '1px 4px', fontSize: '10px' }}
-                    >
-                      Edit
-                    </Link>
-                  </PermissionAction>
                   <PermissionAction requireCreateMaterial>
                     <Link
                       to={`/projects/${projectId}/materials/new?configId=${selectedConfig?.id}&cloneFrom=${entity.id}`}
                       className="button button--primary"
                       style={{ padding: '1px 4px', fontSize: '10px' }}
+                      onClick={(e) => e.stopPropagation()}
                     >
                       Clone
                     </Link>
                   </PermissionAction>
                   <PermissionAction requireDeleteMaterial>
                     <button
-                      onClick={() => handleDeleteClick(entity)}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteClick(entity); }}
                       className="button button--danger"
                       style={{ padding: '1px 4px', fontSize: '10px' }}
                     >
@@ -374,7 +368,7 @@ export function MaterialCatalogPage({ projectId }: MaterialCatalogPageProps) {
                   <span className="material-catalog-card__placeholder">No Image</span>
                 )}
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

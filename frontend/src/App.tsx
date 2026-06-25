@@ -118,7 +118,7 @@ function App() {
           <Route
             path="/projects/:projectId/planning/planning_output_solver"
             element={
-              <ProjectWorkspaceWrapper>
+              <ProjectWorkspaceWrapper additionalBreadcrumbs={(project) => [{ label: 'Plans', to: `/projects/${project.id}/planning` }]}>
                 {(project) => (
                   <PermissionRouteGuard requireRunPlan>
                     <PlanningOutputSolverPage projectId={project.id} />
@@ -142,7 +142,10 @@ function App() {
           <Route
             path="/projects/:projectId/planning/planning_output_solver/:runId"
             element={
-              <ProjectWorkspaceWrapper>
+              <ProjectWorkspaceWrapper additionalBreadcrumbs={(project) => [
+                { label: 'Plans', to: `/projects/${project.id}/planning` },
+                { label: 'Output Solver', to: `/projects/${project.id}/planning/planning_output_solver` }
+              ]}>
                 {(project) => (
                   <PermissionRouteGuard requireRunPlan>
                     <PlanningRunDetailsPage projectId={project.id} />

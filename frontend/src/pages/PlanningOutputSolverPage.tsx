@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getProjectTemplate } from '../api/projects';
-import { listPlanningRuns, PlanningRun } from '../api/planning';
+import { listPlanningRuns, deletePlanningRun, PlanningRun } from '../api/planning';
 import { PermissionAction } from '../components/PermissionAction';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type PlanningOutputSolverPageProps = {
   projectId: string;
@@ -15,6 +16,8 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
   const [runs, setRuns] = useState<PlanningRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirmRun, setDeleteConfirmRun] = useState<PlanningRun | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,12 +109,34 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
     }
   };
 
+  const handleDeleteClick = (run: PlanningRun, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteConfirmRun(run);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmRun) return;
+    
+    setIsDeleting(true);
+    setError(null);
+    try {
+      await deletePlanningRun(deleteConfirmRun.id);
+      setRuns(runs.filter(r => r.id !== deleteConfirmRun.id));
+      setDeleteConfirmRun(null);
+    } catch (err) {
+      setError('Could not delete planning run');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmRun(null);
+  };
+
   if (loading) {
-    return (
-      <div className="card state-message">
-        <p className="state-message__text">Loading planning runs...</p>
-      </div>
-    );
+    return <LoadingSpinner message="Loading planning runs..." />;
   }
 
   if (error) {
@@ -214,8 +239,8 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
             <Link
               key={run.id}
               to={`/projects/${projectId}/planning/planning_output_solver/${run.id}`}
-              className="card project-card"
-              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'row', padding: 0 }}
+              className="card project-card planning-run-card"
+              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'row', padding: 0, position: 'relative' }}
             >
               <div
                 style={{
@@ -234,8 +259,46 @@ export function PlanningOutputSolverPage({ projectId }: PlanningOutputSolverPage
                   <strong>Updated:</strong> {formatDate(run.updated_at)}
                 </p>
               </div>
+              <div className="planning-run-card__actions">
+                <PermissionAction requireRunPlan>
+                  <button
+                    onClick={(e) => handleDeleteClick(run, e)}
+                    className="button button--danger"
+                    style={{ padding: '1px 4px', fontSize: '10px' }}
+                  >
+                    Delete
+                  </button>
+                </PermissionAction>
+              </div>
             </Link>
           ))}
+        </div>
+      )}
+      
+      {deleteConfirmRun && (
+        <div className="modal-overlay">
+          <div className="card" style={{ maxWidth: '400px', margin: 'auto' }}>
+            <h3 className="card-title mb-4">Delete Planning Run</h3>
+            <p className="mb-4">
+              Are you sure you want to delete "{getDisplayName(deleteConfirmRun)}"? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleDeleteCancel}
+                disabled={isDeleting}
+                className="button button--secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+                className="button button--danger"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

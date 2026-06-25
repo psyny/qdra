@@ -175,6 +175,21 @@
   opacity: 1;
 }
 
+.planning-run-card__actions {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  padding: 8px;
+}
+
+.planning-run-card:hover .planning-run-card__actions {
+  opacity: 1;
+}
+
 .project-card__title {
   font-size: 18px;
   font-weight: 600;

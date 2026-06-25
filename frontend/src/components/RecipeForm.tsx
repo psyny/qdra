@@ -39,6 +39,7 @@ type RecipeFormProps = {
   initialSlotCounts?: Record<string, number>;
   initialSlotConstraints?: SlotConstraints;
   group?: string;
+  canEdit?: boolean;
 };
 
 export function RecipeForm({
@@ -58,6 +59,7 @@ export function RecipeForm({
   initialSlotCounts,
   initialSlotConstraints,
   group,
+  canEdit = true,
 }: RecipeFormProps) {
   const [parameters, setParameters] = useState<DraftParameter[]>(initialParameters);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -697,6 +699,7 @@ export function RecipeForm({
             onUploadComplete={setImageUrl}
             onUploadError={(error) => setValidationError(error)}
             onRemove={() => setImageUrl(null)}
+            canEdit={canEdit}
           />
         </div>
       )}
@@ -723,7 +726,7 @@ export function RecipeForm({
       <div className="form-actions">
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !canEdit}
           className="button button--primary"
         >
           {isSubmitting ? 'Saving...' : submitLabel}

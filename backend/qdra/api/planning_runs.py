@@ -10,6 +10,7 @@ from db.session import get_db
 from infrastructure.db.models import PlanningRun
 from infrastructure.security.permission_checker import get_current_user_id
 from services.user_service import UserService
+from services.planning_run_service import PlanningRunService
 from domain.constraints import ConstraintSpec, ConstraintRule
 from domain.planning.output_solver_domain import (
     TargetSpec,
@@ -29,6 +30,7 @@ class CreatePlanningRunRequest(BaseModel):
     type: str
     status: str = "pending"
     input: Optional[Dict[str, Any]] = None
+    project_id: Optional[uuid.UUID] = None
 
 
 class ConstraintSpecModel(BaseModel):
@@ -141,18 +143,28 @@ class PlanningRunListResponse(BaseModel):
 def create_planning_run(
     request: CreatePlanningRunRequest,
     db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Create a new planning run."""
-    planning_run = PlanningRun(
+    # Check can_run_plan permission if project_id is provided
+    if request.project_id:
+        user_service = UserService(db)
+        permissions = user_service.get_project_permissions(user_id, request.project_id)
+        
+        if not permissions:
+            raise HTTPException(status_code=403, detail="You do not have access to this project")
+        
+        if not permissions.can_run_plan:
+            raise HTTPException(status_code=403, detail="Permission 'can_run_plan' is required")
+    
+    service = PlanningRunService(db)
+    return service.create_planning_run(
         name=request.name,
         type=request.type,
         status=request.status,
         input=request.input,
+        project_id=request.project_id,
     )
-    db.add(planning_run)
-    db.commit()
-    db.refresh(planning_run)
-    return planning_run
 
 
 @router.get("", response_model=List[PlanningRunListResponse])
@@ -163,15 +175,8 @@ def list_planning_runs(
     db: Session = Depends(get_db),
 ):
     """List all planning runs without results (to avoid traffic bloat). Can filter by type, status, and project_id."""
-    query = db.query(PlanningRun)
-    if type is not None:
-        query = query.filter(PlanningRun.type == type)
-    if status is not None:
-        query = query.filter(PlanningRun.status == status)
-    if project_id is not None:
-        query = query.filter(PlanningRun.project_id == project_id)
-    planning_runs = query.all()
-    return planning_runs
+    service = PlanningRunService(db)
+    return service.list_planning_runs(type=type, status=status, project_id=project_id)
 
 
 @router.get("/{run_id}", response_model=PlanningRunListResponse)
@@ -180,7 +185,8 @@ def get_planning_run(
     db: Session = Depends(get_db),
 ):
     """Get a single planning run without results via its ID."""
-    planning_run = db.query(PlanningRun).filter(PlanningRun.id == run_id).first()
+    service = PlanningRunService(db)
+    planning_run = service.get_planning_run(run_id)
     if not planning_run:
         raise HTTPException(status_code=404, detail="Planning run not found")
     return planning_run
@@ -192,7 +198,8 @@ def get_planning_run_with_results(
     db: Session = Depends(get_db),
 ):
     """Get a single planning run with results via its ID."""
-    planning_run = db.query(PlanningRun).filter(PlanningRun.id == run_id).first()
+    service = PlanningRunService(db)
+    planning_run = service.get_planning_run_with_results(run_id)
     if not planning_run:
         raise HTTPException(status_code=404, detail="Planning run not found")
     return planning_run
@@ -210,26 +217,49 @@ def update_planning_run(
     db: Session = Depends(get_db),
 ):
     """Update a planning run's status, input, timing, result, and/or error."""
-    planning_run = db.query(PlanningRun).filter(PlanningRun.id == run_id).first()
+    service = PlanningRunService(db)
+    planning_run = service.update_planning_run(
+        run_id=run_id,
+        status=status,
+        input=input,
+        started_at=started_at,
+        finished_at=finished_at,
+        result=result,
+        error=error,
+    )
+    if not planning_run:
+        raise HTTPException(status_code=404, detail="Planning run not found")
+    return planning_run
+
+
+@router.delete("/{run_id}")
+def delete_planning_run(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+):
+    """Delete a planning run by its ID."""
+    service = PlanningRunService(db)
+    planning_run = service.get_planning_run(run_id)
+    
     if not planning_run:
         raise HTTPException(status_code=404, detail="Planning run not found")
     
-    if status is not None:
-        planning_run.status = status
-    if input is not None:
-        planning_run.input = input
-    if started_at is not None:
-        planning_run.started_at = started_at
-    if finished_at is not None:
-        planning_run.finished_at = finished_at
-    if result is not None:
-        planning_run.result = result
-    if error is not None:
-        planning_run.error = error
+    # Check can_run_plan permission if project_id is set
+    if planning_run.project_id:
+        user_service = UserService(db)
+        permissions = user_service.get_project_permissions(user_id, planning_run.project_id)
+        
+        if not permissions:
+            raise HTTPException(status_code=403, detail="You do not have access to this project")
+        
+        if not permissions.can_run_plan:
+            raise HTTPException(status_code=403, detail="Permission 'can_run_plan' is required")
     
-    db.commit()
-    db.refresh(planning_run)
-    return planning_run
+    success = service.delete_planning_run(run_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Planning run not found")
+    return {"message": "Planning run deleted successfully"}
 
 
 @router.post("/output-solver/runs", response_model=PlanningRunResponse)
@@ -463,14 +493,12 @@ def create_output_solver_run(
             ],
         }
 
-    planning_run = PlanningRun(
+    service = PlanningRunService(db)
+    planning_run = service.create_planning_run(
         project_id=request.project_id,
         name=request.name,
         type="output_solver",
         status="pending",
         input=input_dict,
     )
-    db.add(planning_run)
-    db.commit()
-    db.refresh(planning_run)
     return planning_run

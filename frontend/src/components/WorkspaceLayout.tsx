@@ -7,13 +7,18 @@ type WorkspaceLayoutProps = {
   projectId: string;
   projectName: string;
   children: ReactNode;
+  additionalBreadcrumbs?: BreadcrumbItem[];
 };
 
-export function WorkspaceLayout({ projectId, projectName, children }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ projectId, projectName, children, additionalBreadcrumbs }: WorkspaceLayoutProps) {
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: 'Projects', to: '/projects' },
     { label: projectName, to: `/projects/${projectId}` },
   ];
+
+  if (additionalBreadcrumbs && additionalBreadcrumbs.length > 0) {
+    breadcrumbItems.push(...additionalBreadcrumbs);
+  }
 
   return (
     <div className="workspace">

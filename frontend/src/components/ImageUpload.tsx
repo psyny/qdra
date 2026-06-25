@@ -10,6 +10,7 @@ interface ImageUploadProps {
   onRemove?: () => void;
   currentImage?: string | null;
   currentImageId?: string | null;
+  canEdit?: boolean;
 }
 
 export function ImageUpload({
@@ -19,6 +20,7 @@ export function ImageUpload({
   onUploadError,
   onRemove,
   currentImage,
+  canEdit = true,
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentImage || null);
@@ -312,7 +314,7 @@ export function ImageUpload({
           <div className="form-actions" style={{ display: 'flex', gap: '12px' }}>
             <button 
               onClick={() => setEditingImage(null)} 
-              disabled={isUploading} 
+              disabled={isUploading || !canEdit} 
               type="button"
               className="button button--secondary"
             >
@@ -320,7 +322,7 @@ export function ImageUpload({
             </button>
             <button 
               onClick={handleConfirmEdit} 
-              disabled={isUploading} 
+              disabled={isUploading || !canEdit} 
               type="button"
               className="button button--primary"
             >
@@ -345,18 +347,18 @@ export function ImageUpload({
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleFileSelect}
-              disabled={isUploading}
+              disabled={isUploading || !canEdit}
               style={{ display: 'none' }}
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
+              disabled={isUploading || !canEdit}
               type="button"
             >
               {isUploading ? 'Uploading...' : 'Select Image'}
             </button>
             {previewUrl && (
-              <button onClick={handleRemove} disabled={isUploading} type="button">
+              <button onClick={handleRemove} disabled={isUploading || !canEdit} type="button">
                 Remove
               </button>
             )}

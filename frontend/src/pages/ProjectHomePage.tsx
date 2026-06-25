@@ -5,6 +5,7 @@ import { getUserProjectPermissions } from '../api/users';
 import { Project } from '../types/project';
 import { ProjectTemplateDetail } from '../types/template';
 import { WorkspaceLayout } from '../components/WorkspaceLayout';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function ProjectHomePage() {
@@ -69,9 +70,7 @@ export function ProjectHomePage() {
         <div className="page-header">
           <h1 className="page-title">Qdra</h1>
         </div>
-        <div className="card state-message">
-          <p className="state-message__text">Loading project...</p>
-        </div>
+        <LoadingSpinner message="Loading project..." />
       </div>
     );
   }

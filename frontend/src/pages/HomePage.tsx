@@ -1,9 +1,20 @@
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function HomePage() {
   const { appPermissions } = usePermissionContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const hasTemplateAccess = appPermissions?.can_create_templates || appPermissions?.can_edit_templates || appPermissions?.can_delete_templates;
+    const hasUserAccess = appPermissions?.can_manage_users;
+
+    if (!hasTemplateAccess && !hasUserAccess) {
+      navigate('/projects');
+    }
+  }, [appPermissions, navigate]);
 
   return (
     <div className="page">

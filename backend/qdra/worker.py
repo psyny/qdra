@@ -1,5 +1,6 @@
 import json
 import uuid
+import logging
 from datetime import datetime
 from typing import Dict, Any
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 from qdra.db.session import SessionLocal
 from qdra.infrastructure.db.models import PlanningRun
 from qdra.services.planning.output_solver_service import OutputSolverService
+
+logger = logging.getLogger(__name__)
 from qdra.domain.planning.output_solver_domain import (
     SolverRequest, SolverResponse, DomainConstraints, TargetSpec,
     SearchParameters, ScoreRules, UserVariableDef, ScoreFormulaDef
@@ -113,6 +116,11 @@ def _deserialize_solver_request(data: Dict) -> SolverRequest:
         search_parameters=search_parameters,
         score_rules=score_rules,
     )
+
+
+def _planning_run_exists(planning_run_id: uuid.UUID, db: Session) -> bool:
+    """Check if a planning run still exists in the database."""
+    return db.query(PlanningRun).filter(PlanningRun.id == planning_run_id).first() is not None
 
 
 def process_planning_run(planning_run: PlanningRun, db: Session) -> None:
@@ -228,6 +236,9 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
         }
 
         # Update planning run with success
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "completed"
         planning_run.result = result_dict
         planning_run.finished_at = datetime.utcnow()
@@ -236,6 +247,9 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
 
     except ValidationError as e:
         # Input validation error
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "failed"
         planning_run.error = f"Input validation error: {str(e)}"
         planning_run.finished_at = datetime.utcnow()
@@ -243,6 +257,9 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
 
     except ValueError as e:
         # Business logic error
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "failed"
         planning_run.error = str(e)
         planning_run.finished_at = datetime.utcnow()
@@ -250,6 +267,9 @@ def process_output_solver_run(planning_run: PlanningRun, db: Session) -> None:
 
     except Exception as e:
         # Unexpected error
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "failed"
         planning_run.error = f"Unexpected error: {type(e).__name__}: {str(e)}"
         planning_run.finished_at = datetime.utcnow()
@@ -267,6 +287,9 @@ def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
         }
 
         # Update planning run with success
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "completed"
         planning_run.result = result_dict
         planning_run.finished_at = datetime.utcnow()
@@ -275,6 +298,9 @@ def process_health_check_run(planning_run: PlanningRun, db: Session) -> None:
 
     except Exception as e:
         # Unexpected error
+        if not _planning_run_exists(planning_run.id, db):
+            logger.warning(f"Planning run {planning_run.id} (name: {planning_run.name}) was deleted before worker could update it")
+            return
         planning_run.status = "failed"
         planning_run.error = f"Unexpected error: {type(e).__name__}: {str(e)}"
         planning_run.finished_at = datetime.utcnow()

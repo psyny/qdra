@@ -18,6 +18,7 @@ import { ProjectTemplateDetail, ViewConfig, ParameterDefinition } from '../types
 import { Entity, EntityParameter } from '../types/entity';
 import { RecipeForm } from '../components/RecipeForm';
 import { DraftParameter } from '../components/ParameterRow';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 type SlotGroupConfig = {
   type: 'requires' | 'consumes' | 'produces';
@@ -35,6 +36,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const configId = searchParams.get('configId');
   const cloneFrom = searchParams.get('cloneFrom');
   const navigate = useNavigate();
+  const { projectPermissions } = usePermissionContext();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [recipeCatalogView, setRecipeCatalogView] = useState<any>(null);
@@ -49,6 +51,8 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [initialSlotCounts, setInitialSlotCounts] = useState<Record<string, number>>({});
   const [initialSlotConstraints, setInitialSlotConstraints] = useState<any>({});
+
+  const canEdit = projectPermissions?.can_edit_recipe || false;
 
   useEffect(() => {
     const loadData = async () => {
@@ -200,6 +204,11 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
   };
 
   const handleSubmit = async (parameters: DraftParameter[], imageUrl?: string, slotData?: { slotCounts: Record<string, number>; slotConstraints: any }) => {
+    if (!canEdit) {
+      setError('You do not have permission to edit recipes');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -362,6 +371,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
     <div>
       <h2 className="card-title mb-4">
         {recipeId ? 'Edit Entity' : 'New Entity'}
+        {!canEdit && <span style={{ marginLeft: '12px', fontSize: '14px', color: '#888', fontWeight: 'normal' }}>(Read-only)</span>}
       </h2>
       <RecipeForm
         initialParameters={initialParameters}
@@ -380,6 +390,7 @@ export function RecipeEditorPage({ projectId }: RecipeEditorPageProps) {
         initialSlotCounts={initialSlotCounts}
         initialSlotConstraints={initialSlotConstraints}
         group={entity?.group || selectedConfig ? template?.entity_types.find(et => et.id === selectedConfig.entity_type_id)?.name : undefined}
+        canEdit={canEdit}
       />
     </div>
   );

@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getProjects, createProject, updateProject, deleteProject } from '../api/projects';
 import { getTemplates } from '../api/templates';
 import { Project, CreateProjectRequest, UpdateProjectRequest } from '../types/project';
 import { ProjectTemplate } from '../types/template';
 import { WorkspaceHeader } from '../components/WorkspaceHeader';
 import { ProjectForm } from '../components/ProjectForm';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { usePermissionContext } from '../contexts/PermissionContext';
 
 export function ProjectSelectionPage() {
   const { appPermissions } = usePermissionContext();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<ProjectTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,12 @@ export function ProjectSelectionPage() {
     loadProjects();
     loadTemplates();
   }, []);
+
+  useEffect(() => {
+    if (!loading && !error && projects.length === 1) {
+      navigate(`/projects/${projects[0].id}`);
+    }
+  }, [loading, error, projects, navigate]);
 
   const handleCreateProject = async (payload: CreateProjectRequest) => {
     setIsSubmitting(true);
@@ -169,11 +177,7 @@ export function ProjectSelectionPage() {
       </div>
 
       <div className="mt-8">
-        {loading && (
-          <div className="card state-message">
-            <p className="state-message__text">Loading projects...</p>
-          </div>
-        )}
+        {loading && <LoadingSpinner message="Loading projects..." />}
         {error && (
           <div className="card state-message">
             <p className="state-message__text">{error}</p>

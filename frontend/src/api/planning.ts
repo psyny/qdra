@@ -144,3 +144,13 @@ export async function createOutputSolverRun(data: {
   }
   return response.json();
 }
+
+export async function deletePlanningRun(runId: string): Promise<void> {
+  const response = await fetch(apiUrl(`/api/planning-runs/${runId}`), {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete planning run');
+  }
+}

@@ -6,6 +6,7 @@ import { ProjectTemplateDetail, ViewConfig, ParameterDefinition } from '../types
 import { Entity, EntityParameter } from '../types/entity';
 import { MaterialForm } from '../components/MaterialForm';
 import { DraftParameter } from '../components/ParameterRow';
+import { usePermissionContext } from '../contexts/PermissionContext';
 
 type MaterialEditorPageProps = {
   projectId: string;
@@ -17,6 +18,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   const configId = searchParams.get('configId');
   const cloneFrom = searchParams.get('cloneFrom');
   const navigate = useNavigate();
+  const { projectPermissions } = usePermissionContext();
   const [template, setTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [materialCatalogView, setMaterialCatalogView] = useState<any>(null);
@@ -27,6 +29,8 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canEdit = projectPermissions?.can_edit_material || false;
 
   useEffect(() => {
     const loadData = async () => {
@@ -89,6 +93,11 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
   };
 
   const handleSubmit = async (parameters: DraftParameter[], imageUrl?: string) => {
+    if (!canEdit) {
+      setError('You do not have permission to edit materials');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -192,6 +201,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
     <div>
       <h2 className="card-title mb-4">
         {materialId ? 'Edit Entity' : 'New Entity'}
+        {!canEdit && <span style={{ marginLeft: '12px', fontSize: '14px', color: '#888', fontWeight: 'normal' }}>(Read-only)</span>}
       </h2>
       <MaterialForm
         initialParameters={initialParameters}
@@ -205,6 +215,7 @@ export function MaterialEditorPage({ projectId }: MaterialEditorPageProps) {
         currentImage={entity?.image?.url || null}
         projectId={projectId}
         group={entity?.group || selectedConfig ? template?.entity_types.find(et => et.id === selectedConfig.entity_type_id)?.name : undefined}
+        canEdit={canEdit}
       />
     </div>
   );
