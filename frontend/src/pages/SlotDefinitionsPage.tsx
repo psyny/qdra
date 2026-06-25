@@ -317,7 +317,7 @@ export function SlotDefinitionsPage() {
         domain: firstDomain,
         key: firstKey,
         operator: '=',
-        value_string: null,
+        value_string: '',
         value_number: undefined,
         value_boolean: undefined,
       } : {
@@ -327,7 +327,7 @@ export function SlotDefinitionsPage() {
         domain: null,
         key: null,
         operator: '=',
-        value_string: entityTypes[0]?.name || null,
+        value_string: entityTypes[0]?.name || '',
         value_number: undefined,
         value_boolean: undefined,
       };
@@ -393,9 +393,9 @@ export function SlotDefinitionsPage() {
             domain: 'system',
             key: 'group',
             operator: constraint.operator,
-            value_string: constraint.value_string,
-            value_number: constraint.value_number,
-            value_boolean: constraint.value_boolean,
+            value_string: constraint.value_string !== null && constraint.value_string !== undefined ? constraint.value_string : null,
+            value_number: constraint.value_number ?? null,
+            value_boolean: constraint.value_boolean ?? null,
             is_wildcard: false,
           };
         } else if (constraint.origin === 'parameter') {
@@ -405,9 +405,9 @@ export function SlotDefinitionsPage() {
               domain: constraint.domain,
               key: constraint.key,
               operator: constraint.operator,
-              value_string: constraint.value_string,
-              value_number: constraint.value_number,
-              value_boolean: constraint.value_boolean,
+              value_string: constraint.value_string !== null && constraint.value_string !== undefined ? constraint.value_string : null,
+              value_number: constraint.value_number ?? null,
+              value_boolean: constraint.value_boolean ?? null,
               is_wildcard: false,
             };
           }
@@ -437,9 +437,9 @@ export function SlotDefinitionsPage() {
               domain: 'system',
               key: 'group',
               operator: constraint.operator,
-              value_string: constraint.value_string,
-              value_number: constraint.value_number,
-              value_boolean: constraint.value_boolean,
+              value_string: constraint.value_string !== null && constraint.value_string !== undefined ? constraint.value_string : null,
+              value_number: constraint.value_number ?? null,
+              value_boolean: constraint.value_boolean ?? null,
               is_wildcard: false,
             };
           } else if (constraint.origin === 'parameter') {
@@ -449,9 +449,9 @@ export function SlotDefinitionsPage() {
                 domain: constraint.domain,
                 key: constraint.key,
                 operator: constraint.operator,
-                value_string: constraint.value_string,
-                value_number: constraint.value_number,
-                value_boolean: constraint.value_boolean,
+                value_string: constraint.value_string !== null && constraint.value_string !== undefined ? constraint.value_string : null,
+                value_number: constraint.value_number ?? null,
+                value_boolean: constraint.value_boolean ?? null,
                 is_wildcard: false,
               };
             }
@@ -681,7 +681,7 @@ export function SlotDefinitionsPage() {
         domain: firstDomain,
         key: firstKey,
         operator: '=',
-        value_string: null,
+        value_string: '',
         value_number: undefined,
         value_boolean: undefined,
       } : {
@@ -691,7 +691,7 @@ export function SlotDefinitionsPage() {
         domain: null,
         key: null,
         operator: '=',
-        value_string: entityTypes[0]?.name || null,
+        value_string: entityTypes[0]?.name || '',
         value_number: undefined,
         value_boolean: undefined,
       };
@@ -1037,6 +1037,7 @@ export function SlotDefinitionsPage() {
                                 <select
                                   value={constraint.value_string || ''}
                                   onChange={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                  onBlur={(e) => updateTemplateConstraint(group.type, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
                                   className="form-input"
                                   style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                                 >
@@ -1308,6 +1309,7 @@ export function SlotDefinitionsPage() {
                                       <select
                                         value={constraint.value_string || ''}
                                         onChange={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
+                                        onBlur={(e) => updatePerSlotConstraint(group.type as 'requires' | 'consumes' | 'produces', slotIndex, orGroupIndex, constraintIndex, 'value_string', e.target.value)}
                                         className="form-input"
                                         style={{ flex: 1, fontSize: '12px', padding: '5px 6px' }}
                                       >
