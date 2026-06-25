@@ -155,34 +155,8 @@ class EntityService:
         result = []
 
         for entity in entities:
-            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-            entity_kind = entity_type.kind if entity_type else "unknown"
-
-            image = self.image_asset_repository.get_primary_image(entity.id)
-            entity_data: Dict[str, Any] = {
-                "id": entity.id,
-                "project_id": entity.project_id,
-                "entity_type_id": entity.entity_type_id,
-                "group": entity.group,
-                "kind": entity_kind,
-                "created_at": entity.created_at,
-                "updated_at": entity.updated_at,
-                "image": None,
-            }
-            if image and image.status == 'ready':
-                # Generate presigned download URL
-                download_url = await self.storage_provider.create_presigned_download_url(
-                    storage_key=image.storage_key,
-                    expires_in_seconds=3600,
-                )
-                entity_data["image"] = {
-                    "id": image.id,
-                    "url": download_url,
-                    "mime_type": image.mime_type,
-                    "alt_text": image.alt_text,
-                    "width": image.width,
-                    "height": image.height,
-                }
+            # Use get_entity which uses cached data (entity_type, image, parameters)
+            entity_data = await self.get_entity(entity.id)
             result.append(entity_data)
 
         return result
@@ -306,34 +280,8 @@ class EntityService:
         result = []
 
         for entity in entities:
-            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-            entity_kind = entity_type.kind if entity_type else "unknown"
-
-            image = self.image_asset_repository.get_primary_image(entity.id)
-            entity_data: Dict[str, Any] = {
-                "id": entity.id,
-                "project_id": entity.project_id,
-                "entity_type_id": entity.entity_type_id,
-                "group": entity.group,
-                "kind": entity_kind,
-                "created_at": entity.created_at,
-                "updated_at": entity.updated_at,
-                "image": None,
-            }
-            if image and image.status == 'ready':
-                # Generate presigned download URL
-                download_url = await self.storage_provider.create_presigned_download_url(
-                    storage_key=image.storage_key,
-                    expires_in_seconds=3600,
-                )
-                entity_data["image"] = {
-                    "id": image.id,
-                    "url": download_url,
-                    "mime_type": image.mime_type,
-                    "alt_text": image.alt_text,
-                    "width": image.width,
-                    "height": image.height,
-                }
+            # Use get_entity which uses cached data (entity_type, image, parameters)
+            entity_data = await self.get_entity(entity.id)
             result.append(entity_data)
 
         return result
