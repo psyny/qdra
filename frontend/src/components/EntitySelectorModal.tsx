@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getProjectTemplate } from '../api/projects';
-import { getEntities, getEntityParameters } from '../api/entities';
+import { getEntities, getEntitiesResolved } from '../api/entities';
 import { ProjectTemplateDetail, EntityType, ParameterDefinition, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { EntityDetailModal } from './EntityDetailModal';
@@ -83,44 +83,46 @@ export function EntitySelectorModal({
   const loadEntities = async () => {
     setLoading(true);
     try {
+      // Load base entity data (lightweight)
       const data = await getEntities(projectId, selectedType);
-      // Load all entities without filtering - filtering happens in display
       setEntities(data);
 
-      // Load parameters for all entities
-      const paramsMap: Record<string, EntityParameter[]> = {};
-      await Promise.all(
-        data.map(async (entity) => {
-          try {
-            const params = await getEntityParameters(projectId, entity.id);
-            // Add system parameters (id and group)
-            paramsMap[entity.id] = [
-              {
-                id: 'sys_id',
-                entity_id: entity.id,
-                domain: '__system__',
-                key: 'id',
-                value_string: entity.id,
-                created_at: '',
-                updated_at: '',
-              },
-              {
-                id: 'sys_group',
-                entity_id: entity.id,
-                domain: '__system__',
-                key: 'group',
-                value_string: entity.group,
-                created_at: '',
-                updated_at: '',
-              },
-              ...params,
-            ];
-          } catch (err) {
-            paramsMap[entity.id] = [];
-          }
-        })
-      );
-      setEntityParameters(paramsMap);
+      // Load resolved entities with parameters in bulk
+      if (data.length > 0) {
+        const entityIds = data.map(e => e.id);
+        const resolvedEntities = await getEntitiesResolved(entityIds);
+        
+        // Map parameters from resolved entities
+        const paramsMap: Record<string, EntityParameter[]> = {};
+        resolvedEntities.forEach((entity) => {
+          const params = entity.parameters || [];
+          // Add system parameters (id and group)
+          paramsMap[entity.id] = [
+            {
+              id: 'sys_id',
+              entity_id: entity.id,
+              domain: '__system__',
+              key: 'id',
+              value_string: entity.id,
+              created_at: '',
+              updated_at: '',
+            },
+            {
+              id: 'sys_group',
+              entity_id: entity.id,
+              domain: '__system__',
+              key: 'group',
+              value_string: entity.group,
+              created_at: '',
+              updated_at: '',
+            },
+            ...params,
+          ];
+        });
+        setEntityParameters(paramsMap);
+      } else {
+        setEntityParameters({});
+      }
     } catch (err) {
       console.error('Failed to load entities:', err);
     } finally {

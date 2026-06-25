@@ -3,16 +3,17 @@ import uuid
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, exists
-from cachetools import TTLCache
+from infrastructure.cache.constraint_cache import (
+    get_constraint_resolution,
+    set_constraint_resolution,
+)
 
 from models.entity import Entity
 from models.entity_parameter import EntityParameter
 from models.project_template import ProjectTemplateEntityType
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
-from infrastructure.cache.cache_service import CacheService
 from infrastructure.config.settings import settings
-from infrastructure.cache.relationship_cache import get_cache_service
 from domain.constraints import ConstraintSpec
 
 from services.constraint_matcher import ConstraintMatcher
@@ -21,12 +22,10 @@ from services.constraint_matcher import ConstraintMatcher
 class ConstraintResolutionService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db, CacheService())
+        self.entity_repo = EntityRepository(db)
         self.entity_param_repo = EntityParameterRepository(db)
         from qdra.infrastructure.config.settings import settings
         self.settings = settings
-        self.cache_service = get_cache_service()
-        self.l1_cache = TTLCache(maxsize=1000, ttl=settings.cache_relationship_ttl)
 
     def find_materials_by_constraints(
         self,
@@ -37,18 +36,10 @@ class ConstraintResolutionService:
         # Create cache key from constraints
         cache_key = self._make_cache_key("materials", project_id, constraints)
 
-        # L1: Check local cache if enabled
-        if self.settings.l1_caching and cache_key in self.l1_cache:
-            return self.l1_cache[cache_key]
-
-        # L2: Check Redis cache if enabled
-        if self.settings.l2_caching:
-            cached = self.cache_service.get(cache_key)
-            if cached:
-                result = [uuid.UUID(id_str) for id_str in cached]
-                if self.settings.l1_caching:
-                    self.l1_cache[cache_key] = result
-                return result
+        # Check cache (L1 then L2)
+        cached = get_constraint_resolution(cache_key)
+        if cached is not None:
+            return cached
 
         # Build SQL query with constraint filtering
         query = (
@@ -65,12 +56,8 @@ class ConstraintResolutionService:
         # Execute query
         matching_materials = [row[0] for row in query.all()]
 
-        # Cache result if enabled
-        if self.settings.l1_caching:
-            self.l1_cache[cache_key] = matching_materials
-        if self.settings.l2_caching:
-            serialized = [str(id) for id in matching_materials]
-            self.cache_service.set(cache_key, serialized, self.settings.cache_relationship_ttl)
+        # Cache result
+        set_constraint_resolution(cache_key, matching_materials)
 
         return matching_materials
 
@@ -83,18 +70,10 @@ class ConstraintResolutionService:
         # Create cache key from constraints
         cache_key = self._make_cache_key("recipes", project_id, constraints)
 
-        # L1: Check local cache if enabled
-        if self.settings.l1_caching and cache_key in self.l1_cache:
-            return self.l1_cache[cache_key]
-
-        # L2: Check Redis cache if enabled
-        if self.settings.l2_caching:
-            cached = self.cache_service.get(cache_key)
-            if cached:
-                result = [uuid.UUID(id_str) for id_str in cached]
-                if self.settings.l1_caching:
-                    self.l1_cache[cache_key] = result
-                return result
+        # Check cache (L1 then L2)
+        cached = get_constraint_resolution(cache_key)
+        if cached is not None:
+            return cached
 
         # Build SQL query with constraint filtering
         query = (
@@ -111,12 +90,8 @@ class ConstraintResolutionService:
         # Execute query
         matching_recipes = [row[0] for row in query.all()]
 
-        # Cache result if enabled
-        if self.settings.l1_caching:
-            self.l1_cache[cache_key] = matching_recipes
-        if self.settings.l2_caching:
-            serialized = [str(id) for id in matching_recipes]
-            self.cache_service.set(cache_key, serialized, self.settings.cache_relationship_ttl)
+        # Cache result
+        set_constraint_resolution(cache_key, matching_recipes)
 
         return matching_recipes
 
@@ -379,9 +354,10 @@ class ConstraintResolutionService:
 
     def clear_cache(self):
         """Clear the L1 cache."""
-        self.l1_cache.clear()
+        # This is now handled by the constraint_cache module
+        pass
 
-    def clear_pattern(self, project_id: str):
-        """Clear all L2 caches matching the project pattern."""
-        if self.settings.l2_caching:
-            self.cache_service.delete_pattern(f"constraint_resolution:*:{project_id}:*")
+    def clear_pattern(self, project_id: uuid.UUID):
+        """Clear all caches matching the project pattern."""
+        from qdra.infrastructure.cache.invalidation_controller import constraint_resolution_changed
+        constraint_resolution_changed(project_id)

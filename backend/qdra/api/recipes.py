@@ -103,6 +103,8 @@ class RecipeResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     image: Optional[Dict[str, Any]] = None
+    parameters: Optional[List[Dict[str, Any]]] = None
+    slots: Optional[List[Dict[str, Any]]] = None
 
 
 class OptionMaterialsResponse(BaseModel):
@@ -207,18 +209,14 @@ async def create_recipe(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
 
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
         entity = service.create_entity(project_id=project_id, entity_type_id=et_id)
         # Invalidate all relationship caches so the solver sees the new recipe
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -231,8 +229,7 @@ async def create_recipe_bulk(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
 
     service = EntityService(db)
     slot_repo = SlotRepository(db)
@@ -265,10 +262,7 @@ async def create_recipe_bulk(
                     )
 
         # Invalidate all relationship caches so the solver sees the new recipe
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -276,9 +270,26 @@ async def create_recipe_bulk(
 
 @router.get("/projects/{project_id}/recipes", response_model=List[RecipeResponse])
 async def list_recipes(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List recipes by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind="recipe")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+class EntityIdsRequest(BaseModel):
+    entity_ids: List[uuid.UUID]
+
+@router.post("/recipes/resolved", response_model=List[RecipeResponse])
+async def get_recipes_resolved(
+    request: EntityIdsRequest,
+    db: Session = Depends(get_db),
+):
+    """Get resolved recipes by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(request.entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -301,17 +312,13 @@ def delete_recipe(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_delete_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     try:
         service.delete_entity(recipe_id)
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([recipe_id], project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -324,8 +331,7 @@ def create_slot(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     slot_repo = SlotRepository(db)
     slot = slot_repo.create(
@@ -334,10 +340,7 @@ def create_slot(
         sort_order=slot_data.sort_order,
     )
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
     return slot
 
 
@@ -350,8 +353,7 @@ def create_option(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     option_repo = OptionRepository(db)
     option = option_repo.create(
@@ -360,10 +362,7 @@ def create_option(
         sort_order=option_data.sort_order,
     )
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
     return option
 
 
@@ -381,8 +380,7 @@ def create_constraint(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     constraint_repo = ParameterConstraintRepository(db)
     constraint = constraint_repo.create(
@@ -395,10 +393,7 @@ def create_constraint(
         is_wildcard=constraint_data.is_wildcard,
     )
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
     return constraint
 
 
@@ -503,17 +498,13 @@ def delete_recipe_slot(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     slot_repo = SlotRepository(db)
     if not slot_repo.delete(slot_id):
         raise HTTPException(status_code=404, detail="Slot not found")
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
 
 
 @router.delete("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_id}", status_code=204)
@@ -525,8 +516,7 @@ def delete_recipe_option(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     option_repo = OptionRepository(db)
     option = option_repo.get_by_id(option_id)
@@ -535,10 +525,7 @@ def delete_recipe_option(
     db.delete(option)
     db.commit()
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
 
 
 @router.delete("/projects/{project_id}/recipes/{recipe_id}/slots/{slot_id}/options/{option_id}/constraints/{constraint_id}", status_code=204)
@@ -551,8 +538,7 @@ def delete_recipe_constraint(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     constraint_repo = ParameterConstraintRepository(db)
     constraint = constraint_repo.get_by_id(constraint_id)
@@ -561,10 +547,7 @@ def delete_recipe_constraint(
     db.delete(constraint)
     db.commit()
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)
 
 
 @router.post("/projects/{project_id}/recipes/{recipe_id}/parameters", response_model=RecipeParameterResponse, status_code=201)
@@ -575,8 +558,7 @@ def add_recipe_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     try:
@@ -586,10 +568,7 @@ def add_recipe_parameter(
             value_boolean=param_data.value_boolean,
         )
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([recipe_id], project_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -614,14 +593,10 @@ def delete_recipe_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_recipe),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([recipe_id], project_id)

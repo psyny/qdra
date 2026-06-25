@@ -14,11 +14,8 @@ from models.project_user_permissions import ProjectUserPermissions
 from infrastructure.cache.permission_cache import (
     get_app_permissions,
     set_app_permissions,
-    invalidate_app_permissions,
     get_project_permissions,
     set_project_permissions,
-    invalidate_project_permissions,
-    invalidate_all_user_permissions,
 )
 
 
@@ -127,7 +124,8 @@ class UserService:
             return None
         
         # Invalidate all permission caches for this user
-        invalidate_all_user_permissions(user_id)
+        from qdra.infrastructure.cache.invalidation_controller import user_permissions_changed
+        user_permissions_changed(user_id)
         
         return UserRead.model_validate(user)
 
@@ -138,7 +136,8 @@ class UserService:
             return None
         
         # Invalidate all permission caches for this user
-        invalidate_all_user_permissions(user_id)
+        from qdra.infrastructure.cache.invalidation_controller import user_permissions_changed
+        user_permissions_changed(user_id)
         
         return UserRead.model_validate(user)
 
@@ -185,7 +184,8 @@ class UserService:
         result = UserAppPermissionsRead.model_validate(perms)
         
         # Invalidate cache for this user
-        invalidate_app_permissions(user_id)
+        from qdra.infrastructure.cache.invalidation_controller import user_permissions_changed
+        user_permissions_changed(user_id)
         
         return result
 
@@ -195,7 +195,8 @@ class UserService:
         result = UserAppPermissionsRead.model_validate(perms)
         
         # Invalidate cache for this user since we may have created new permissions
-        invalidate_app_permissions(user_id)
+        from qdra.infrastructure.cache.invalidation_controller import user_permissions_changed
+        user_permissions_changed(user_id)
         
         return result
 
@@ -251,7 +252,8 @@ class UserService:
         result = ProjectUserPermissionsRead.model_validate(perms)
         
         # Invalidate cache for this user/project
-        invalidate_project_permissions(user_id, project_id)
+        from qdra.infrastructure.cache.invalidation_controller import project_permissions_changed
+        project_permissions_changed(user_id, project_id)
         
         return result
 
@@ -260,4 +262,5 @@ class UserService:
         self.project_perms_repo.delete(user_id, project_id)
         
         # Invalidate cache for this user/project
-        invalidate_project_permissions(user_id, project_id)
+        from qdra.infrastructure.cache.invalidation_controller import project_permissions_changed
+        project_permissions_changed(user_id, project_id)

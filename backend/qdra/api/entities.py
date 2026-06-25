@@ -118,6 +118,8 @@ class EntityResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     image: Optional[Dict[str, Any]] = None
+    parameters: Optional[List[Dict[str, Any]]] = None
+    slots: Optional[List[Dict[str, Any]]] = None
 
     model_config = {"from_attributes": True}
 
@@ -133,8 +135,7 @@ async def create_entity(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
 
     # Check if this is a material entity type
     is_material = _is_material_entity_type(project_id, request.entity_type_id, db)
@@ -161,10 +162,7 @@ async def create_entity(
                     value_boolean=param.value_boolean,
                 )
         # Invalidate all relationship caches so the solver sees the new entity
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -177,8 +175,7 @@ async def bulk_create_entities(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
 
     service = EntityService(db)
     results = []
@@ -210,10 +207,7 @@ async def bulk_create_entities(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     # Invalidate all relationship caches so the solver sees the new entities
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_added([e.id for e in results], project_id)
     return results
 
 
@@ -223,9 +217,26 @@ async def list_entities(
     kind: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    """List entities by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind=kind)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+class EntityIdsRequest(BaseModel):
+    entity_ids: List[uuid.UUID]
+
+@router.post("/entities/resolved", response_model=List[EntityResponse])
+async def get_entities_resolved(
+    request: EntityIdsRequest,
+    db: Session = Depends(get_db),
+):
+    """Get resolved entities by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(request.entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -256,10 +267,7 @@ async def update_entity(
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
     """Update an entity's parameters."""
-    from repositories.entity_repository import EntityRepository
-    from qdra.infrastructure.cache.cache_service import CacheService
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     # Check if this is a material entity
     is_material = _is_material_entity(entity_id, db)
@@ -269,7 +277,6 @@ async def update_entity(
         _check_material_permission(project_id, "can_edit_material", db, user_id)
 
     service = EntityService(db)
-    entity_repo = EntityRepository(db, CacheService())
 
     try:
         # Verify entity exists
@@ -293,14 +300,8 @@ async def update_entity(
                     value_boolean=param.value_boolean,
                 )
 
-            # Invalidate entity cache
-            entity_repo.invalidate_entity(entity_id)
-
             # Invalidate all relationship caches for this project
-            if settings.l1_caching:
-                clear_all_caches()
-            if settings.l2_caching:
-                clear_pattern(str(project_id))
+            entities_changed([entity_id], project_id)
 
         return await service.get_entity(entity_id)
     except ValueError as e:
@@ -314,8 +315,7 @@ def delete_entity(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     # Check if this is a material entity
     is_material = _is_material_entity(entity_id, db)
@@ -328,10 +328,7 @@ def delete_entity(
     try:
         service.delete_entity(entity_id)
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([entity_id], project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -347,8 +344,7 @@ def add_entity_parameter(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     # Check if this is a material entity
     is_material = _is_material_entity(entity_id, db)
@@ -368,10 +364,7 @@ def add_entity_parameter(
             value_boolean=request.value_boolean,
         )
         # Invalidate all relationship caches so constraint lookups reflect the new parameter
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([entity_id], project_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -402,7 +395,7 @@ async def list_entities_by_view_config(
     config_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """List entities filtered by a view config's entity_type_id and filter_params."""
+    """List entities filtered by a view config's entity_type_id (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities_by_view_config(project_id, config_id)
@@ -421,8 +414,7 @@ def delete_entity_parameter(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     # Check if this is a material entity
     is_material = _is_material_entity(entity_id, db)
@@ -436,10 +428,7 @@ def delete_entity_parameter(
     if not deleted:
         raise HTTPException(status_code=404, detail="Parameter not found")
     # Invalidate all relationship caches so constraint lookups reflect the removed parameter
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([entity_id], project_id)
 
 
 @router.post("/projects/{project_id}/parameter-values")
@@ -489,7 +478,7 @@ def get_values_for_parameter(
         # Get parameter values for the specified domain:key from these materials and recipes
         all_values = set()
         for material_id in material_ids:
-            params = service.entity_parameter_repository.list_by_entity(material_id)
+            params = service.get_entity_parameters(material_id)
             for param in params:
                 # Check if this parameter matches the domain:key
                 if param.domain == domain and param.key == key:
@@ -501,7 +490,7 @@ def get_values_for_parameter(
                         all_values.add(str(param.value_boolean))
 
         for recipe_id in recipe_ids:
-            params = service.entity_parameter_repository.list_by_entity(recipe_id)
+            params = service.get_entity_parameters(recipe_id)
             for param in params:
                 # Check if this parameter matches the domain:key
                 if param.domain == domain and param.key == key:

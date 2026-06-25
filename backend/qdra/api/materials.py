@@ -48,6 +48,7 @@ class MaterialResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     image: Optional[Dict[str, Any]] = None
+    parameters: Optional[List[Dict[str, Any]]] = None
 
 
 class RecipeSlotInfo(BaseModel):
@@ -105,6 +106,8 @@ async def create_material(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_material),
 ):
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
+
     service = EntityService(db)
     try:
         et_id = _resolve_entity_type_id(project_id, data.entity_type_id, db)
@@ -116,6 +119,8 @@ async def create_material(
                     value_string=p.value_string, value_number=p.value_number,
                     value_boolean=p.value_boolean,
                 )
+        # Invalidate all relationship caches so the solver sees the new material
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -128,6 +133,8 @@ async def create_material_bulk(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_create_material),
 ):
+    from qdra.infrastructure.cache.invalidation_controller import entities_added
+
     service = EntityService(db)
     try:
         mat = MaterialCreate(parameters=material_data.parameters)
@@ -141,6 +148,8 @@ async def create_material_bulk(
                 value_string=p.value_string, value_number=p.value_number,
                 value_boolean=p.value_boolean,
             )
+        # Invalidate all relationship caches so the solver sees the new material
+        entities_added([entity.id], project_id)
         return await service.get_entity(entity.id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -148,9 +157,26 @@ async def create_material_bulk(
 
 @router.get("/projects/{project_id}/materials", response_model=List[MaterialResponse])
 async def list_materials(project_id: uuid.UUID, db: Session = Depends(get_db)):
+    """List materials by project (base data only)."""
     service = EntityService(db)
     try:
         return await service.list_entities(project_id=project_id, kind="material")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+class EntityIdsRequest(BaseModel):
+    entity_ids: List[uuid.UUID]
+
+@router.post("/materials/resolved", response_model=List[MaterialResponse])
+async def get_materials_resolved(
+    request: EntityIdsRequest,
+    db: Session = Depends(get_db),
+):
+    """Get resolved materials by list of IDs (includes images, parameters, etc.)."""
+    service = EntityService(db)
+    try:
+        return await service.get_entities(request.entity_ids)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -171,17 +197,13 @@ def delete_material(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_delete_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     try:
         service.delete_entity(material_id)
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([material_id], project_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -209,8 +231,7 @@ def add_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     try:
@@ -220,10 +241,7 @@ def add_parameter(
             value_boolean=param_data.value_boolean,
         )
         # Invalidate all relationship caches for this project
-        if settings.l1_caching:
-            clear_all_caches()
-        if settings.l2_caching:
-            clear_pattern(str(project_id))
+        entities_changed([material_id], project_id)
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -248,14 +266,10 @@ def delete_parameter(
     db: Session = Depends(get_db),
     _: uuid.UUID = Depends(require_can_edit_material),
 ):
-    from qdra.infrastructure.config.settings import settings
-    from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     service = EntityService(db)
     if not service.delete_parameter(parameter_id):
         raise HTTPException(status_code=404, detail="Parameter not found")
     # Invalidate all relationship caches for this project
-    if settings.l1_caching:
-        clear_all_caches()
-    if settings.l2_caching:
-        clear_pattern(str(project_id))
+    entities_changed([material_id], project_id)

@@ -20,6 +20,7 @@ from infrastructure.cache.relationship_cache import (
     get_cache_service,
 )
 
+from services.entity_service import EntityService
 from services.constraint_resolution_service import ConstraintResolutionService
 
 from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
@@ -29,11 +30,12 @@ from domain.constraints import ConstraintSpec
 class RecipeEvaluationService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repo = EntityRepository(db, CacheService())
+        self.entity_repo = EntityRepository(db)
         self.slot_repo = SlotRepository(db)
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
+        self.entity_service = EntityService(db)
         self.constraint_resolution_service = ConstraintResolutionService(db)
         from qdra.infrastructure.config.settings import settings
         self.settings = settings
@@ -46,7 +48,7 @@ class RecipeEvaluationService:
 
         Returns a RecipeMatchResult with success status and allocations.
         """
-        recipe = self.entity_repo.get_by_id(recipe_id)
+        recipe = self.entity_service.get_basic_entity(recipe_id)
         if not recipe:
             return RecipeMatchResult(
                 success=False,
@@ -59,7 +61,7 @@ class RecipeEvaluationService:
         materials = []
         material_params_map = {}
         for material_id in material_ids:
-            material = self.entity_repo.get_by_id(material_id)
+            material = self.entity_service.get_basic_entity(material_id)
             if material:
                 materials.append(material)
                 material_params_map[material_id] = (
@@ -218,7 +220,7 @@ class RecipeEvaluationService:
                 return cached
         
         # Compute result
-        recipe = self.entity_repo.get_by_id(recipe_id)
+        recipe = self.entity_service.get_basic_entity(recipe_id)
         if not recipe:
             return {"consumes": [], "produces": [], "requires": []}
 
@@ -226,8 +228,9 @@ class RecipeEvaluationService:
         materials = self.entity_repo.list_by_project(project_id, kind="material")
         material_params_map = {}
         for material in materials:
+            # Use cached parameters if available via entity_service
             material_params_map[material.id] = (
-                self.entity_parameter_repo.list_by_entity(material.id)
+                self.entity_service.get_entity_parameters(material.id)
             )
 
         # Load recipe structure
@@ -308,11 +311,12 @@ class RecipeEvaluationService:
         
         # Compute result
         # Load material and its parameters once
-        material = self.entity_repo.get_by_id(material_id)
+        material = self.entity_service.get_basic_entity(material_id)
         if not material:
             return {"consumes": [], "produces": [], "requires": []}
         
-        material_params = self.entity_parameter_repo.list_by_entity(material_id)
+        # Use cached parameters if available via entity_service
+        material_params = self.entity_service.get_entity_parameters(material_id)
         
         # Load all recipes in the project
         recipes = self.entity_repo.list_by_project(project_id, kind="recipe")

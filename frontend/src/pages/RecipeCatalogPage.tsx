@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getProjectTemplate } from '../api/projects';
-import { getEntitiesByViewConfig, getEntityParameters, deleteEntity } from '../api/entities';
+import { getEntitiesByViewConfig, getEntitiesResolved, deleteEntity } from '../api/entities';
 import { ProjectTemplateDetail, View, ViewConfig } from '../types/template';
 import { Entity, EntityParameter } from '../types/entity';
 import { PermissionAction } from '../components/PermissionAction';
@@ -17,7 +17,6 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
   const [recipeCatalogView, setRecipeCatalogView] = useState<View | null>(null);
   const [selectedConfig, setSelectedConfig] = useState<ViewConfig | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
-  const [entityParameters, setEntityParameters] = useState<Record<string, EntityParameter[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,22 +66,14 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
       setLoading(true);
       setError(null);
       try {
-        const data = await getEntitiesByViewConfig(projectId, selectedConfig.id);
-        setEntities(data);
+        // Get base entities (no resolved data)
+        const baseEntities = await getEntitiesByViewConfig(projectId, selectedConfig.id);
         
-        // Load parameters for all entities
-        const paramsMap: Record<string, EntityParameter[]> = {};
-        await Promise.all(
-          data.map(async (entity) => {
-            try {
-              const params = await getEntityParameters(projectId, entity.id);
-              paramsMap[entity.id] = params;
-            } catch (err) {
-              paramsMap[entity.id] = [];
-            }
-          })
-        );
-        setEntityParameters(paramsMap);
+        // Extract IDs and get resolved entities in one call
+        const entityIds = baseEntities.map((e: Entity) => e.id);
+        const resolvedEntities = await getEntitiesResolved(entityIds);
+        
+        setEntities(resolvedEntities);
       } catch (err) {
         setError('Could not load entities');
       } finally {
@@ -119,7 +110,7 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
       return '';
     }
 
-    const params = entityParameters[entity.id] || [];
+    const params = entity.parameters || [];
     const param = params.find((p: EntityParameter) => p.domain === domain && p.key === key);
     
     if (!param) {
@@ -172,7 +163,7 @@ export function RecipeCatalogPage({ projectId }: RecipeCatalogPageProps) {
     ? entities.filter((e: Entity) => {
         const searchLower = searchQuery.toLowerCase();
         const searchableParams = getSearchableParameters();
-        const params = entityParameters[e.id] || [];
+        const params = e.parameters || [];
         
         // Check if any searchable parameter matches
         for (const paramDef of searchableParams) {

@@ -7,6 +7,7 @@ from models.entity import Entity
 from models.entity_parameter import EntityParameter
 from models.slot import Slot
 from models.project_template import ProjectTemplateSlotGroup
+from models.image_asset import ImageAsset
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
@@ -18,6 +19,7 @@ from repositories.parameter_constraint_repository import ParameterConstraintRepo
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
+from infrastructure.cache.entity_cache import set_entity_with_data, get_entity_with_data
 from infrastructure.config.settings import settings
 from infrastructure.cache.cache_service import CacheService
 
@@ -25,7 +27,7 @@ from infrastructure.cache.cache_service import CacheService
 class EntityService:
     def __init__(self, db: Session):
         self.db = db
-        self.entity_repository = EntityRepository(db, CacheService())
+        self.entity_repository = EntityRepository(db)
         self.entity_parameter_repository = EntityParameterRepository(db)
         self.project_repository = ProjectRepository(db)
         self.template_repository = ProjectTemplateRepository(db)
@@ -81,13 +83,22 @@ class EntityService:
 
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         from datetime import datetime
+        
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            return cached
+        
+        # Cache miss: resolve from DB
         entity = self.entity_repository.get_by_id(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
 
+        # Get entity_type
         entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
         kind = entity_type.kind if entity_type else "unknown"
 
+        # Get image
         image = self.image_asset_repository.get_primary_image(entity.id)
 
         # Ensure updated_at is set (fallback for test environments)
@@ -119,6 +130,44 @@ class EntityService:
                 "height": image.height,
             }
 
+        # Get parameters (uses cache)
+        parameters = self.get_entity_parameters(entity_id)
+        result["parameters"] = [
+            {
+                "id": str(p.id),
+                "entity_id": str(p.entity_id),
+                "domain": p.domain,
+                "key": p.key,
+                "value_string": p.value_string,
+                "value_number": p.value_number,
+                "value_boolean": p.value_boolean,
+            }
+            for p in parameters
+        ]
+
+        # Get slots for recipe entities
+        if kind == "recipe":
+            slots = self.slot_repository.list_by_recipe_entity(entity_id)
+            result["slots"] = [
+                {
+                    "id": str(slot.id),
+                    "kind": slot.kind,
+                    "sort_order": slot.sort_order,
+                }
+                for slot in slots
+            ]
+
+        # Cache the full resolved entity data
+        set_entity_with_data(entity_id, result)
+
+        return result
+
+    async def get_entities(self, entity_ids: List[uuid.UUID]) -> List[Dict[str, Any]]:
+        """Get resolved entities by list of IDs (uses cache for resolved data)."""
+        result = []
+        for entity_id in entity_ids:
+            entity_data = await self.get_entity(entity_id)
+            result.append(entity_data)
         return result
 
     async def list_entities(
@@ -126,44 +175,26 @@ class EntityService:
         project_id: uuid.UUID,
         kind: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        """List entities by project (base data only, no resolved data like images/parameters)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
 
         entities = self.entity_repository.list_by_project(project_id, kind=kind)
+        
+        # Return base entity data with kind (no resolved data like images, parameters)
         result = []
-
         for entity in entities:
             entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-            entity_kind = entity_type.kind if entity_type else "unknown"
-
-            image = self.image_asset_repository.get_primary_image(entity.id)
-            entity_data: Dict[str, Any] = {
+            result.append({
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
                 "group": entity.group,
-                "kind": entity_kind,
+                "kind": entity_type.kind if entity_type else "unknown",
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
-                "image": None,
-            }
-            if image and image.status == 'ready':
-                # Generate presigned download URL
-                download_url = await self.storage_provider.create_presigned_download_url(
-                    storage_key=image.storage_key,
-                    expires_in_seconds=3600,
-                )
-                entity_data["image"] = {
-                    "id": image.id,
-                    "url": download_url,
-                    "mime_type": image.mime_type,
-                    "alt_text": image.alt_text,
-                    "width": image.width,
-                    "height": image.height,
-                }
-            result.append(entity_data)
-
+            })
         return result
 
     def delete_entity(self, entity_id: uuid.UUID) -> bool:
@@ -216,10 +247,42 @@ class EntityService:
     def delete_parameter(self, parameter_id: uuid.UUID) -> bool:
         return self.entity_parameter_repository.delete(parameter_id)
 
+    def get_basic_entity(self, entity_id: uuid.UUID) -> Optional[Entity]:
+        """Get the basic Entity object with caching. Returns None if not found."""
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            # Reconstruct Entity from cached data
+            return Entity(
+                id=uuid.UUID(cached["id"]),
+                project_id=uuid.UUID(cached["project_id"]),
+                entity_type_id=uuid.UUID(cached["entity_type_id"]),
+                group=cached["group"],
+                created_at=cached["created_at"],
+                updated_at=cached["updated_at"],
+            )
+        
+        # Cache miss: query from DB
+        return self.entity_repository.get_by_id(entity_id)
+
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
-        entity = self.entity_repository.get_by_id(entity_id)
-        if not entity:
-            raise ValueError(f"Entity '{entity_id}' not found")
+        # Use cached parameters if available
+        cached = get_entity_with_data(entity_id)
+        if cached and cached.get("parameters"):
+            return [
+                EntityParameter(
+                    id=uuid.UUID(p["id"]),
+                    entity_id=uuid.UUID(p["entity_id"]),
+                    domain=p["domain"],
+                    key=p["key"],
+                    value_string=p["value_string"],
+                    value_number=p["value_number"],
+                    value_boolean=p["value_boolean"],
+                )
+                for p in cached["parameters"]
+            ]
+        
+        # Fallback to DB query
         return self.entity_parameter_repository.list_by_entity(entity_id)
 
     def get_distinct_parameter_values(
@@ -244,7 +307,7 @@ class EntityService:
         project_id: uuid.UUID,
         view_config_id: uuid.UUID,
     ) -> List[Dict[str, Any]]:
-        """List entities filtered by a view config's entity_type_id and filter_params."""
+        """List entities filtered by a view config's entity_type_id (base data only, no resolved data like images/parameters)."""
         project = self.project_repository.get_by_id(project_id)
         if not project:
             raise ValueError(f"Project '{project_id}' not found")
@@ -263,38 +326,17 @@ class EntityService:
         )
 
         # TODO: Apply filter_params from view_config if needed
-        # For now, return all entities of the type
+        # Return base entity data with kind (no resolved data like images, parameters)
         result = []
-
         for entity in entities:
             entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-            entity_kind = entity_type.kind if entity_type else "unknown"
-
-            image = self.image_asset_repository.get_primary_image(entity.id)
-            entity_data: Dict[str, Any] = {
+            result.append({
                 "id": entity.id,
                 "project_id": entity.project_id,
                 "entity_type_id": entity.entity_type_id,
                 "group": entity.group,
-                "kind": entity_kind,
+                "kind": entity_type.kind if entity_type else "unknown",
                 "created_at": entity.created_at,
                 "updated_at": entity.updated_at,
-                "image": None,
-            }
-            if image and image.status == 'ready':
-                # Generate presigned download URL
-                download_url = await self.storage_provider.create_presigned_download_url(
-                    storage_key=image.storage_key,
-                    expires_in_seconds=3600,
-                )
-                entity_data["image"] = {
-                    "id": image.id,
-                    "url": download_url,
-                    "mime_type": image.mime_type,
-                    "alt_text": image.alt_text,
-                    "width": image.width,
-                    "height": image.height,
-                }
-            result.append(entity_data)
-
+            })
         return result

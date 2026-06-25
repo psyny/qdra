@@ -1,22 +1,18 @@
 import uuid
 from typing import List, Optional
-from cachetools import TTLCache
 from sqlalchemy.orm import Session
 
 from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
-from infrastructure.cache.cache_service import CacheService
+from models.image_asset import ImageAsset
+from models.entity_parameter import EntityParameter
+from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data
 from infrastructure.config.settings import settings
 
 
 class EntityRepository:
-    def __init__(self, db: Session, cache_service: Optional[CacheService] = None):
+    def __init__(self, db: Session):
         self.db = db
-        self.cache_service = cache_service or CacheService()
-        self.local_cache = TTLCache(
-            maxsize=settings.cache_entity_local_size,
-            ttl=settings.cache_entity_local_ttl
-        )
 
     def create(
         self,
@@ -41,44 +37,84 @@ class EntityRepository:
 
     def get_by_id(self, entity_id: uuid.UUID) -> Optional[Entity]:
         from datetime import datetime
-        cache_key = f"entity:{entity_id}"
         
-        # L1: Check local cache (if enabled)
-        if settings.l1_caching and cache_key in self.local_cache:
-            return self.local_cache[cache_key]
-        
-        # L2: Check Redis cache (if enabled)
-        if settings.l2_caching:
-            cached = self.cache_service.get(cache_key)
-            if cached:
-                entity = self._deserialize_entity(cached)
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            entity_data = cached.get("entity")
+            if entity_data:
+                entity = self._deserialize_entity(entity_data)
                 if entity:
-                    if settings.l1_caching:
-                        self.local_cache[cache_key] = entity
                     return entity
         
-        # L3: Query database
+        # Query database
         entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
         if entity:
             # Ensure updated_at is set (fallback for test environments)
             if entity.updated_at is None:
                 entity.updated_at = entity.created_at or datetime.utcnow()
                 self.db.commit()
-            self._cache_entity(entity)
+            
+            # Fetch entity_type and image for caching
+            entity_type = self.db.query(ProjectTemplateEntityType).filter(
+                ProjectTemplateEntityType.id == entity.entity_type_id
+            ).first()
+            
+            image = self.db.query(ImageAsset).filter(
+                ImageAsset.entity_id == entity_id,
+                ImageAsset.status == 'ready'
+            ).first()
+            
+            # Fetch parameters for caching
+            parameters = self.db.query(EntityParameter).filter(
+                EntityParameter.entity_id == entity_id
+            ).all()
+            
+            # Cache the entity with entity_type, image, and parameters
+            data = {
+                "entity": self._serialize_entity(entity),
+                "entity_type": self._serialize_entity_type(entity_type) if entity_type else None,
+                "image": self._serialize_image(image) if image else None,
+                "parameters": self._serialize_parameters(parameters),
+                "slots": [],
+            }
+            set_entity_with_data(entity_id, data)
         
         return entity
     
-    def _cache_entity(self, entity: Entity) -> None:
-        """Cache entity in both L1 and L2 if enabled."""
-        cache_key = f"entity:{entity.id}"
-        if settings.l1_caching:
-            self.local_cache[cache_key] = entity
-        if settings.l2_caching:
-            self.cache_service.set(
-                cache_key,
-                self._serialize_entity(entity),
-                settings.cache_entity_redis_ttl
-            )
+    def _serialize_entity_type(self, entity_type: ProjectTemplateEntityType) -> dict:
+        """Serialize entity_type for cache storage."""
+        return {
+            "id": str(entity_type.id),
+            "name": entity_type.name,
+            "kind": entity_type.kind,
+        }
+    
+    def _serialize_image(self, image: ImageAsset) -> dict:
+        """Serialize image for cache storage."""
+        return {
+            "id": str(image.id),
+            "storage_key": image.storage_key,
+            "mime_type": image.mime_type,
+            "width": image.width,
+            "height": image.height,
+            "alt_text": image.alt_text,
+        }
+    
+    def _serialize_parameters(self, parameters: List[EntityParameter]) -> List[dict]:
+        """Serialize parameters for cache storage."""
+        return [
+            {
+                "id": str(p.id),
+                "entity_id": str(p.entity_id),
+                "domain": p.domain,
+                "key": p.key,
+                "value_string": p.value_string,
+                "value_number": p.value_number,
+                "value_boolean": p.value_boolean,
+            }
+            for p in parameters
+        ]
     
     def _serialize_entity(self, entity: Entity) -> dict:
         """Serialize entity for Redis storage."""
@@ -105,14 +141,6 @@ class EntityRepository:
         except Exception:
             return None
     
-    def invalidate_entity(self, entity_id: uuid.UUID) -> None:
-        """Invalidate entity from both cache layers if enabled."""
-        cache_key = f"entity:{entity_id}"
-        if settings.l1_caching and cache_key in self.local_cache:
-            del self.local_cache[cache_key]
-        if settings.l2_caching:
-            self.cache_service.delete(cache_key)
-
     def list_by_project(
         self, project_id: uuid.UUID, kind: Optional[str] = None
     ) -> List[Entity]:
@@ -143,7 +171,6 @@ class EntityRepository:
         entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
         if not entity:
             return False
-        self.invalidate_entity(entity_id)
         self.db.delete(entity)
         self.db.commit()
         return True
