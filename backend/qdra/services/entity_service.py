@@ -7,6 +7,7 @@ from models.entity import Entity
 from models.entity_parameter import EntityParameter
 from models.slot import Slot
 from models.project_template import ProjectTemplateSlotGroup
+from models.image_asset import ImageAsset
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
@@ -81,14 +82,34 @@ class EntityService:
 
     async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
         from datetime import datetime
-        entity = self.entity_repository.get_by_id(entity_id)
+        
+        # Get entity with cached data (entity_type, image)
+        entity, cached_data = self.entity_repository.get_entity_with_cached_data(entity_id)
         if not entity:
             raise ValueError(f"Entity '{entity_id}' not found")
 
-        entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-        kind = entity_type.kind if entity_type else "unknown"
+        # Use cached entity_type if available, otherwise fallback to DB
+        if cached_data and cached_data.get("entity_type"):
+            entity_type_data = cached_data["entity_type"]
+            kind = entity_type_data.get("kind", "unknown")
+        else:
+            entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+            kind = entity_type.kind if entity_type else "unknown"
 
-        image = self.image_asset_repository.get_primary_image(entity.id)
+        # Use cached image if available, otherwise fallback to DB
+        if cached_data and cached_data.get("image"):
+            image_data = cached_data["image"]
+            image = ImageAsset(
+                id=uuid.UUID(image_data["id"]),
+                storage_key=image_data["storage_key"],
+                mime_type=image_data["mime_type"],
+                width=image_data["width"],
+                height=image_data["height"],
+                alt_text=image_data["alt_text"],
+                status='ready',
+            )
+        else:
+            image = self.image_asset_repository.get_primary_image(entity.id)
 
         # Ensure updated_at is set (fallback for test environments)
         updated_at = entity.updated_at or entity.created_at or datetime.utcnow()

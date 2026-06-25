@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
+from models.image_asset import ImageAsset
 from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data
 from infrastructure.config.settings import settings
 
@@ -52,9 +53,22 @@ class EntityRepository:
             if entity.updated_at is None:
                 entity.updated_at = entity.created_at or datetime.utcnow()
                 self.db.commit()
-            # Cache the entity (without parameters/slots for now)
+            
+            # Fetch entity_type and image for caching
+            entity_type = self.db.query(ProjectTemplateEntityType).filter(
+                ProjectTemplateEntityType.id == entity.entity_type_id
+            ).first()
+            
+            image = self.db.query(ImageAsset).filter(
+                ImageAsset.entity_id == entity_id,
+                ImageAsset.status == 'ready'
+            ).first()
+            
+            # Cache the entity with entity_type and image
             data = {
                 "entity": self._serialize_entity(entity),
+                "entity_type": self._serialize_entity_type(entity_type) if entity_type else None,
+                "image": self._serialize_image(image) if image else None,
                 "parameters": [],
                 "slots": [],
             }
@@ -62,6 +76,46 @@ class EntityRepository:
         
         return entity
     
+    def get_entity_with_cached_data(self, entity_id: uuid.UUID) -> tuple[Optional[Entity], Optional[dict]]:
+        """Get entity and its cached data (entity_type, image) together."""
+        from datetime import datetime
+        
+        # Try cache first
+        cached = get_entity_with_data(entity_id)
+        if cached:
+            entity_data = cached.get("entity")
+            if entity_data:
+                entity = self._deserialize_entity(entity_data)
+                if entity:
+                    return entity, cached
+        
+        # Query database and cache
+        entity = self.get_by_id(entity_id)
+        if entity:
+            cached = get_entity_with_data(entity_id)
+            return entity, cached
+        
+        return None, None
+    
+    
+    def _serialize_entity_type(self, entity_type: ProjectTemplateEntityType) -> dict:
+        """Serialize entity_type for cache storage."""
+        return {
+            "id": str(entity_type.id),
+            "name": entity_type.name,
+            "kind": entity_type.kind,
+        }
+    
+    def _serialize_image(self, image: ImageAsset) -> dict:
+        """Serialize image for cache storage."""
+        return {
+            "id": str(image.id),
+            "storage_key": image.storage_key,
+            "mime_type": image.mime_type,
+            "width": image.width,
+            "height": image.height,
+            "alt_text": image.alt_text,
+        }
     
     def _serialize_entity(self, entity: Entity) -> dict:
         """Serialize entity for Redis storage."""

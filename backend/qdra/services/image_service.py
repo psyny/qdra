@@ -125,15 +125,24 @@ class ImageService:
     
     async def delete_image(self, image_asset_id: uuid.UUID):
         """Delete an image."""
+        from qdra.infrastructure.cache.invalidation_controller import entities_changed
+        
         image_asset = self.image_asset_repo.get_by_id(image_asset_id)
         if not image_asset:
             raise ValueError("Image not found")
+        
+        entity_id = image_asset.entity_id
         
         # Delete from storage
         await self.storage_provider.delete(image_asset.storage_key)
         
         # Delete from database
         self.image_asset_repo.delete(image_asset_id)
+        
+        # Invalidate entity cache since image was deleted
+        entity = self.entity_repo.get_by_id(entity_id)
+        if entity:
+            entities_changed([entity_id], entity.project_id)
     
     async def get_image_stream(self, image_asset_id: uuid.UUID):
         """Get a read stream for an image."""
@@ -180,6 +189,8 @@ class ImageService:
             raise ValueError(f"Image size exceeds {settings.max_image_size_mb}MB limit")
         
         # Delete any existing image for this entity (one image per entity)
+        from qdra.infrastructure.cache.invalidation_controller import entities_changed
+        
         existing_images = self.image_asset_repo.get_by_entity_id(entity_id)
         for existing_image in existing_images:
             try:
@@ -187,6 +198,10 @@ class ImageService:
             except Exception:
                 pass
             self.image_asset_repo.delete(existing_image.id)
+        
+        # Invalidate entity cache since existing images were replaced
+        if existing_images:
+            entities_changed([entity_id], entity.project_id)
         
         # Create image asset record in pending state
         image_asset_id = uuid.uuid4()
@@ -221,6 +236,8 @@ class ImageService:
     
     async def finalize_upload(self, image_asset_id: uuid.UUID):
         """Finalize an image upload after the file is uploaded to storage."""
+        from qdra.infrastructure.cache.invalidation_controller import entities_changed
+        
         image_asset = self.image_asset_repo.get_by_id(image_asset_id)
         if not image_asset:
             raise ValueError("Image asset not found")
@@ -234,6 +251,11 @@ class ImageService:
         
         # Mark as ready
         image_asset = self.image_asset_repo.update_status(image_asset_id, 'ready')
+        
+        # Invalidate entity cache since image status changed
+        entity = self.entity_repo.get_by_id(image_asset.entity_id)
+        if entity:
+            entities_changed([image_asset.entity_id], entity.project_id)
         
         # Generate public URL, fallback to presigned URL if not available
         public_url = await self.storage_provider.get_public_url(image_asset.storage_key)

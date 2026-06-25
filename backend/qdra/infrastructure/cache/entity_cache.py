@@ -1,4 +1,4 @@
-"""Entity cache for storing entity data, parameters, and slots together with L1/L2 caching."""
+"""Entity cache for storing entity data, parameters, slots, entity_type, and image together with L1/L2 caching."""
 import uuid
 from typing import Any, Dict, List, Optional
 from cachetools import TTLCache
