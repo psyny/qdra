@@ -3,12 +3,11 @@ import uuid
 from typing import Any, Optional
 from cachetools import TTLCache
 from qdra.infrastructure.config.settings import settings
-from qdra.infrastructure.cache.cache_service import CacheService
+from qdra.infrastructure.cache.cache_service import get_cache_service
 
 # Module-level L1 caches for permission operations
 _app_permissions_cache = None
 _project_permissions_cache = None
-_cache_service = None
 
 
 def get_app_permissions_cache():
@@ -25,14 +24,6 @@ def get_project_permissions_cache():
     if _project_permissions_cache is None:
         _project_permissions_cache = TTLCache(maxsize=settings.cache_permission_project_size, ttl=settings.cache_permission_ttl)
     return _project_permissions_cache
-
-
-def get_cache_service():
-    """Get or create the shared cache service for L2 caching."""
-    global _cache_service
-    if _cache_service is None:
-        _cache_service = CacheService()
-    return _cache_service
 
 
 def clear_all_permission_caches():

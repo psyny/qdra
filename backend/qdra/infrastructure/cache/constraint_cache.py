@@ -3,11 +3,10 @@ import uuid
 from typing import Any, List
 from cachetools import TTLCache
 from qdra.infrastructure.config.settings import settings
-from qdra.infrastructure.cache.cache_service import CacheService
+from qdra.infrastructure.cache.cache_service import get_cache_service
 
 # Module-level L1 cache for constraint resolution
 _constraint_cache = None
-_cache_service = None
 
 
 def get_constraint_cache():
@@ -16,14 +15,6 @@ def get_constraint_cache():
     if _constraint_cache is None:
         _constraint_cache = TTLCache(maxsize=settings.cache_constraint_size, ttl=settings.cache_constraint_ttl)
     return _constraint_cache
-
-
-def get_cache_service():
-    """Get or create the shared cache service for L2 caching."""
-    global _cache_service
-    if _cache_service is None:
-        _cache_service = CacheService()
-    return _cache_service
 
 
 def clear_all_constraint_caches():

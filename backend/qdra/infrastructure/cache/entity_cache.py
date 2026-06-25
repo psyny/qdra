@@ -3,11 +3,10 @@ import uuid
 from typing import Any, Dict, List, Optional
 from cachetools import TTLCache
 from qdra.infrastructure.config.settings import settings
-from qdra.infrastructure.cache.cache_service import CacheService
+from qdra.infrastructure.cache.cache_service import get_cache_service
 
 # Module-level L1 cache for entity data
 _entity_cache = None
-_cache_service = None
 
 
 def get_entity_cache():
@@ -16,14 +15,6 @@ def get_entity_cache():
     if _entity_cache is None:
         _entity_cache = TTLCache(maxsize=settings.cache_entity_size, ttl=settings.cache_entity_ttl)
     return _entity_cache
-
-
-def get_cache_service():
-    """Get or create the shared cache service for L2 caching."""
-    global _cache_service
-    if _cache_service is None:
-        _cache_service = CacheService()
-    return _cache_service
 
 
 def clear_all_entity_caches():
