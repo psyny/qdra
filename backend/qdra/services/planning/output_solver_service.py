@@ -12,6 +12,7 @@ from models.entity import Entity
 from repositories.entity_repository import EntityRepository
 from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.project_repository import ProjectRepository
+from services.entity_service import EntityService
 from services.recipe_evaluation_service import RecipeEvaluationService
 from services.constraint_resolution_service import ConstraintResolutionService
 from infrastructure.cache.cache_service import CacheService
@@ -75,6 +76,7 @@ class OutputSolverService:
         self.entity_repo = EntityRepository(db)
         self.entity_param_repo = EntityParameterRepository(db)
         self.project_repo = ProjectRepository(db)
+        self.entity_service = EntityService(db)
         self.recipe_eval_service = RecipeEvaluationService(db)
         self.constraint_resolution_service = ConstraintResolutionService(db)
 

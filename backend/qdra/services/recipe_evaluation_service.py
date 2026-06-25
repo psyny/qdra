@@ -20,6 +20,7 @@ from infrastructure.cache.relationship_cache import (
     get_cache_service,
 )
 
+from services.entity_service import EntityService
 from services.constraint_resolution_service import ConstraintResolutionService
 
 from domain.evaluation import RecipeMatchResult, SlotMatchResult, Allocation
@@ -34,6 +35,7 @@ class RecipeEvaluationService:
         self.option_repo = OptionRepository(db)
         self.entity_parameter_repo = EntityParameterRepository(db)
         self.constraint_repo = ParameterConstraintRepository(db)
+        self.entity_service = EntityService(db)
         self.constraint_resolution_service = ConstraintResolutionService(db)
         from qdra.infrastructure.config.settings import settings
         self.settings = settings

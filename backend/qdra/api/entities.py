@@ -315,7 +315,7 @@ def delete_entity(
     db: Session = Depends(get_db),
     user_id: uuid.UUID = Depends(get_current_user_id),
 ):
-    from qdra.infrastructure.cache.invalidation_controller import entities_edited
+    from qdra.infrastructure.cache.invalidation_controller import entities_changed
 
     # Check if this is a material entity
     is_material = _is_material_entity(entity_id, db)
