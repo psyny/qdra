@@ -190,14 +190,16 @@ class EntityService:
             slots = get_entity_slots(entity_id)
             if slots is None:
                 slots = self.slot_repository.list_by_recipe_entity(entity_id)
-                set_entity_slots(entity_id, [
+                slots_dict = [
                     {
                         "id": str(slot.id),
                         "kind": slot.kind,
                         "sort_order": slot.sort_order,
                     }
                     for slot in slots
-                ])
+                ]
+                set_entity_slots(entity_id, slots_dict)
+                slots = slots_dict
             result["slots"] = slots
 
         return result
