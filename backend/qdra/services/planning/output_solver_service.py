@@ -16,6 +16,21 @@ from services.entity_service import EntityService
 from services.recipe_evaluation_service import RecipeEvaluationService
 from services.constraint_resolution_service import ConstraintResolutionService
 from infrastructure.cache.cache_service import CacheService
+from infrastructure.cache.solver_cache import (
+    init_solver_cache,
+    clear_solver_cache,
+    get_solver_cache_stats,
+    get_material_recipes,
+    set_material_recipes,
+    get_recipe_materials,
+    set_recipe_materials,
+    get_constraint_materials,
+    set_constraint_materials,
+    get_constraint_recipes,
+    set_constraint_recipes,
+    get_entity_params,
+    set_entity_params,
+)
 
 from domain.planning.output_solver_domain import (
     MaterialNode, RecipeExecNode, MaterialEdge, RecipeEdge,
@@ -81,20 +96,40 @@ class OutputSolverService:
         self.constraint_resolution_service = ConstraintResolutionService(db)
 
     def _get_recipes_for_material(self, material_id: uuid.UUID, project_id: uuid.UUID) -> dict:
-        """Get recipes that can consume/produce/require this material (cached at service level)."""
-        return self.recipe_eval_service.find_recipes_for_material(material_id, project_id)
+        """Get recipes that can consume/produce/require this material (cached at solver L1)."""
+        cached = get_material_recipes(material_id)
+        if cached is not None:
+            return cached
+        result = self.recipe_eval_service.find_recipes_for_material(material_id, project_id)
+        set_material_recipes(material_id, result)
+        return result
 
     def _get_materials_for_recipe(self, recipe_id: uuid.UUID, project_id: uuid.UUID) -> dict:
-        """Get materials that match each slot of this recipe (cached at service level)."""
-        return self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
+        """Get materials that match each slot of this recipe (cached at solver L1)."""
+        cached = get_recipe_materials(recipe_id)
+        if cached is not None:
+            return cached
+        result = self.recipe_eval_service.find_materials_for_recipe_slots(recipe_id, project_id)
+        set_recipe_materials(recipe_id, result)
+        return result
 
     def _find_materials_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
-        """Find materials in the project that match the given constraints (delegated to service)."""
-        return self.constraint_resolution_service.find_materials_by_constraints(constraints, project_id)
+        """Find materials in the project that match the given constraints (cached at solver L1)."""
+        cached = get_constraint_materials(constraints)
+        if cached is not None:
+            return cached
+        result = self.constraint_resolution_service.find_materials_by_constraints(constraints, project_id)
+        set_constraint_materials(constraints, result)
+        return result
 
     def _find_recipes_by_constraints(self, constraints: List[ConstraintSpec], project_id: uuid.UUID) -> List[uuid.UUID]:
-        """Find recipes in the project that match the given constraints (delegated to service)."""
-        return self.constraint_resolution_service.find_recipes_by_constraints(constraints, project_id)
+        """Find recipes in the project that match the given constraints (cached at solver L1)."""
+        cached = get_constraint_recipes(constraints)
+        if cached is not None:
+            return cached
+        result = self.constraint_resolution_service.find_recipes_by_constraints(constraints, project_id)
+        set_constraint_recipes(constraints, result)
+        return result
 
     def _preload_constraint_materials(self, project_id: uuid.UUID, constraint_rules: List[ConstraintRule]) -> Set[uuid.UUID]:
         """Pre-load all material IDs matching the given constraint rules."""
@@ -127,67 +162,75 @@ class OutputSolverService:
         return matching_by_rule
 
     def solve(self, request: SolverRequest) -> SolverResponse:
-        if not self.project_repo.get_by_id(request.project_id):
-            return SolverResponse(success=False)
-
-        if request.score_rules and request.score_rules.score_formulas:
-            system_names = set(SYSTEM_VARIABLE_NAMES)
-            user_names = {v.name for v in request.score_rules.user_variables}
-            all_names = system_names | user_names
-            for fdef in request.score_rules.score_formulas:
-                validate_formula(fdef.formula, all_names)
-
-        recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
-
-        # Pre-load material ID sets for constraint rules
-        forbidden_materials_ids = self._preload_constraint_materials(
-            request.project_id, request.domain_constraints.forbidden_materials_matching
-        )
-        required_materials_ids = self._preload_constraint_materials(
-            request.project_id, request.domain_constraints.required_materials_matching
-        )
-        do_not_expand_materials_ids = self._preload_constraint_materials(
-            request.project_id, request.domain_constraints.do_not_expand_materials_matching
-        )
-
-        # Pre-load recipe ID sets for constraint rules
-        forbidden_recipes_ids = self._preload_constraint_recipes(
-            request.project_id, request.domain_constraints.forbidden_recipe_matching
-        )
-        required_recipes_by_rule = self._preload_constraint_recipes_by_rule(
-            request.project_id, request.domain_constraints.required_recipe_matching
-        )
-
-        recipe_params: Dict[str, List[ConstraintSpec]] = {}
-        # Load recipe params only if needed for score rules (recipe-type user variables)
-        if request.score_rules and any(
-            v.constraints and any(c.domain == "recipe" for rule in v.constraints for c in rule.constraints)
-            for v in request.score_rules.user_variables
-        ):
-            recipe_params = self._load_recipe_params([r.id for r in recipes])
-
-        # Initialize state based on target type (material or recipe)
-        if request.target.target_type == "recipe":
-            initial_states = self._initialize_recipe_target(request)
-        else:
-            initial_states = self._initialize_material_target(request)
-
-        plans: List[SolvedPlan] = []
-        seen_fps: Set[str] = set()
-        discarded_stats = DiscardedPlansStats()
+        # Initialize solver L1 cache for this run
+        run_id = uuid.uuid4()
+        init_solver_cache(run_id)
         
-        # Explore from each initial state (for material targets, there may be multiple matching materials; for recipe targets, there may be multiple matching recipes)
-        for initial in initial_states:
-            self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats,
-                         forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
-                         forbidden_recipes_ids, required_recipes_by_rule)
+        try:
+            if not self.project_repo.get_by_id(request.project_id):
+                return SolverResponse(success=False)
 
-        for i, plan in enumerate(plans):
-            plan.plan_id = f"plan_{i:03d}"
-            self._tag_nodes(plan)
+            if request.score_rules and request.score_rules.score_formulas:
+                system_names = set(SYSTEM_VARIABLE_NAMES)
+                user_names = {v.name for v in request.score_rules.user_variables}
+                all_names = system_names | user_names
+                for fdef in request.score_rules.score_formulas:
+                    validate_formula(fdef.formula, all_names)
 
-        entities = self._collect_entities(plans, request.project_id)
-        return SolverResponse(success=True, plans=plans, entities=entities, discarded_plans_stats=discarded_stats)
+            recipes = self.entity_repo.list_by_project(request.project_id, kind="recipe")
+
+            # Pre-load material ID sets for constraint rules
+            forbidden_materials_ids = self._preload_constraint_materials(
+                request.project_id, request.domain_constraints.forbidden_materials_matching
+            )
+            required_materials_ids = self._preload_constraint_materials(
+                request.project_id, request.domain_constraints.required_materials_matching
+            )
+            do_not_expand_materials_ids = self._preload_constraint_materials(
+                request.project_id, request.domain_constraints.do_not_expand_materials_matching
+            )
+
+            # Pre-load recipe ID sets for constraint rules
+            forbidden_recipes_ids = self._preload_constraint_recipes(
+                request.project_id, request.domain_constraints.forbidden_recipe_matching
+            )
+            required_recipes_by_rule = self._preload_constraint_recipes_by_rule(
+                request.project_id, request.domain_constraints.required_recipe_matching
+            )
+
+            recipe_params: Dict[str, List[ConstraintSpec]] = {}
+            # Load recipe params only if needed for score rules (recipe-type user variables)
+            if request.score_rules and any(
+                v.constraints and any(c.domain == "recipe" for rule in v.constraints for c in rule.constraints)
+                for v in request.score_rules.user_variables
+            ):
+                recipe_params = self._load_recipe_params([r.id for r in recipes])
+
+            # Initialize state based on target type (material or recipe)
+            if request.target.target_type == "recipe":
+                initial_states = self._initialize_recipe_target(request)
+            else:
+                initial_states = self._initialize_material_target(request)
+
+            plans: List[SolvedPlan] = []
+            seen_fps: Set[str] = set()
+            discarded_stats = DiscardedPlansStats()
+            
+            # Explore from each initial state (for material targets, there may be multiple matching materials; for recipe targets, there may be multiple matching recipes)
+            for initial in initial_states:
+                self._explore(initial, request, plans, seen_fps, frozenset(), recipe_params, discarded_stats,
+                             forbidden_materials_ids, required_materials_ids, do_not_expand_materials_ids,
+                             forbidden_recipes_ids, required_recipes_by_rule)
+
+            for i, plan in enumerate(plans):
+                plan.plan_id = f"plan_{i:03d}"
+                self._tag_nodes(plan)
+
+            entities = self._collect_entities(plans, request.project_id)
+            return SolverResponse(success=True, plans=plans, entities=entities, discarded_plans_stats=discarded_stats)
+        finally:
+            # Clear solver cache at end of run
+            clear_solver_cache()
 
     @staticmethod
     def _build_adjacency(
