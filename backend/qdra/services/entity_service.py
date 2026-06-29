@@ -19,7 +19,12 @@ from repositories.parameter_constraint_repository import ParameterConstraintRepo
 from infrastructure.storage.image_storage_provider import ImageStorageProvider
 from infrastructure.storage.local_image_storage_provider import LocalImageStorageProvider
 from infrastructure.storage.s3_image_storage_provider import S3ImageStorageProvider
-from infrastructure.cache.entity_cache import set_entity_with_data, get_entity_with_data, get_entity_cache, invalidate_entity
+from infrastructure.cache.entity_cache import (
+    get_entity_base, set_entity_base,
+    get_entity_params, set_entity_params,
+    get_entity_slots, set_entity_slots,
+    invalidate_entity
+)
 from infrastructure.config.settings import settings
 from infrastructure.cache.cache_service import CacheService
 
@@ -81,56 +86,86 @@ class EntityService:
 
         return entity
 
-    async def get_entity(self, entity_id: uuid.UUID) -> Dict[str, Any]:
-        from datetime import datetime
-        
-        # Use a separate cache key for the flat structure (service layer)
-        # to avoid conflict with repository's nested structure cache
-        cache = get_entity_cache()
-        flat_key = f"flat:{entity_id}"
-        cached_flat = cache.get(flat_key)
-        if cached_flat:
-            return cached_flat
-        
-        # Cache miss: resolve from DB
-        entity = self.entity_repository.get_by_id(entity_id)
-        if not entity:
-            raise ValueError(f"Entity '{entity_id}' not found")
+    async def get_entity(self, entity_id: uuid.UUID, resolve_image: bool = True) -> Dict[str, Any]:
+        """Get fully resolved entity from cache or DB.
 
-        # Get entity_type
-        entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
-        kind = entity_type.kind if entity_type else "unknown"
+        Args:
+            entity_id: Entity UUID
+            resolve_image: If True, generate presigned download URL for image (default True).
+                           Set to False for internal services that only need structural data.
 
-        # Get image
-        image = self.image_asset_repository.get_primary_image(entity.id)
+        Returns:
+            Dict with id, project_id, entity_type_id, group, kind, created_at, updated_at,
+            image (with url if resolve_image=True), parameters, slots (for recipes).
+        """
+        # Get base entity from cache (has kind and image metadata)
+        base = get_entity_base(entity_id)
+        if not base:
+            # Cache miss: fetch from DB via repository (which will cache it)
+            entity = self.entity_repository.get_by_id(entity_id)
+            if not entity:
+                raise ValueError(f"Entity '{entity_id}' not found")
+            base = get_entity_base(entity_id)
+            if not base:
+                # Fallback if repository didn't cache (shouldn't happen)
+                entity_type = self.template_repository.get_entity_type_by_id(entity.entity_type_id)
+                kind = entity_type.kind if entity_type else "unknown"
+                image = self.image_asset_repository.get_primary_image(entity.id)
+                base = {
+                    "id": str(entity.id),
+                    "project_id": str(entity.project_id),
+                    "entity_type_id": str(entity.entity_type_id),
+                    "group": entity.group,
+                    "kind": kind,
+                    "created_at": entity.created_at,
+                    "updated_at": entity.updated_at or entity.created_at,
+                    "image": None,
+                }
+                if image and image.status == 'ready':
+                    base["image"] = {
+                        "id": str(image.id),
+                        "storage_key": image.storage_key,
+                        "mime_type": image.mime_type,
+                        "alt_text": image.alt_text,
+                        "width": image.width,
+                        "height": image.height,
+                    }
 
-        # Ensure updated_at is set (fallback for test environments)
-        updated_at = entity.updated_at or entity.created_at or datetime.utcnow()
-
+        # Build result from base
         result: Dict[str, Any] = {
-            "id": entity.id,
-            "project_id": entity.project_id,
-            "entity_type_id": entity.entity_type_id,
-            "group": entity.group,
-            "kind": kind,
-            "created_at": entity.created_at,
-            "updated_at": updated_at,
+            "id": uuid.UUID(base["id"]),
+            "project_id": uuid.UUID(base["project_id"]),
+            "entity_type_id": uuid.UUID(base["entity_type_id"]),
+            "group": base["group"],
+            "kind": base["kind"],
+            "created_at": base["created_at"],
+            "updated_at": base["updated_at"],
             "image": None,
         }
 
-        if image and image.status == 'ready':
-            # Generate presigned download URL
+        # Add image URL if requested and image metadata exists
+        if resolve_image and base.get("image"):
             download_url = await self.storage_provider.create_presigned_download_url(
-                storage_key=image.storage_key,
+                storage_key=base["image"]["storage_key"],
                 expires_in_seconds=3600,
             )
             result["image"] = {
-                "id": image.id,
+                "id": uuid.UUID(base["image"]["id"]),
                 "url": download_url,
-                "mime_type": image.mime_type,
-                "alt_text": image.alt_text,
-                "width": image.width,
-                "height": image.height,
+                "mime_type": base["image"]["mime_type"],
+                "alt_text": base["image"]["alt_text"],
+                "width": base["image"]["width"],
+                "height": base["image"]["height"],
+            }
+        elif base.get("image"):
+            # Image metadata without URL
+            result["image"] = {
+                "id": uuid.UUID(base["image"]["id"]),
+                "url": None,
+                "mime_type": base["image"]["mime_type"],
+                "alt_text": base["image"]["alt_text"],
+                "width": base["image"]["width"],
+                "height": base["image"]["height"],
             }
 
         # Get parameters (uses cache)
@@ -151,19 +186,19 @@ class EntityService:
         ]
 
         # Get slots for recipe entities
-        if kind == "recipe":
-            slots = self.slot_repository.list_by_recipe_entity(entity_id)
-            result["slots"] = [
-                {
-                    "id": str(slot.id),
-                    "kind": slot.kind,
-                    "sort_order": slot.sort_order,
-                }
-                for slot in slots
-            ]
-
-        # Cache the flat structure with separate key
-        cache[flat_key] = result
+        if base["kind"] == "recipe":
+            slots = get_entity_slots(entity_id)
+            if slots is None:
+                slots = self.slot_repository.list_by_recipe_entity(entity_id)
+                set_entity_slots(entity_id, [
+                    {
+                        "id": str(slot.id),
+                        "kind": slot.kind,
+                        "sort_order": slot.sort_order,
+                    }
+                    for slot in slots
+                ])
+            result["slots"] = slots
 
         return result
 
@@ -240,11 +275,7 @@ class EntityService:
         if values_provided != 1:
             raise ValueError("Exactly one value must be provided")
 
-        # Invalidate cache for this entity
-        cache = get_entity_cache()
-        entity_id_str = str(entity_id)
-        cache.pop(f"flat:{entity_id_str}", None)
-        cache.pop(f"params:{entity_id_str}", None)
+        # Invalidate cache for this entity (all 3 keys)
         invalidate_entity(entity_id)
 
         return self.entity_parameter_repository.create(
@@ -260,39 +291,28 @@ class EntityService:
         # Get the parameter first to find the entity_id
         param = self.entity_parameter_repository.get_by_id(parameter_id)
         if param:
-            # Invalidate cache for this entity
-            cache = get_entity_cache()
-            entity_id_str = str(param.entity_id)
-            cache.pop(f"flat:{entity_id_str}", None)
-            cache.pop(f"params:{entity_id_str}", None)
+            # Invalidate cache for this entity (all 3 keys)
             invalidate_entity(param.entity_id)
-        
+
         return self.entity_parameter_repository.delete(parameter_id)
 
     def get_basic_entity(self, entity_id: uuid.UUID) -> Optional[Entity]:
         """Get the basic Entity object with caching. Returns None if not found."""
-        # Try cache first
-        cached = get_entity_with_data(entity_id)
+        cached = get_entity_base(entity_id)
         if cached:
-            # Reconstruct Entity from cached data
             return Entity(
                 id=uuid.UUID(cached["id"]),
                 project_id=uuid.UUID(cached["project_id"]),
                 entity_type_id=uuid.UUID(cached["entity_type_id"]),
                 group=cached["group"],
-                created_at=cached["created_at"],
-                updated_at=cached["updated_at"],
+                created_at=cached.get("created_at"),
+                updated_at=cached.get("updated_at"),
             )
-        
-        # Cache miss: query from DB
         return self.entity_repository.get_by_id(entity_id)
 
     def get_entity_parameters(self, entity_id: uuid.UUID) -> List[EntityParameter]:
-        # Use a separate cache key for parameters to avoid conflicts
-        cache = get_entity_cache()
-        params_key = f"params:{entity_id}"
-        cached_params = cache.get(params_key)
-        if cached_params:
+        cached = get_entity_params(entity_id)
+        if cached is not None:
             return [
                 EntityParameter(
                     id=uuid.UUID(p["id"]),
@@ -305,14 +325,14 @@ class EntityService:
                     created_at=p["created_at"],
                     updated_at=p["updated_at"],
                 )
-                for p in cached_params
+                for p in cached
             ]
-        
+
         # Cache miss: query from DB
         params = self.entity_parameter_repository.list_by_entity(entity_id)
-        
-        # Cache the parameters with datetime fields
-        cache[params_key] = [
+
+        # Cache the parameters
+        set_entity_params(entity_id, [
             {
                 "id": str(p.id),
                 "entity_id": str(p.entity_id),
@@ -325,8 +345,8 @@ class EntityService:
                 "updated_at": p.updated_at,
             }
             for p in params
-        ]
-        
+        ])
+
         return params
 
     def get_distinct_parameter_values(

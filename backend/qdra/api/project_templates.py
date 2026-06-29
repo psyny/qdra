@@ -591,9 +591,7 @@ def update_entity_type(
     data: EntityTypeUpdate,
     db: Session = Depends(get_db),
 ):
-    from qdra.infrastructure.cache.entity_cache import clear_all_entity_caches
-    from qdra.infrastructure.cache.cache_service import CacheService
-    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.entity_cache import clear_all_entity_related_caches
     
     repo = ProjectTemplateRepository(db)
     et = repo.update_entity_type(
@@ -607,11 +605,7 @@ def update_entity_type(
     
     # Invalidate all entity caches since entity_type data changed
     # (entity type changes are rare, so clearing all is acceptable)
-    if settings.l1_caching:
-        clear_all_entity_caches()
-    if settings.l2_caching:
-        cache_service = CacheService()
-        cache_service.delete_pattern("entity:")
+    clear_all_entity_related_caches()
     
     # Return with parameter definitions
     param_defs = repo.list_parameter_definitions_by_entity_type(entity_type_id)
@@ -629,9 +623,7 @@ def delete_entity_type(
     entity_type_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    from qdra.infrastructure.cache.entity_cache import clear_all_entity_caches
-    from qdra.infrastructure.cache.cache_service import CacheService
-    from qdra.infrastructure.config.settings import settings
+    from qdra.infrastructure.cache.entity_cache import clear_all_entity_related_caches
     
     repo = ProjectTemplateRepository(db)
     # Check if entity type is used by runtime entities
@@ -644,11 +636,7 @@ def delete_entity_type(
         raise HTTPException(status_code=404, detail="Entity type not found")
     
     # Invalidate all entity caches since entity_type was deleted
-    if settings.l1_caching:
-        clear_all_entity_caches()
-    if settings.l2_caching:
-        cache_service = CacheService()
-        cache_service.delete_pattern("entity:")
+    clear_all_entity_related_caches()
 
 
 # Parameter definitions
