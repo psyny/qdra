@@ -35,15 +35,29 @@ def clear_all_caches():
 
 
 def get_cached_data(key: str):
-    """Get data from L1 cache (material_recipes_cache as default)."""
-    cache = get_material_recipes_cache()
-    return cache.get(key)
+    """Get data from L1 cache then L2 cache (material_recipes_cache as default)."""
+    if settings.l1_caching:
+        cache = get_material_recipes_cache()
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+    if settings.l2_caching:
+        cache_service = get_cache_service()
+        cached = cache_service.get(key)
+        if cached is not None:
+            return cached
+    return None
 
 
 def set_cached_data(key: str, value: Any, ttl: int = None):
-    """Set data in L1 cache (material_recipes_cache as default)."""
-    cache = get_material_recipes_cache()
-    cache[key] = value
+    """Set data in L1 cache and L2 cache (material_recipes_cache as default)."""
+    if settings.l1_caching:
+        cache = get_material_recipes_cache()
+        cache[key] = value
+    if settings.l2_caching:
+        cache_service = get_cache_service()
+        cache_ttl = ttl if ttl is not None else settings.cache_relationship_ttl
+        cache_service.set(key, value, cache_ttl)
 
 
 def clear_pattern(project_id: str):
@@ -53,3 +67,4 @@ def clear_pattern(project_id: str):
         cache_service.delete_pattern(f"material_recipes:{project_id}:*")
         cache_service.delete_pattern(f"recipe_materials:{project_id}:*")
         cache_service.delete_pattern(f"constraint_resolution:*:{project_id}:*")
+        cache_service.delete_pattern(f"param_values:{project_id}:*")

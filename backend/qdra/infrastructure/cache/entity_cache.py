@@ -49,21 +49,15 @@ def get_entity_base(entity_id: uuid.UUID) -> Optional[Dict]:
     Returns dict with: id, project_id, entity_type_id, group, kind,
     created_at, updated_at, image (metadata only, no url).
     """
-    print(f"[DEBUG] get_entity_base({entity_id}): L1 enabled={settings.l1_caching}, L2 enabled={settings.l2_caching}")
     key = str(entity_id)
     if settings.l1_caching:
         cached = get_entity_cache().get(f"entity:{key}")
         if cached is not None:
-            print(f"[DEBUG] get_entity_base({entity_id}): L1 cache HIT")
             return cached
-        print(f"[DEBUG] get_entity_base({entity_id}): L1 cache MISS")
     if settings.l2_caching:
         cached = get_cache_service().get(f"entity:{key}")
         if cached is not None:
-            print(f"[DEBUG] get_entity_base({entity_id}): L2 cache HIT")
             return cached
-        print(f"[DEBUG] get_entity_base({entity_id}): L2 cache MISS")
-    print(f"[DEBUG] get_entity_base({entity_id}): NO cache hit")
     return None
 
 
