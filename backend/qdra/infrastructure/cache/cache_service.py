@@ -52,3 +52,15 @@ class CacheService:
             return bool(self.redis_client.exists(key))
         except Exception:
             return False
+
+
+# Singleton instance
+_cache_service_instance = None
+
+
+def get_cache_service() -> CacheService:
+    """Get the singleton cache service instance."""
+    global _cache_service_instance
+    if _cache_service_instance is None:
+        _cache_service_instance = CacheService()
+    return _cache_service_instance

@@ -15,9 +15,8 @@ from repositories.entity_parameter_repository import EntityParameterRepository
 from repositories.parameter_constraint_repository import ParameterConstraintRepository
 from infrastructure.cache.cache_service import CacheService
 from infrastructure.cache.relationship_cache import (
-    get_material_recipes_cache,
-    get_recipe_materials_cache,
-    get_cache_service,
+    get_cached_data,
+    set_cached_data,
 )
 
 from services.entity_service import EntityService
@@ -204,19 +203,11 @@ class RecipeEvaluationService:
         each containing a list of slots with their matching material IDs.
         """
         cache_key = f"recipe_materials:{project_id}:{recipe_id}"
-        l1_cache = get_recipe_materials_cache()
-        cache_service = get_cache_service()
-        
-        # L1: Check local cache if enabled
-        if self.settings.l1_caching and cache_key in l1_cache:
-            return l1_cache[cache_key]
         
         # L2: Check Redis cache if enabled
         if self.settings.l2_caching:
-            cached = cache_service.get(cache_key)
+            cached = get_cached_data(cache_key)
             if cached:
-                if self.settings.l1_caching:
-                    l1_cache[cache_key] = cached
                 return cached
         
         # Compute result
@@ -279,10 +270,8 @@ class RecipeEvaluationService:
                 result["requires"].append(slot_data)
 
         # Cache result if enabled
-        if self.settings.l1_caching:
-            l1_cache[cache_key] = result
         if self.settings.l2_caching:
-            cache_service.set(cache_key, result, self.settings.cache_relationship_ttl)
+            set_cached_data(cache_key, result, self.settings.cache_relationship_ttl)
         
         return result
 
@@ -294,19 +283,11 @@ class RecipeEvaluationService:
         each containing a list of recipes with their matching slots.
         """
         cache_key = f"material_recipes:{project_id}:{material_id}"
-        l1_cache = get_material_recipes_cache()
-        cache_service = get_cache_service()
-        
-        # L1: Check local cache if enabled
-        if self.settings.l1_caching and cache_key in l1_cache:
-            return l1_cache[cache_key]
         
         # L2: Check Redis cache if enabled
         if self.settings.l2_caching:
-            cached = cache_service.get(cache_key)
+            cached = get_cached_data(cache_key)
             if cached:
-                if self.settings.l1_caching:
-                    l1_cache[cache_key] = cached
                 return cached
         
         # Compute result
@@ -368,9 +349,7 @@ class RecipeEvaluationService:
                     result["requires"].append(recipe_matches.copy())
         
         # Cache result if enabled
-        if self.settings.l1_caching:
-            l1_cache[cache_key] = result
         if self.settings.l2_caching:
-            cache_service.set(cache_key, result, self.settings.cache_relationship_ttl)
+            set_cached_data(cache_key, result, self.settings.cache_relationship_ttl)
         
         return result

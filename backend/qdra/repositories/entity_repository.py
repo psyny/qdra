@@ -6,7 +6,7 @@ from models.entity import Entity
 from models.project_template import ProjectTemplateEntityType
 from models.image_asset import ImageAsset
 from models.entity_parameter import EntityParameter
-from infrastructure.cache.entity_cache import get_entity_with_data, set_entity_with_data
+from infrastructure.cache.entity_cache import get_entity_base, set_entity_base
 from infrastructure.config.settings import settings
 
 
@@ -37,16 +37,12 @@ class EntityRepository:
 
     def get_by_id(self, entity_id: uuid.UUID) -> Optional[Entity]:
         from datetime import datetime
-        
-        # Try cache first
-        cached = get_entity_with_data(entity_id)
+
+        # Try cache first (flat structure: entity + kind + image metadata)
+        cached = get_entity_base(entity_id)
         if cached:
-            entity_data = cached.get("entity")
-            if entity_data:
-                entity = self._deserialize_entity(entity_data)
-                if entity:
-                    return entity
-        
+            return self._deserialize_entity(cached)
+
         # Query database
         entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
         if entity:
@@ -54,44 +50,34 @@ class EntityRepository:
             if entity.updated_at is None:
                 entity.updated_at = entity.created_at or datetime.utcnow()
                 self.db.commit()
-            
-            # Fetch entity_type and image for caching
+
+            # Fetch entity_type and image metadata for caching
             entity_type = self.db.query(ProjectTemplateEntityType).filter(
                 ProjectTemplateEntityType.id == entity.entity_type_id
             ).first()
-            
+
             image = self.db.query(ImageAsset).filter(
                 ImageAsset.entity_id == entity_id,
                 ImageAsset.status == 'ready'
             ).first()
-            
-            # Fetch parameters for caching
-            parameters = self.db.query(EntityParameter).filter(
-                EntityParameter.entity_id == entity_id
-            ).all()
-            
-            # Cache the entity with entity_type, image, and parameters
+
+            # Cache the base entity with kind and image metadata (no parameters, no slots)
             data = {
-                "entity": self._serialize_entity(entity),
-                "entity_type": self._serialize_entity_type(entity_type) if entity_type else None,
+                "id": str(entity.id),
+                "project_id": str(entity.project_id),
+                "entity_type_id": str(entity.entity_type_id),
+                "group": entity.group,
+                "kind": entity_type.kind if entity_type else "unknown",
+                "created_at": entity.created_at.isoformat() if entity.created_at else None,
+                "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
                 "image": self._serialize_image(image) if image else None,
-                "parameters": self._serialize_parameters(parameters),
-                "slots": [],
             }
-            set_entity_with_data(entity_id, data)
-        
+            set_entity_base(entity_id, data)
+
         return entity
-    
-    def _serialize_entity_type(self, entity_type: ProjectTemplateEntityType) -> dict:
-        """Serialize entity_type for cache storage."""
-        return {
-            "id": str(entity_type.id),
-            "name": entity_type.name,
-            "kind": entity_type.kind,
-        }
-    
+
     def _serialize_image(self, image: ImageAsset) -> dict:
-        """Serialize image for cache storage."""
+        """Serialize image metadata for cache storage (no URL)."""
         return {
             "id": str(image.id),
             "storage_key": image.storage_key,
@@ -100,37 +86,9 @@ class EntityRepository:
             "height": image.height,
             "alt_text": image.alt_text,
         }
-    
-    def _serialize_parameters(self, parameters: List[EntityParameter]) -> List[dict]:
-        """Serialize parameters for cache storage."""
-        return [
-            {
-                "id": str(p.id),
-                "entity_id": str(p.entity_id),
-                "domain": p.domain,
-                "key": p.key,
-                "value_string": p.value_string,
-                "value_number": p.value_number,
-                "value_boolean": p.value_boolean,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-                "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-            }
-            for p in parameters
-        ]
-    
-    def _serialize_entity(self, entity: Entity) -> dict:
-        """Serialize entity for Redis storage."""
-        return {
-            "id": str(entity.id),
-            "project_id": str(entity.project_id),
-            "entity_type_id": str(entity.entity_type_id),
-            "group": entity.group,
-            "created_at": entity.created_at.isoformat() if entity.created_at else None,
-            "updated_at": entity.updated_at.isoformat() if entity.updated_at else None,
-        }
-    
+
     def _deserialize_entity(self, data: dict) -> Optional[Entity]:
-        """Deserialize entity from Redis storage."""
+        """Deserialize entity from cache storage (flat structure)."""
         try:
             return Entity(
                 id=uuid.UUID(data["id"]),

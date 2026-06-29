@@ -36,7 +36,7 @@ class ConstraintResolutionService:
         # Create cache key from constraints
         cache_key = self._make_cache_key("materials", project_id, constraints)
 
-        # Check cache (L1 then L2)
+        # Check cache (L2 only)
         cached = get_constraint_resolution(cache_key)
         if cached is not None:
             return cached
@@ -70,7 +70,7 @@ class ConstraintResolutionService:
         # Create cache key from constraints
         cache_key = self._make_cache_key("recipes", project_id, constraints)
 
-        # Check cache (L1 then L2)
+        # Check cache (L2 only)
         cached = get_constraint_resolution(cache_key)
         if cached is not None:
             return cached
@@ -353,7 +353,7 @@ class ConstraintResolutionService:
         return f"constraint_resolution:{entity_type}:{project_id}:{hash_str}"
 
     def clear_cache(self):
-        """Clear the L1 cache."""
+        """Clear the cache (now L2 only)."""
         # This is now handled by the constraint_cache module
         pass
 

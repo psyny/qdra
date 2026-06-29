@@ -447,12 +447,11 @@ def get_values_for_parameter(
     key = request.key
     groups = request.groups
 
-    # Check cache first
+    # Check cache first (L1 then L2)
     cache_key = f"param_values:{project_id}:{domain}:{key}:{','.join(sorted(groups))}"
-    if settings.l1_caching:
-        cached = get_cached_data(cache_key)
-        if cached is not None:
-            return cached
+    cached = get_cached_data(cache_key)
+    if cached is not None:
+        return cached
 
     service = EntityService(db)
     constraint_service = ConstraintResolutionService(db)
@@ -503,9 +502,8 @@ def get_values_for_parameter(
 
         result = sorted(list(all_values))
 
-        # Cache the result
-        if settings.l1_caching:
-            set_cached_data(cache_key, result)
+        # Cache the result (L1 and L2)
+        set_cached_data(cache_key, result)
 
         return result
     except ValueError as e:
