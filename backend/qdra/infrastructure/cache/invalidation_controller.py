@@ -7,7 +7,7 @@ import uuid
 from typing import List
 
 from qdra.infrastructure.config.settings import settings
-from qdra.infrastructure.cache.relationship_cache import clear_all_caches, clear_pattern
+from qdra.infrastructure.cache.relationship_cache import clear_pattern
 from qdra.infrastructure.cache.entity_cache import invalidate_entity
 from qdra.infrastructure.cache.permission_cache import (
     invalidate_app_permissions,
@@ -15,7 +15,6 @@ from qdra.infrastructure.cache.permission_cache import (
     invalidate_all_user_permissions,
 )
 from qdra.infrastructure.cache.constraint_cache import (
-    clear_all_constraint_caches,
     invalidate_constraint_resolution,
 )
 
@@ -28,9 +27,8 @@ def entities_added(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None:
     """Invalidate caches when entities are created (Case #1).
     
     This invalidates:
-    - Material↔Recipe Relationship Caches (L1 + L2)
-    - Constraint Resolution Cache (L1 + L2)
-    - Parameter value autocomplete cache (L1, via clear_all_caches)
+    - Material↔Recipe Relationship Caches (L2)
+    - Constraint Resolution Cache (L2)
     
     Note: Does NOT invalidate entity cache (new entities aren't cached yet).
     
@@ -38,9 +36,6 @@ def entities_added(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None:
         entity_ids: List of entity IDs that were created
         project_id: Project ID where entities were created
     """
-    if settings.l1_caching:
-        clear_all_caches()
-        clear_all_constraint_caches()
     if settings.l2_caching:
         clear_pattern(str(project_id))
 
@@ -60,9 +55,6 @@ def entities_changed(entity_ids: List[uuid.UUID], project_id: uuid.UUID) -> None
         project_id: Project ID where entities were changed
     """
     # Invalidate relationship and constraint caches
-    if settings.l1_caching:
-        clear_all_caches()
-        clear_all_constraint_caches()
     if settings.l2_caching:
         clear_pattern(str(project_id))
     
